@@ -78,6 +78,14 @@ header #nightBtn[aria-pressed=true]{background:#fff;color:var(--hdr)}
   header .xl{display:none}header .xs{display:inline!important}
 }
 header .xs{display:none}
+/* the header's second row: search, Explain radio terms and every button, on one line on a desktop (owner 11-14) */
+header .hrow1{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;min-width:0}
+@media (min-width:901px){header .hrow1{flex-wrap:nowrap}header .hrow1>*{flex-shrink:0}
+  header .hrow1 #net{display:block;flex-shrink:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}}
+header .hrow{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+@media (min-width:901px){header .hrow{flex-wrap:nowrap}header .hrow>*{flex-shrink:0}
+  header .hrow .hsearch{flex:0 1 260px;min-width:130px}header .hrow #q{width:auto;flex:1;min-width:0}}
+@media (min-width:901px) and (max-width:1279px){header .xl{display:none}header .xs{display:inline!important}}
 .logbox>h2{margin-bottom:6px}.guide .empty{margin:0}
 /* the top of each column: one tab set (Radio | Coach | Stations heard). All three panes share one
    grid cell; the radio card sets its height, the others scroll inside it, so the conversation below never jumps. */
@@ -508,11 +516,14 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
 <body>
 <div id="alert"></div>
 <header>
+  <div class="hrow1">
   <h1 id="me">HAM Sidekick Station</h1>
   <div class="net" id="net"></div>
   <span id="nettype" class="badge">Net type: listening…</span>
   <span class="clock" id="clock"></span>
   <span id="conn" class="muted">connecting…</span> <span class="small" id="engine" aria-live="polite"></span>
+  </div>
+  <div class="hrow">
   <form id="searchForm" class="hsearch" role="search"><input id="q" type="search" placeholder="Search everything" aria-label="Search every transmission, callsign, net and the minutes" autocomplete="off"> <button>Search</button></form>
   <label class="small" title="Explain Q-codes, prowords and abbreviations (Roger, QSO, QSY…) under each transmission"><input type="checkbox" id="explain" checked style="width:auto"> <span class="xl">Explain radio terms</span><span class="xs">Explain terms</span></label>
   <button id="openNets" title="Schedule, history, who takes part, minutes and what is still open">Nets</button>
@@ -523,6 +534,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <button id="openReadout" title="The EOC's situation report: approve it, then read it on the net from a large-type card" onclick="window.open('/readout','_blank')">Read-out</button>
   <button id="nightBtn" aria-pressed="false" title="Night colours: all red on black, to keep your night vision (again for normal colours)" onclick="setDisplay('theme',DISP.theme==='night'?(DISP.prevTheme||'auto'):(DISP.prevTheme=DISP.theme,'night'))">☾ Night</button>
   <a class="helpbtn" href="/help" target="_blank" rel="noopener" title="How to use the station: the reference cards (the station, Sidekick, recording a conversation; printable)">Help</a>
+  </div>
 </header>
 <nav id="today" class="today" aria-label="Nets today"></nav>
 <div id="alerts" aria-live="polite"></div>
