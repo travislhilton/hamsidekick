@@ -59,18 +59,38 @@ def addresses(host_header: str | None, port: int, ips: list[str] | None = None) 
     return uniq
 
 
-def qr_svg(text: str) -> str:
+def qr_svg(text: str, error: str = "m") -> str:
     import segno
-    return segno.make(text, error="m").svg_inline(scale=5, border=2, dark="#000", light="#fff", omitsize=True)
+    return segno.make(text, error=error).svg_inline(scale=5, border=2, dark="#000", light="#fff", omitsize=True)
 
 
 REPO_URL = "https://github.com/travislhilton/hamsidekick"   # the public project page (Code → Download ZIP)
 
 
+def card_pdf_url(name: str) -> str:
+    """A reference card's own PDF on GitHub (its "Share this card" QR code): GitHub's page for the file shows the PDF."""
+    return f"{REPO_URL}/blob/master/docs/{name}.pdf"
+
+
+def _share_qr(html: str) -> str:
+    """<!--CARD_QR:<pdf name>--> -> the QR code of that card's PDF on GitHub (owner 11-14: every card has a QR code
+    back to itself, so it can be shared fast)."""
+    import re
+
+    def qr(m):
+        try:
+            return qr_svg(card_pdf_url(m.group(1)), error="l")     # fewer, larger squares: it is printed small
+        except ImportError:
+            return ""
+    return re.sub(r"<!--CARD_QR:(\w+)-->", qr, html)
+
+
 def card_with_download(html: str, url: str | None = REPO_URL) -> str:
     """The reference card with the download link and its QR code: config/station.yaml `download_url` when set
-    (a club's own copy), else the public project page. `download_url: ""` prints "ask the instructor" instead."""
+    (a club's own copy), else the public project page. `download_url: ""` prints "ask the instructor" instead.
+    Each card's "Share this card" QR code (its own PDF on GitHub) is filled in too."""
     import html as h
+    html = _share_qr(html)
     if url is None:
         url = REPO_URL
     if url:

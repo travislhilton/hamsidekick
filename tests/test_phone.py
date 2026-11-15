@@ -28,3 +28,15 @@ def test_card_download_link_from_config():
     assert phone.REPO_URL in phone.card_with_download(html, None)           # not set: the public project page
     assert phone.REPO_URL.startswith("https://github.com/") and phone.REPO_URL.endswith("/hamsidekick")
     assert "Ask the instructor" in phone.card_with_download(html, "")       # "" = no link on the card
+
+
+def test_every_card_has_a_share_qr_to_its_own_pdf_on_github():
+    """Owner 2026-11-14: every reference card has a QR code back to itself on GitHub, so it can be shared fast."""
+    from tools import build_ref_card
+    for src, name in build_ref_card.CARDS:
+        html = src.read_text(encoding="utf-8")
+        assert html.count("<!--CARD_QR:") == 1 and f"<!--CARD_QR:{name}-->" in html, src.name
+        out = phone.card_with_download(html, None)
+        assert "CARD_QR" not in out and out.count("<svg") >= 1
+        assert (build_ref_card.OUT / f"{name}.pdf").exists()
+    assert phone.card_pdf_url("X") == phone.REPO_URL + "/blob/master/docs/X.pdf"
