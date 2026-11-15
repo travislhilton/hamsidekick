@@ -290,6 +290,16 @@ you chose is remembered. Each column shows:
   **Move to Not heard** / **Keep it**. **Find nets** lists a found net that matches a Not heard one (same frequency and
   start, or same name) apart, under "not heard here", and adds it only with **Add anyway** (it then leaves Not heard).
   Kept in `data/nets_unheard.json`.
+- **VARA chat and files** (owner 2026-11-15): set a radio to **Winlink only**, then **VARA chat** on its card. Open the
+  VARA HF or VARA FM modem as you do for Winlink Express (ports 8300 / 8301 by default), then **Switch VARA on**.
+  Type a callsign and **Connect** (VARA FM can go via a digipeater), or **Call CQ**; tick **Answer calls while I am
+  here** to accept calls. Type and press Enter to chat; **File** sends a file (up to 5 MB, checked on arrival).
+  It transmits only when the radio's Transmit switch is on (Radios…), you are at the dashboard, and your license class
+  (Settings → Station agent) has data privileges on the radio's frequency; the window says why when it will not.
+  **Abort** drops the link at once. To use Winlink Express, click **Hand VARA to Winlink Express**, and **Take VARA
+  back** after closing it. Files received are in the list below the chat as downloads (data/vara/inbox); open them
+  only if you expected them. Chat with another HAM Sidekick Station gets files too; with any other VARA keyboard
+  program you get plain chat.
 - **Plans** (Nets → Plans, owner 2026-11-15): the **band plan** is built in (your privileges for phone, data and CW
   by license class, set in Settings → Station agent, and what the ARRL band plan sets each segment aside for) and
   works with no internet. **Find local plans** searches for the clubs and EMCOMM groups within the distance you set,

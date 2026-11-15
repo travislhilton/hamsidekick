@@ -168,6 +168,24 @@ def make_handler(station):
                 return self._json(station.local_names())
             if u.path == "/api/netfind":                         # Nets -> Find nets (netfind.py)
                 return self._json(_finder(station).state())
+            if u.path == "/api/vara":                            # VARA keyboard chat / files (varalink.py)
+                return self._json(station.vara.view())
+            vin = re.fullmatch(r"/api/vara/inbox/([^/]+)", u.path)
+            if vin:                                              # a received file: a download, never opened here
+                from urllib.parse import unquote
+                p = station.vara.inbox_file(unquote(vin.group(1)))
+                if not p:
+                    return self._json({"error": "not found"}, 404)
+                data = p.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Disposition", f'attachment; filename="{p.name}"')
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Content-Security-Policy", "sandbox")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if u.path == "/api/localplans":                      # Nets -> Plans (localplans.py)
                 return self._json(_plans(station).state())
             if u.path == "/api/bandplan":                        # the built-in band plan (bandplan.py)
@@ -274,7 +292,8 @@ def make_handler(station):
                       "/api/nets/assign", "/api/netfind/settings", "/api/netfind/search", "/api/netfind/add",
                       "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
-                      "/api/localplans/copies"}
+                      "/api/localplans/copies"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
+                      "listen", "cq", "chat", "file", "handoff", "takeback")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
             alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss)", u.path)        # pre-net alert
             item = re.fullmatch(r"/api/items(?:/(\d+)(/delete)?)?", u.path)                             # minutes items
@@ -289,7 +308,7 @@ def make_handler(station):
                 self.close_connection = True                   # its body is unread: never reuse the connection
                 return self._json({"error": "not found"}, 404)
             try:
-                cap = 28 * 1024 ** 2 if u.path in ("/api/agent/library", "/api/localplans/file") else 512 * 1024   # a file (base64)
+                cap = 28 * 1024 ** 2 if u.path in ("/api/agent/library", "/api/localplans/file", "/api/vara/file") else 512 * 1024   # a file (base64)
                 n = int(self.headers.get("Content-Length") or 0)
                 if n > cap:
                     self.close_connection = True
@@ -356,6 +375,11 @@ def make_handler(station):
                                                                          noise=bool(body.get("noise")))))
                     except LookupError:
                         return self._json({"error": "no such transmission"}, 404)
+                if u.path.startswith("/api/vara/"):              # VARA (varalink.py)
+                    what = u.path.rsplit("/", 1)[1]
+                    if what == "settings":
+                        return self._json(station.vara.settings(body))
+                    return self._json(station.vara.act(what, body))
                 if u.path.startswith("/api/localplans/"):        # Nets -> Plans (localplans.py)
                     lp, what = _plans(station), u.path.rsplit("/", 1)[1]
                     if what == "settings":

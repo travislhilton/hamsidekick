@@ -268,6 +268,16 @@ class Station:
         threading.Thread(target=self.accurate.run, args=(self.stop,), daemon=True, name="accurate").start()
         threading.Thread(target=self.summarizer.run, args=(self.stop,), daemon=True, name="summary").start()
         threading.Thread(target=self.costs.run, args=(self.stop,), daemon=True, name="aicost").start()
+        if self.vara.cfg()["enabled"]:                     # VARA keyboard chat / files (station/varalink.py)
+            threading.Thread(target=self.vara.restart, daemon=True, name="vara-start").start()
+
+    @property
+    def vara(self):
+        v = self.__dict__.get("_vara")
+        if v is None:
+            from .varalink import Link
+            v = self.__dict__["_vara"] = Link(self)
+        return v
 
     @property
     def costs(self):

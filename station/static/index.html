@@ -482,6 +482,9 @@ table.acc tr.grp td{color:var(--muted);font-size:11px;text-transform:uppercase;l
 table.costt{border-collapse:collapse;margin:6px 0;font-size:13px}table.costt td,table.costt th{padding:2px 10px 2px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere}
 a.btn{display:inline-block;padding:4px 10px;border:1px solid var(--line,#888);border-radius:6px;text-decoration:none;color:inherit;margin-right:6px}
 #pcSet ul{margin:4px 0 6px 18px;padding:0}#pcSet li.bad{color:#c0392b}#pcSet .fix{color:var(--muted)}
+.vlog{max-height:45vh;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:8px 0}
+.vmsg{margin:3px 0;overflow-wrap:anywhere}.vmsg.out b{color:var(--accent)}
+#varaDlg{width:min(720px,calc(100vw - 32px))}
 .st{white-space:nowrap;color:var(--muted)}button.st.perf{background:none;border:0;padding:0;margin:0;font:inherit;cursor:pointer;opacity:.75}button.st.perf.on{opacity:1;font-weight:600}.st.ok{color:var(--ok)}.st.warn{color:var(--warn)}.st.bad{color:var(--bad)}
 #settings .savebar{position:sticky;bottom:-16px;background:var(--panel);border-top:1px solid var(--line);margin:12px -16px -16px;padding:10px 16px;z-index:2}
 button:disabled{cursor:not-allowed}
@@ -582,6 +585,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <div class="row savebar"><button value="save" id="setSave" class="primary">Save</button> <button value="cancel" formnovalidate>Cancel</button> <span class="err" id="setErr"></span></div>
 </form></dialog>
 <dialog id="wl"><div id="wlBody"></div></dialog>
+<dialog id="varaDlg" aria-label="VARA keyboard chat and files"><div id="varaBody"></div></dialog>
 <dialog id="testDlg"><div id="testBody"></div></dialog>
 <dialog id="levelDlg"><div id="levelBody"></div></dialog>
 <dialog id="radiosDlg"><div id="radiosBody"></div></dialog>
@@ -1355,6 +1359,7 @@ function renderRadios(){
     el.querySelector(".rsetup").innerHTML=(r.antenna?`<span>Antenna <span class="rseg" role="group" aria-label="Antenna on ${esc(r.name)}">${seg("setant","hf","HF",r.antenna==="hf")}${seg("setant","vu","VHF/UHF",r.antenna==="vu")}</span></span>`:"")
       +`<span><button class="linkish small" data-rsearch="${esc(r.id)}" title="Search everything heard on ${esc(r.name)}: words, callsigns, names (press / anywhere for all radios)">Search this log</button></span>`
       +`<span>Used for <span class="rseg" role="group" aria-label="${esc(r.name)} is used for">${seg("setrole","nets","Nets",r.role!=="winlink")}${seg("setrole","winlink","Winlink only",r.role==="winlink")}</span></span>`
+      +(r.role==="winlink"?`<span><button class="small" data-varaopen="${esc(r.id)}" title="Keyboard chat and file transfer over VARA HF / FM, through the VARA modem on this PC">VARA chat${VA.d&&VA.d.state&&VA.d.state.session==="connected"&&VA.d.cfg.radio===r.id?` · with ${esc(VA.d.state.peer)}`:""}</button></span>`:"")
       +(r.scan&&!r.scan.can?`<span title="Scan HF for conversations between nets. A net always comes first.">Scan <span class="rseg" role="group" aria-label="Scan on ${esc(r.name)}">${seg("scanmode","off","Off",r.scan.mode==="off")}${seg("scanmode","on","On",r.scan.mode==="on")}${seg("scanmode","auto","Auto",r.scan.mode==="auto")}</span> <button class="linkish small" data-scanset="${esc(r.id)}" title="Antenna, bands and remembered frequencies">${esc((r.scan.antenna||{}).name||"Antenna")}…</button></span>`:"")
       +(r.role!=="winlink"&&AG&&(AG.settings||{}).enabled?`<span title="${esc(agName())}: Draft = shows what it would say, never transmits. Send = says it on the air after a 3 s countdown, only while you are at this PC (Esc stops it); offered when this radio's Transmit switch is on (Radios…).">${esc(agName())} <span class="rseg" role="group" aria-label="${esc(agName())} on ${esc(r.name)}">${seg("agmode","off","Off",agMode(r.id)==="off")}${seg("agmode","draft","Draft",agMode(r.id)==="draft")}${((AG||{}).tx_ready||{})[r.id]||agMode(r.id)==="send"?seg("agmode","send","Send",agMode(r.id)==="send"):""}</span></span>`:"");
     renderEcho(r.id);
@@ -1779,6 +1784,8 @@ function connect(){
   es.addEventListener("radios",e=>{const d=JSON.parse(e.data);S.radios=d.radios;S.net=d.net;renderRadios();renderNet()});
   es.addEventListener("m",e=>onMeter(JSON.parse(e.data)));
   es.addEventListener("engines",e=>renderEngine(JSON.parse(e.data)));
+  es.addEventListener("vara",e=>{const d=JSON.parse(e.data);if(!d.vara)return;const t=VA.d&&VA.d.transcript,ib=VA.d&&VA.d.inbox;VA.d=Object.assign(d.vara,{transcript:t,inbox:ib});
+    if($("varaDlg").open){if(["chat","chat_sent","file_received","file_sent","file_failed","connected","disconnected","abort","cq_heard","listen_off"].includes(d.event))api("/api/vara").then(x=>{VA.d=x;if(d.event==="listen_off"&&x.last)VA.msg={bad:true,text:"Stopped listening: "+(x.last.why||"")};renderVara()}).catch(()=>{});else renderVara()}renderRadios()});
   es.addEventListener("pc",e=>{const d=JSON.parse(e.data);S.pc=Object.assign(S.pc||{},"slow" in d?{slow:d.slow}:{},d.awake?{awake:d.awake}:{});renderPCNote();renderEngine();if($("settings").open&&d.checks)renderPC(d)});
   es.addEventListener("schedule",e=>{const d=JSON.parse(e.data);S.schedule=d.schedule;S.net=d.net;if(d.unheard)S.unheard=d.unheard;renderRadios();renderNet();if($("netsDlg").open&&NV.tab==="schedule")renderSchedule(false)});
   es.addEventListener("alerts",e=>{S.alerts=JSON.parse(e.data).alerts;renderAlerts()});
@@ -1839,6 +1846,54 @@ function renderNetsArea(){
   $("netPick").parentElement.style.visibility=NV.tab==="schedule"&&!NV.radio?"hidden":"";
   ({schedule:renderSchedule,history:renderHistory,analysis:renderAnalysis,minutes:renderMinutes,open:renderOpen,plans:renderPlans})[NV.tab](true);
 }
+// ----- VARA keyboard chat and files (station/varalink.py, station/vara.py) -----
+const VA={d:null,msg:null,rid:null};
+async function varaOpen(rid){VA.rid=rid;VA.msg=null;try{VA.d=await api("/api/vara")}catch(e){VA.msg={bad:true,text:e.message}}renderVara();if(!$("varaDlg").open)$("varaDlg").showModal()}
+function renderVara(){
+  const box=$("varaBody"),d=VA.d;if(!box)return;if(!d){box.innerHTML=`<p class="bad">${esc(VA.msg?VA.msg.text:"VARA is not available")}</p><div class="row"><button onclick="$('varaDlg').close()">Close</button></div>`;return}
+  const c=d.cfg,st=d.state||{},on=c.enabled&&!c.handed_off,conn=st.session==="connected",ok=d.tx_ok;
+  const link=!on?(c.handed_off?"With Winlink Express":"Off"):st.link==="up"?(conn?`Connected to <b>${esc(st.peer)}</b>${st.peer_proto==="raw"?' <span class="muted">(plain terminal: chat only)</span>':""}${st.bw?` · ${st.bw} Hz`:""}`:st.session==="connecting"?`Calling ${esc(st.peer)}…`:st.listening?"Listening for calls":"Ready (not listening)"):`<span class="warnc">VARA is not answering on ${esc(c.host)}:${c.cmd_port}: is the VARA ${c.kind.toUpperCase()} modem open?</span>`;
+  const msgs=(d.transcript||[]).slice(-80).map(x=>{const who=x.dir==="out"?"You":esc(x.peer||st.peer||"");
+    if(x.kind==="chat")return `<div class="vmsg ${x.dir}"><b>${who}</b> ${esc(x.text||"")}</div>`;
+    if(x.kind==="file")return `<div class="vmsg ${x.dir}"><b>${who}</b> 📎 ${esc(x.name||"")} <span class="muted">${x.size?Math.round(x.size/1024)+" KB":""}${x.ok===false?" · failed: "+esc(x.why||""):""}</span></div>`;
+    return `<div class="vmsg sys muted small">${esc(String(x.at||"").slice(11,16))} ${esc(x.kind)}${x.peer?" "+esc(x.peer):""}${x.why?" · "+esc(x.why):""}</div>`}).join("");
+  const sending=st.sending?`<p class="small">Sending ${esc(st.sending.name)}: <progress max="${st.sending.size}" value="${st.sending.size-(st.sending.left||0)}"></progress></p>`:"";
+  const heard=(st.cq_heard||[]).length?`<p class="small">CQs heard: ${st.cq_heard.slice(-8).reverse().map(h=>`<button class="linkish small" data-vcall="${esc(h.call)}">${esc(h.call)}</button>`).join(" · ")}</p>`:"";
+  const inbox=(d.inbox||[]).length?`<details class="small"><summary>Files received (${d.inbox.length})</summary><ul>${d.inbox.map(f=>`<li><a href="/api/vara/inbox/${enc(f.name)}">${esc(f.name)}</a> <span class="muted">${Math.round(f.bytes/1024)} KB · a download only, never opened here</span></li>`).join("")}</ul></details>`:"";
+  box.innerHTML=`<h3>VARA chat and files</h3>
+   <div class="row nfrow small"><label>Modem <select data-vset="kind"><option value="hf"${c.kind==="hf"?" selected":""}>VARA HF</option><option value="fm"${c.kind==="fm"?" selected":""}>VARA FM</option></select></label>
+     ${c.kind==="hf"?`<label>Bandwidth <select data-vset="bw"><option value=""${!c.bw?" selected":""}>VARA's setting</option>${[500,2300,2750].map(b=>`<option value="${b}"${c.bw===b?" selected":""}>${b} Hz</option>`).join("")}</select></label>`:""}
+     <label>Ports <input data-vset="cmd_port" value="${c.cmd_port}" style="width:5em" inputmode="numeric"> / <input data-vset="data_port" value="${c.data_port}" style="width:5em" inputmode="numeric"></label>
+     ${c.handed_off?`<button data-vact="takeback">Take VARA back</button>`:c.enabled?`<button data-vact="handoff" title="Let go of VARA so Winlink Express can use it">Hand VARA to Winlink Express</button> <button class="quiet" data-voff>Switch off</button>`:`<button class="primary" data-von>Switch VARA on</button>`}</div>
+   <p>${link}${st.sn!=null&&conn?` <span class="muted small">S/N ${esc(String(st.sn))} dB</span>`:""}${st.ptt?' <span class="badge emergency">ON AIR</span>':""}${st.busy?' <span class="badge">channel busy</span>':""}</p>
+   ${on?`<p class="small ${ok?"ok":"warnc"}">${ok?"Transmitting allowed: your Transmit switch is on, you are here, and your license allows data here.":"Not transmitting: "+esc(d.tx_why)}</p>`:""}
+   ${d.express_running&&!c.handed_off?'<p class="small warnc">Winlink Express is open: this station leaves VARA alone until it closes.</p>':""}
+   ${VA.msg?`<p class="${VA.msg.bad?"bad":"ok"}">${esc(VA.msg.text)}</p>`:""}
+   ${on?`<div class="row nfrow">${conn?`<button data-vact="disconnect">Disconnect</button>`:`<input id="vCall" placeholder="Callsign" autocomplete="off" style="width:8em;text-transform:uppercase">${c.kind==="fm"?'<input id="vVia" placeholder="via (digipeater)" style="width:9em;text-transform:uppercase">':""}<button class="primary" data-vact="connect"${ok?"":" disabled"}>Connect</button><button data-vact="cq"${ok?"":" disabled"}>Call CQ</button><label class="small"><input type="checkbox" data-vlisten${st.listening?" checked":""}${ok||st.listening?"":" disabled"}> Answer calls while I am here</label>`}
+     <button class="danger" data-vact="abort" title="Drop the link at once and let go of the transmitter">Abort</button></div>`:""}
+   ${heard}<div class="vlog" id="vLog">${msgs||'<p class="muted small">Nothing yet. Chat and files are logged on this PC (data/vara).</p>'}</div>${sending}
+   ${on&&conn?`<form id="vChat" class="row"><input id="vText" maxlength="4000" placeholder="Type, then Enter to send" autocomplete="off" style="flex:1"><button class="primary">Send</button><label class="small">File <input type="file" id="vFile"></label></form>${st.peer_proto==="raw"?'<p class="small muted">The other station is a plain terminal: files need the other station to run this program too.</p>':""}`:""}
+   ${inbox}<p class="small muted">Chat and files are sent in the clear (no encryption: Part 97). Nothing transmits unless you click, and listening stops when you leave this PC.</p>
+   <div class="row"><button onclick="$('varaDlg').close()">Close</button></div>`;
+  const lg=$("vLog");if(lg)lg.scrollTop=lg.scrollHeight;
+  const ch=$("vChat");if(ch)ch.onsubmit=async e=>{e.preventDefault();const t=$("vText").value.trim();if(!t)return;await varaAct("chat",{text:t});const x=$("vText");if(x)x.focus()};
+  const fi=$("vFile");if(fi)fi.onchange=async()=>{const f=fi.files[0];if(!f)return;const b64=await new Promise((ok_,no)=>{const r=new FileReader();r.onload=()=>ok_(String(r.result).split(",")[1]);r.onerror=no;r.readAsDataURL(f)});await varaAct("file",{name:f.name,data:b64})};
+  box.querySelectorAll("[data-vset]").forEach(el=>el.onchange=()=>{const k=el.dataset.vset;let v=el.value;if(k!=="kind")v=v===""?null:Number(v);varaSet({[k]:v})});
+}
+async function varaAct(what,body){try{VA.d=await post("/api/vara/"+what,body||{});VA.msg=null}catch(e){VA.msg={bad:true,text:e.message}}renderVara();renderRadios()}
+async function varaSet(body){try{VA.d=await post("/api/vara/settings",body);VA.msg=null}catch(e){VA.msg={bad:true,text:e.message}}renderVara();renderRadios()}
+document.addEventListener("click",async e=>{const t=e.target;if(!t.closest)return;
+  const op=t.closest("[data-varaopen]");if(op){varaOpen(op.dataset.varaopen);return}
+  if(!t.closest("#varaDlg"))return;
+  if(t.closest("[data-von]")){await varaSet({enabled:true,radio:VA.rid});return}
+  if(t.closest("[data-voff]")){await varaSet({enabled:false});return}
+  const vc=t.closest("[data-vcall]");if(vc){const i=$("vCall");if(i)i.value=vc.dataset.vcall;return}
+  const li=t.closest("[data-vlisten]");if(li){await varaAct("listen",{on:li.checked});return}
+  const a=t.closest("[data-vact]");if(!a)return;const w=a.dataset.vact;
+  if(w==="connect"){const call=($("vCall")||{}).value||"",via=(($("vVia")||{}).value||"").split(/[\s,]+/).filter(Boolean);if(!call.trim()){VA.msg={bad:true,text:"Type the callsign to call."};renderVara();return}await varaAct("connect",{call,via});return}
+  if(w==="cq"&&!confirm("Call CQ on VARA now? Your station transmits."))return;
+  await varaAct(w,{});
+});
 // ----- Plans (station/localplans.py, station/bandplan.py): band plans, clubs, ARES / RACES plans -----
 const PL={d:null,bp:null,sel:new Set(),msg:null,busy:false};
 async function plansLoad(){try{const [d,bp]=await Promise.all([api("/api/localplans"),api("/api/bandplan")]);PL.d=d;PL.bp=bp}catch(e){}}
