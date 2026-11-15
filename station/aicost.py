@@ -52,7 +52,7 @@ STT_USD_PER_HOUR = 0.10              # Speech to Text (REST)
 TTS_USD_PER_MCHAR = 15.0             # Text to Speech, per 1M characters
 
 FEATURES = {"draft": "Sidekick drafts", "answer": "Sidekick (thinking model)", "chat": "Sidekick chat",
-            "topic": "Sidekick prepared topics", "net_summary": "Net summaries", "find_nets": "Find nets",
+            "topic": "Sidekick prepared topics", "net_summary": "Net summaries", "find_nets": "Find nets", "local_plans": "Local plans",
             "speech_to_text": "Grok speech-to-text", "text_to_speech": "Sidekick's voice"}
 BACKGROUND = ("net summaries", "Grok speech-to-text", "the voice's pre-made clips")
 

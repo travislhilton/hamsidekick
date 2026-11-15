@@ -123,16 +123,8 @@ def name_in(text: str, name: str) -> bool:
 
 
 # US phone privileges (MHz), 97.301 / 97.305; 60 m is five USB channels for General and up.
-PHONE = {
-    "technician": [(28.300, 28.500), (50.100, 54.0), (144.100, 148.0), (222.0, 225.0), (420.0, 450.0)],
-    "general": [(1.800, 2.000), (3.800, 4.000), (7.175, 7.300), (14.225, 14.350), (18.110, 18.168), (21.275, 21.450),
-                (24.930, 24.990), (28.300, 29.700), (50.100, 54.0), (144.100, 148.0), (222.0, 225.0), (420.0, 450.0)],
-    "extra": [(1.800, 2.000), (3.600, 4.000), (7.125, 7.300), (14.150, 14.350), (18.110, 18.168), (21.200, 21.450),
-              (24.930, 24.990), (28.300, 29.700), (50.100, 54.0), (144.100, 148.0), (222.0, 225.0), (420.0, 450.0)],
-}
-PHONE["advanced"] = [(1.800, 2.000), (3.700, 4.000), (7.125, 7.300), (14.175, 14.350), (18.110, 18.168),
-                     (21.225, 21.450), (24.930, 24.990), (28.300, 29.700), (50.100, 54.0), (144.100, 148.0),
-                     (222.0, 225.0), (420.0, 450.0)]
+from .bandplan import ALLOC as _ALLOC  # noqa: E402  the one table of privileges (station/bandplan.py)
+PHONE = {c: [seg for seg in _ALLOC[c]["phone"] if seg[0] < 500] for c in ("technician", "general", "extra", "advanced")}
 SIXTY_M = (5.3305, 5.3465, 5.3570, 5.3715, 5.4035)    # channel centres (USB dial 1.5 kHz below)
 
 KINDS = ["check_in", "reply", "acknowledge", "stand_by", "say_again", "working", "ready", "answer", "sign_off", "none"]
@@ -239,22 +231,13 @@ _CODE = re.compile(r"\b[A-Z0-9]{5}(\s+[A-Z0-9]{5}){2,}\b")      # five-letter gr
 
 
 def privileges(freq_mhz, mode, license_class) -> tuple[bool | None, str]:
-    """(ok, why). None = can't tell (no frequency or no class set)."""
-    if not freq_mhz:
-        return None, "no frequency known"
-    if not license_class:
-        return None, "the operator's license class is not set (Settings → Station agent)"
-    f = float(freq_mhz)
-    if 5.3 <= f <= 5.41:
-        if license_class == "technician":
-            return False, "60 m is not a Technician phone band"
-        if any(abs(f - c) <= 0.0016 or abs(f - (c - 0.0015)) <= 0.0002 for c in SIXTY_M):
-            return (mode or "USB").upper() == "USB" or None, "60 m channel (USB only)"
-        return False, f"{f:.4f} MHz is not one of the five 60 m channels"
-    seg = PHONE.get(license_class, [])
-    if any(a <= f <= b for a, b in seg):
-        return True, f"{f:.3f} MHz is inside {license_class.title()} phone privileges"
-    return False, f"{f:.3f} MHz is outside {license_class.title()} phone privileges (97.301/97.305)"
+    """(ok, why) for Sidekick's voice. None = can't tell (no frequency or no class set). The rules live in
+    station/bandplan.py (phone, data and CW for every class); a 60 m channel is USB only."""
+    from . import bandplan
+    ok, why = bandplan.privileges(freq_mhz, "phone", license_class)
+    if ok and freq_mhz and 5.3 <= float(freq_mhz) <= 5.41 and (mode or "USB").upper() != "USB":
+        return None, why
+    return ok, why
 
 
 def fcc_check(d: dict, ctx: dict) -> list[dict]:

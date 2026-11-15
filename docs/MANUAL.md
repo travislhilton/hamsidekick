@@ -290,6 +290,16 @@ you chose is remembered. Each column shows:
   **Move to Not heard** / **Keep it**. **Find nets** lists a found net that matches a Not heard one (same frequency and
   start, or same name) apart, under "not heard here", and adds it only with **Add anyway** (it then leaves Not heard).
   Kept in `data/nets_unheard.json`.
+- **Plans** (Nets → Plans, owner 2026-11-15): the **band plan** is built in (your privileges for phone, data and CW
+  by license class, set in Settings → Station agent, and what the ARRL band plan sets each segment aside for) and
+  works with no internet. **Find local plans** searches for the clubs and EMCOMM groups within the distance you set,
+  your state coordinator's band plan, and the public ARES, RACES and ICS-205 plans, and lists the frequencies they
+  assign with a link to each source. Tick the ones that are right and **Keep** them: a kept channel names a radio's
+  frequency on its card ("County ARES primary"), and a plan's regular net can be added to the schedule. Public plan
+  documents are saved on this PC (download them from the list) so they are there in an outage. Plans that are
+  members-only are never fetched: add your copy with **Add a plan you have** and its frequencies are read and offered
+  the same way (the file stays on this PC). Search again now and then: it marks new frequencies and kept channels
+  their plan no longer lists. A search costs about $0.20–0.50 of xAI.
 - **Find nets around the world** (owner 2026-11-14): in Nets → Find nets, **What you can hear around the world today**
   lists, for your antenna, height, power and today's solar flux, each part of the world (Japan, China, Russia,
   Europe, South America, Antarctica, the Pacific…) with the bands and the hours (your time) you hear it at least 60%

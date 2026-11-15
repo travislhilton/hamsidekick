@@ -18,6 +18,15 @@ HELP_CARDS = {"/help": "card.html", "/card": "card.html", "/help/sidekick": "sid
               "/help/conversation": "conversation_card.html"}                                    # reference cards
 
 
+def _plans(station):
+    """The one Local plans helper per station (station/localplans.py)."""
+    p = getattr(station, "_localplans", None)
+    if p is None:
+        from .localplans import Plans
+        p = station._localplans = Plans(station)
+    return p
+
+
 def _finder(station):
     """The one Find nets helper per station (station/netfind.py)."""
     f = getattr(station, "_netfind", None)
@@ -159,6 +168,28 @@ def make_handler(station):
                 return self._json(station.local_names())
             if u.path == "/api/netfind":                         # Nets -> Find nets (netfind.py)
                 return self._json(_finder(station).state())
+            if u.path == "/api/localplans":                      # Nets -> Plans (localplans.py)
+                return self._json(_plans(station).state())
+            if u.path == "/api/bandplan":                        # the built-in band plan (bandplan.py)
+                from . import bandplan
+                return self._json({"bands": bandplan.table(_plans(station)._class()),
+                                   "license_class": _plans(station)._class()})
+            lpd = re.fullmatch(r"/api/localplans/doc/([0-9a-f]{12})", u.path)
+            if lpd:                                              # a saved plan: always a download, never run here
+                got = _plans(station).doc_file(lpd.group(1))
+                if not got:
+                    return self._json({"error": "not found"}, 404)
+                path, ctype, nice = got
+                data = path.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") else ""))
+                self.send_header("Content-Disposition", f'attachment; filename="{nice}"')
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Content-Security-Policy", "sandbox")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if u.path == "/api/netfind/reach":                   # what this HF setup hears around the world today
                 f = _finder(station)
                 return self._json({"table": f.reach_table(wait=True) or []})
@@ -241,7 +272,9 @@ def make_handler(station):
                       "/api/history/minutes", "/api/history/summary", "/api/learned", "/api/local-names", "/api/local-names/import",
                       "/api/pc/measure", "/api/pc/seen", "/api/settings-pack/preview", "/api/settings-pack/apply",
                       "/api/nets/assign", "/api/netfind/settings", "/api/netfind/search", "/api/netfind/add",
-                      "/api/aicost", "/api/aicost/refresh"}
+                      "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
+                      "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
+                      "/api/localplans/copies"}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
             alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss)", u.path)        # pre-net alert
             item = re.fullmatch(r"/api/items(?:/(\d+)(/delete)?)?", u.path)                             # minutes items
@@ -256,7 +289,7 @@ def make_handler(station):
                 self.close_connection = True                   # its body is unread: never reuse the connection
                 return self._json({"error": "not found"}, 404)
             try:
-                cap = 28 * 1024 ** 2 if u.path == "/api/agent/library" else 512 * 1024   # a library file (base64)
+                cap = 28 * 1024 ** 2 if u.path in ("/api/agent/library", "/api/localplans/file") else 512 * 1024   # a file (base64)
                 n = int(self.headers.get("Content-Length") or 0)
                 if n > cap:
                     self.close_connection = True
@@ -323,6 +356,27 @@ def make_handler(station):
                                                                          noise=bool(body.get("noise")))))
                     except LookupError:
                         return self._json({"error": "no such transmission"}, 404)
+                if u.path.startswith("/api/localplans/"):        # Nets -> Plans (localplans.py)
+                    lp, what = _plans(station), u.path.rsplit("/", 1)[1]
+                    if what == "settings":
+                        return self._json(lp.settings(body))
+                    if what == "search":
+                        return self._json(lp.search(body))
+                    if what == "keep":
+                        return self._json(lp.keep(body.get("ids")))
+                    if what == "drop":
+                        return self._json(lp.drop(body.get("ids")))
+                    if what == "net":
+                        return self._json(lp.add_net(str(body.get("id") or ""), body.get("radio")))
+                    if what == "copies":
+                        lp.save_copies(background=True, urls=[str(u_) for u_ in body.get("urls") or []] or None)
+                        return self._json(lp.state())
+                    import base64
+                    try:
+                        data = base64.b64decode(str(body.get("data") or ""), validate=True)
+                    except ValueError:
+                        raise ValueError("the file did not arrive whole: try again") from None
+                    return self._json(lp.add_file(str(body.get("name") or ""), data))
                 if u.path == "/api/netfind/settings":            # {km, hf_km, address, gps: {lat, lon, acc_m} | null, hf}
                     return self._json(_finder(station).settings(body))
                 if u.path == "/api/netfind/search":              # {"bands": "HF"|"VU"|null, km, hf_km, hf, interests}

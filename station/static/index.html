@@ -586,7 +586,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
 <dialog id="levelDlg"><div id="levelBody"></div></dialog>
 <dialog id="radiosDlg"><div id="radiosBody"></div></dialog>
 <dialog id="netsDlg" class="big" aria-labelledby="netsTitle"><div class="dhead"><h3 id="netsTitle">Nets</h3><label class="small">Net <select id="netPick"></select></label><button id="netsClose" class="x" aria-label="Close">✕</button></div>
-<nav id="netsTabs" class="ntabs" role="tablist" aria-label="Nets"><button role="tab" data-ntab="schedule">Schedule</button><button role="tab" data-ntab="history">History</button><button role="tab" data-ntab="analysis">Analysis</button><button role="tab" data-ntab="minutes">Minutes</button><button role="tab" data-ntab="open">Still open</button></nav>
+<nav id="netsTabs" class="ntabs" role="tablist" aria-label="Nets"><button role="tab" data-ntab="schedule">Schedule</button><button role="tab" data-ntab="history">History</button><button role="tab" data-ntab="analysis">Analysis</button><button role="tab" data-ntab="minutes">Minutes</button><button role="tab" data-ntab="open">Still open</button><button role="tab" data-ntab="plans" title="Band plans, the area's clubs and the ARES / RACES communications plans">Plans</button></nav>
 <div id="netsBody" class="dbody" role="tabpanel"></div></dialog>
 <dialog id="searchDlg" class="big" aria-labelledby="searchTitle"><div class="dhead"><h3 id="searchTitle">Search</h3><button id="searchClose" class="x" aria-label="Close">✕</button></div><div id="searchBody" class="dbody"></div></dialog>
 <dialog id="skDlg" class="big" aria-labelledby="skTitle"><div class="dhead"><h3 id="skTitle">Sidekick</h3><label class="small">Radio <select id="skRadio"></select></label><button id="skClose" class="x" aria-label="Close">✕</button></div>
@@ -1338,7 +1338,7 @@ function renderRadios(){
     el.querySelector(".nm").textContent=r.name;
     const nb=el.querySelector(".nb");nb.textContent=net.type&&net.type!=="unknown"?net.label:"";nb.className="nb badge "+(net.type||"");nb.style.display=nb.textContent?"":"none";
     if(!(document.activeElement&&document.activeElement.closest("#r-"+CSS.escape(r.id)+" .tuneform"))){
-      el.querySelector(".fq").innerHTML=`<b>${r.freq_mhz?Number(r.freq_mhz).toFixed(3)+" MHz":"frequency not set"}</b> <span class="muted">${r.band&&r.band.band?esc(r.band.band):""} · ${esc(r.mode||"")} · ${r.gate==="carrier"?"carrier gate":"voice gate"}</span>${catBadge(r)}
+      el.querySelector(".fq").innerHTML=`<b>${r.freq_mhz?Number(r.freq_mhz).toFixed(3)+" MHz":"frequency not set"}</b> <span class="muted">${r.band&&r.band.band?esc(r.band.band):""} · ${esc(r.mode||"")} · ${r.gate==="carrier"?"carrier gate":"voice gate"}</span>${catBadge(r)}${planLabel(r.freq_mhz)}
         <button class="tune" data-tune="${esc(r.id)}" title="${r.cat?"Tune the radio (CAT)":"Set what this radio is tuned to"}">Change</button>`;
       const rec=(r.recent_freqs||[]).filter(x=>!(r.freq_mhz&&Math.abs(x.f-r.freq_mhz)<0.0005&&x.m===r.mode));
       const dl=`fq-${esc(r.id)}`;
@@ -1760,7 +1760,7 @@ function connect(){
   const es=new EventSource("/events");
   es.onopen=()=>{$("conn").textContent="● live";$("conn").className="ok"};
   es.onerror=()=>{$("conn").textContent="● reconnecting…";$("conn").className="bad"};
-  es.addEventListener("snapshot",e=>{const d=JSON.parse(e.data);Object.assign(S,d);$("me").textContent=d.callsign?d.callsign+" station":"HAM Sidekick Station";renderEngine(d.engines);all();renderPCNote();if($("netsDlg").open&&NV.tab==="schedule")renderSchedule(false)});   // Nets opened before the first data arrived fills in
+  es.addEventListener("snapshot",e=>{const d=JSON.parse(e.data);Object.assign(S,d);if(!PL.d)plansLoad().then(renderRadios);$("me").textContent=d.callsign?d.callsign+" station":"HAM Sidekick Station";renderEngine(d.engines);all();renderPCNote();if($("netsDlg").open&&NV.tab==="schedule")renderSchedule(false)});   // Nets opened before the first data arrived fills in
   es.addEventListener("tx",e=>{const t=JSON.parse(e.data);upsertTx(t);if(t.status==="final")boardSoon(t.radio)});
   es.addEventListener("agent",e=>{const m=JSON.parse(e.data);if(!AG)return;
     if(m.chat){if(SK&&SK.rid===m.chat.radio){SK.chat=[...SK.chat.filter(x=>x.id!==m.chat.id),m.chat];if(m.chat.role==="assistant")SK.busy=false;if(SK.tab==="chat")skRender()}return}
@@ -1837,8 +1837,64 @@ $("netsTabs").addEventListener("keydown",e=>{if(!["ArrowLeft","ArrowRight"].incl
 function renderNetsArea(){
   document.querySelectorAll("#netsTabs [data-ntab]").forEach(b=>{const on=b.dataset.ntab===NV.tab;b.classList.toggle("on",on);b.setAttribute("aria-selected",on);b.tabIndex=on?0:-1});
   $("netPick").parentElement.style.visibility=NV.tab==="schedule"&&!NV.radio?"hidden":"";
-  ({schedule:renderSchedule,history:renderHistory,analysis:renderAnalysis,minutes:renderMinutes,open:renderOpen})[NV.tab](true);
+  ({schedule:renderSchedule,history:renderHistory,analysis:renderAnalysis,minutes:renderMinutes,open:renderOpen,plans:renderPlans})[NV.tab](true);
 }
+// ----- Plans (station/localplans.py, station/bandplan.py): band plans, clubs, ARES / RACES plans -----
+const PL={d:null,bp:null,sel:new Set(),msg:null,busy:false};
+async function plansLoad(){try{const [d,bp]=await Promise.all([api("/api/localplans"),api("/api/bandplan")]);PL.d=d;PL.bp=bp}catch(e){}}
+function planLabel(f){if(!f||!PL.d)return"";f=Number(f);
+  const k=(PL.d.kept||[]).find(x=>Math.abs(x.freq_mhz-f)<=0.0025||(x.offset_mhz&&Math.abs(x.freq_mhz+x.offset_mhz-f)<=0.0025));
+  if(k)return ` <span class="np k-ready" style="padding:0 6px" title="Your plan channel${k.org?" ("+esc(k.org)+")":""}: Nets → Plans">${esc(k.use)}${k.priority?" · "+esc(k.priority):""}</span>`;
+  let best=null;for(const b of (PL.bp||{}).bands||[])for(const x of b.plan)if(f>=x.from-0.0005&&f<=x.to+0.0005&&(!best||x.to-x.from<best.to-best.from))best=x;
+  return best?` <span class="small muted" title="The ARRL band plan">· ${esc(best.what)}</span>`:""}
+const pFreq=x=>`${Number(x.freq_mhz).toFixed(4).replace(/0$/,"")} ${esc(x.mode)}${x.offset_mhz!=null?` <span class="muted">${x.offset_mhz>0?"+":""}${x.offset_mhz}${x.tone_hz?` · ${x.tone_hz}`:""}</span>`:x.tone_hz?` <span class="muted">${x.tone_hz}</span>`:""}`;
+async function renderPlans(full){
+  const box=$("netsBody");if(full||!PL.d){box.innerHTML='<p class="muted">Loading…</p>';await plansLoad()}
+  const d=PL.d,bp=PL.bp;if(!d){box.innerHTML='<p class="bad">Plans are not available.</p>';return}
+  const kind=k=>`<span class="np" style="padding:0 6px">${esc((d.freq_kinds||{})[k]||k)}</span>`;
+  const src=x=>x.source_url?`<a href="${esc(x.source_url)}" target="_blank" rel="noopener noreferrer">source</a>${x.source_opened?"":' <span class="warnc">not opened</span>'}`:x.source_file?`your file ${esc(x.source_file)}`:"";
+  const newIds=new Set((d.changes||{}).new||[]),goneIds=new Set((d.changes||{}).gone||[]);
+  const found=(d.frequencies||[]).filter(f=>!f.kept);
+  for(const id of [...PL.sel])if(!found.some(f=>f.id===id))PL.sel.delete(id);
+  const head=`<h4>Plans</h4><p class="small muted">The band plan below is built in and works offline. Local plans come from a web search (or a file you add): nothing is used until you keep it, and every frequency links to where it was found.${d.license_class?"":' <span class="warnc">Set your license class (Settings → Station agent) to see your privileges.</span>'}</p>`;
+  const busy=PL.busy||d.busy;
+  const search=!d.key?'<p>Searching needs the xAI key (Settings → Station agent). You can still add a plan file once the key is set, and the band plan works without it.</p>'
+    :`<div class="row nfrow"><span>${d.location?`Near <b>${esc(d.location.label)}</b>`:'<span class="bad">Set the station\'s location first (Nets → Find nets).</span>'}</span>
+      <label>Within <input id="plKm" type="number" min="5" max="400" value="${d.km}" style="width:5em"> km</label>
+      <button class="primary" data-plgo${busy||!d.location?" disabled":""}>${busy?"Searching… clubs, the coordinator's band plan, ARES / RACES plans (up to two minutes)":d.at?"Search again":"Find local plans"}</button></div>
+      <p class="small muted">${d.at?`Last searched ${esc(new Date(d.at*1000).toLocaleString([],{month:"short",day:"numeric",year:"numeric"}))}${d.cost_usd!=null?` · cost $${d.cost_usd}`:""}.${d.stale?' <span class="warnc">Over a month ago: plans change; search again to see what is new.</span>':""}`:"One search costs about $0.20–0.50 of xAI. It reads only public pages: a members-only plan can be added below as a file."}${d.saving?" Saving offline copies…":""}</p>`;
+  const msg=PL.msg?`<p class="${PL.msg.bad?"bad":"ok"}">${esc(PL.msg.text)}</p>`:"";
+  const chg=(newIds.size||goneIds.size)?`<p class="small"><b>Since the last search:</b> ${newIds.size} new frequenc${newIds.size===1?"y":"ies"}${goneIds.size?`; ${goneIds.size} of your kept channels no longer appear in their plan (marked below)`:""}.</p>`:"";
+  const kept=(d.kept||[]).length?`<h4>Your plan channels <span class="muted">(${d.kept.length})</span></h4><div class="nlistwrap"><table class="nlist"><thead><tr><th>Frequency</th><th>Use</th><th>Whose plan</th><th>Band plan</th><th></th></tr></thead><tbody>${d.kept.map(k=>`<tr${goneIds.has(k.id)?' class="att"':""}><td class="f">${pFreq(k)}</td><td><b>${esc(k.use)}</b>${k.priority?` <span class="np k-tune" style="padding:0 6px">${esc(k.priority)}</span>`:""} ${kind(k.kind)}${goneIds.has(k.id)?' <span class="warnc small">not in the plan any more</span>':""}</td><td class="small">${esc(k.org||"")}<div>${src(k)}</div></td><td class="small muted">${esc(k.plan_says||"")}</td><td class="small">${k.net&&!(S.schedule||[]).some(n=>n.name===k.net.name&&Math.abs((n.freq_mhz||0)-k.freq_mhz)<0.003)?`<button class="small" data-plnet="${esc(k.id)}" title="Put the plan's net (${esc(k.net.name||"")}) on the schedule">Add its net</button> `:""}<button class="small quiet" data-pldrop="${esc(k.id)}">Remove</button></td></tr>`).join("")}</tbody></table></div><p class="small muted">A radio tuned to one of these shows its name on its card.</p>`:"";
+  const allOn=found.length&&found.every(f=>PL.sel.has(f.id));
+  const fr=found.length?`<h4>Frequencies found <span class="muted">(${found.length}, not kept yet)</span></h4><div class="nsel">${PL.sel.size?`<b>${PL.sel.size} selected</b><button class="primary" data-plkeep>Keep ${PL.sel.size===1?"it":PL.sel.size}</button>`:'<span class="muted">Check each against its source, then tick the ones to keep.</span>'}</div>
+    <div class="nlistwrap"><table class="nlist"><thead><tr><th class="ck"><input type="checkbox" data-plall${allOn?" checked":""} aria-label="Select every frequency found"></th><th>Frequency</th><th>Use</th><th>Whose plan · found on</th><th>Band plan</th></tr></thead><tbody>${found.map(f=>`<tr class="${PL.sel.has(f.id)?"picked":""}"><td class="ck"><input type="checkbox" data-plpick="${esc(f.id)}"${PL.sel.has(f.id)?" checked":""} aria-label="Select ${esc(f.use)}"></td><td class="f">${pFreq(f)}</td><td><b>${esc(f.use)}</b>${f.priority?` <span class="np k-tune" style="padding:0 6px">${esc(f.priority)}</span>`:""} ${kind(f.kind)}${newIds.has(f.id)?' <span class="badge ok">new</span>':""}${f.net?`<div class="small muted">net: ${esc(f.net.name||"")}</div>`:""}</td><td class="small">${esc(f.org||"")}<div>${src(f)}</div></td><td class="small muted">${esc(f.band||"")}${f.plan_says?" · "+esc(f.plan_says):""}</td></tr>`).join("")}</tbody></table></div>`
+    :d.at&&!(d.kept||[]).length?`<p class="muted">${esc(d.error||"No frequencies found.")}</p>`:"";
+  const docs=(d.documents||[]).length||(d.files||[]).length?`<h4>Plans and documents</h4><ul class="small">${(d.files||[]).map(x=>`<li><b>${esc(x.name)}</b> <span class="np" style="padding:0 6px">your file</span> · ${x.found} frequenc${x.found===1?"y":"ies"} read · <a href="/api/localplans/doc/${esc(x.id)}">download</a></li>`).join("")}${(d.documents||[]).map(x=>`<li><b>${esc(x.title)}</b> <span class="np" style="padding:0 6px">${esc((d.doc_kinds||{})[x.kind]||x.kind)}</span>${x.org?" · "+esc(x.org):""}${x.date?" · "+esc(x.date):""} · <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">open</a>${!x.public?' · <span class="muted">members only: not copied</span>':x.saved&&x.saved.path?` · <a href="/api/localplans/doc/${esc(x.saved.id)}">offline copy</a> <span class="muted">(saved ${esc(new Date(x.saved.at*1000).toLocaleDateString())})</span>`:x.saved&&x.saved.error?` · <span class="warnc" title="${esc(x.saved.error)}">copy failed</span> <button class="linkish small" data-plcopy="${esc(x.url)}">try again</button>`:` · <button class="linkish small" data-plcopy="${esc(x.url)}">save an offline copy</button>`}</li>`).join("")}</ul>`:"";
+  const clubs=(d.clubs||[]).length?`<details class="small"${PL.clubsOpen?" open":""} data-plclubs><summary><b>Clubs and groups (${d.clubs.length})</b></summary><ul>${d.clubs.map(c=>`<li><b>${c.url?`<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${esc(c.name)}</a>`:esc(c.name)}</b>${c.emcomm?' <span class="badge emergency">EMCOMM</span>':""}${c.area?" · "+esc(c.area):""}${c.meets?` · <span class="muted">${esc(c.meets)}</span>`:""}${c.repeaters.length?`<div class="muted">${esc(c.repeaters.join("; "))}</div>`:""}</li>`).join("")}</ul></details>`:"";
+  const out=(d.left_out||[]).length?`<details class="small"><summary>${d.left_out.length} more found but left out</summary><ul>${d.left_out.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></details>`:"";
+  const file=d.key?`<div class="row nfrow small"><label>Add a plan you have (PDF, Word, text): <input type="file" id="plFile" accept=".pdf,.docx,.txt,.csv,.html,.htm"></label> <span class="muted">Kept on this PC only; its frequencies are read and offered to keep.</span></div>`:"";
+  const cls=bp&&bp.license_class,fx=a=>a.map(([x,y])=>`${x}–${y}`).join(", ");
+  const band=bp?`<details class="small"${PL.bpOpen?" open":""} data-plbp><summary><b>Band plan</b> <span class="muted">(built in: FCC privileges${cls?` for a ${esc(cls)}`:""} and the ARRL band plan)</span></summary><div class="nlistwrap"><table class="nlist"><thead><tr><th>Band</th>${cls?"<th>Your privileges, MHz</th>":""}<th>Band plan</th></tr></thead><tbody>${bp.bands.map(b=>`<tr><td><b>${esc(b.band)}</b><div class="muted">${b.from}–${b.to}</div></td>${cls?`<td>${b.mine&&(b.mine.phone.length||b.mine.data.length||b.mine.cw.length)?["phone","data","cw"].filter(k=>b.mine[k].length).map(k=>`<div>${k==="cw"?"CW":k[0].toUpperCase()+k.slice(1)}: ${fx(b.mine[k])}</div>`).join(""):'<span class="muted">none</span>'}</td>`:""}<td>${b.plan.map(x=>`<div>${x.from===x.to?x.from:`${x.from}–${x.to}`} <span class="muted">${esc(x.what)}</span></div>`).join("")}</td></tr>`).join("")}</tbody></table></div><p class="muted">US rules (47 CFR 97.301 / 97.305). The band plan is voluntary; your state's coordinator and local plans refine VHF/UHF.</p></details>`:"";
+  box.innerHTML=head+search+msg+chg+kept+fr+docs+clubs+out+file+band;
+  const km=$("plKm");if(km)km.onchange=async()=>{try{PL.d=await post("/api/localplans/settings",{km:km.value})}catch(e){PL.msg={bad:true,text:e.message};renderPlans()}};
+  const fi=$("plFile");if(fi)fi.onchange=async()=>{const f=fi.files[0];if(!f)return;PL.msg={bad:false,text:`Reading ${f.name}…`};renderPlans();
+    try{const b64=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(",")[1]);r.onerror=no;r.readAsDataURL(f)});
+      const d2=await post("/api/localplans/file",{name:f.name,data:b64});PL.d=d2;PL.msg={bad:false,text:`${f.name}: ${d2.found} frequenc${d2.found===1?"y":"ies"} found. Tick the ones to keep.`}}catch(e){PL.msg={bad:true,text:e.message}}renderPlans()};
+  const cl=box.querySelector("[data-plclubs]");if(cl)cl.ontoggle=()=>PL.clubsOpen=cl.open;
+  const bo=box.querySelector("[data-plbp]");if(bo)bo.ontoggle=()=>PL.bpOpen=bo.open;
+}
+document.addEventListener("click",async e=>{
+  const t=e.target;if(!t.closest||!t.closest("#netsBody")||NV.tab!=="plans")return;
+  const act=async(fn,ok)=>{try{PL.d=await fn();PL.msg=ok?{bad:false,text:typeof ok==="function"?ok(PL.d):ok}:null}catch(err){PL.msg={bad:true,text:err.message}}renderPlans();renderRadios()};
+  if(t.closest("[data-plgo]")){PL.busy=true;PL.msg=null;renderPlans();await act(()=>post("/api/localplans/search",{km:$("plKm")?$("plKm").value:undefined}),d=>`${(d.frequencies||[]).filter(f=>!f.kept).length} frequencies, ${(d.documents||[]).length} plans and documents, ${(d.clubs||[]).length} clubs found.`);PL.busy=false;renderPlans();return}
+  const pk=t.closest("[data-plpick]");if(pk){pk.checked?PL.sel.add(pk.dataset.plpick):PL.sel.delete(pk.dataset.plpick);renderPlans();return}
+  const al=t.closest("[data-plall]");if(al){(PL.d.frequencies||[]).filter(f=>!f.kept).forEach(f=>al.checked?PL.sel.add(f.id):PL.sel.delete(f.id));renderPlans();return}
+  if(t.closest("[data-plkeep]")){const ids=[...PL.sel];PL.sel.clear();await act(()=>post("/api/localplans/keep",{ids}),`Kept ${ids.length}.`);return}
+  const dr=t.closest("[data-pldrop]");if(dr){await act(()=>post("/api/localplans/drop",{ids:[dr.dataset.pldrop]}));return}
+  const nt=t.closest("[data-plnet]");if(nt){await act(()=>post("/api/localplans/net",{id:nt.dataset.plnet}),d=>`Added ${d.added} to the schedule.`);return}
+  const cp=t.closest("[data-plcopy]");if(cp){await act(()=>post("/api/localplans/copies",{urls:[cp.dataset.plcopy]}),"Saving the copy…");setTimeout(()=>{if(NV.tab==="plans")renderPlans(true)},5000);return}
+});
 // ----- Schedule -----
 const KLABEL={ready:"Records",tune:"You tune",clash:"Clash",cant:"Can't hear",none:"No radio"},KORDER={none:0,cant:1,clash:2,tune:3,ready:4};
 const kindOf=n=>(n.status||{}).kind||"ready";

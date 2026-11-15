@@ -100,6 +100,21 @@ class Chat:
             pass
         return msg
 
+    def _plan_line(self, f) -> list[str]:
+        """The local plan's name for the radio's frequency (Nets -> Plans), and the band plan's use of it."""
+        try:
+            from .localplans import Plans
+            lp = getattr(self.st, "_localplans", None) or Plans(self.st)
+            lab = lp.label(f)
+        except Exception:  # noqa: BLE001
+            return []
+        if not lab:
+            return []
+        ch = lab.get("channel")
+        return [("Local plan: " + ch["use"] + (f" ({ch['org']})" if ch.get("org") else "")
+                 + (f", {ch['priority']}" if ch.get("priority") else "") + ". " if ch else "")
+                + (f"Band plan: {lab['plan']}." if lab.get("plan") else "")]
+
     # ----- what the model is told -----
     def context(self, rid: str, question: str, tools: bool = False) -> list[str]:
         from .agent import facts, privileges
@@ -113,6 +128,7 @@ class Chat:
                f"license class {cls or 'not set'}; {a.cfg.get('station') or 'a fixed home station'}.",
                f"The radio: {r.get('name') or rid}, {r.get('freq_mhz') or '?'} MHz {r.get('mode') or ''} "
                f"({r.get('band') or '?'}); privileges there: {why or ('yes' if ok else 'unknown')}.",
+               *self._plan_line(r.get("freq_mhz")),
                f"Local time {now:%A %Y-%m-%d %H:%M}."]
         try:
             b = st.history.board(rid, now)
