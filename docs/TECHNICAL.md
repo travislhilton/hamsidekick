@@ -240,6 +240,10 @@ Details: `docs/ARCHITECTURE.md`, deploy: `deploy/my-server/`.
 returns to well under 1 GB. `GET /health` shows `whisper_loaded`, `idle_s` and the GPU memory in use. `STT_MLX_CACHE_GB`
 (default 4) caps what MLX may keep between decodes. Before this the cache was never returned: a server with no
 restart grew to 43 GB in 12 hours of final passes; six replayed final passes now stay at 4.5 GB, no slower.
+A decode that never ends: `GET /health` says `"ok": false` (with `busy_s` and `stuck`) once one decode has held the
+GPU for `STT_STUCK_S` (default 1200 s), so every station runs the accurate pass on its own PC, and after
+`STT_STUCK_EXIT_S` (default 1500 s) the service ends itself and launchd starts a fresh one; the log names the decode.
+Before this (2026-11-15) one decode ran 30 hours while `/health` said ok, and every station's upload timed out.
 
 ## VHF/UHF path analysis (`hamkit/pathprofile.py`)
 

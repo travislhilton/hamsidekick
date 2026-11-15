@@ -30,6 +30,7 @@ def _gpu_on_demand():
     """Whisper loads on the first request and is unloaded when the requests stop (transcribe/gpu.py)."""
     gpu.configure()
     gpu.start_idle_watcher()
+    gpu.start_watchdog()
 
 engine = Engine()
 _db = None
@@ -81,7 +82,8 @@ def _open_nets(s, at: datetime):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "model": MODEL, "accurate_model": ACCURATE_MODEL, "db": bool(_db), **gpu.status()}
+    st = gpu.status()        # a decode stuck on the GPU: not ok, so the stations do the pass on their own PCs
+    return {"ok": not st["stuck"], "model": MODEL, "accurate_model": ACCURATE_MODEL, "db": bool(_db), **st}
 
 
 @app.post("/reload-vocab", dependencies=[Depends(auth)])
@@ -170,7 +172,7 @@ async def accurate_context(request: Request):
 
     def run():
         t0 = time.time()
-        with gpu.using():
+        with gpu.using(f"context {stage} {audio_s:.0f} s audio, {len(clips)} clips, {method}"):
             res = cx.transcribe_clips(clips, _whisper_decode(ACCURATE_MODEL), mode=method)
         return res, time.time() - t0
     res, took = await asyncio.get_running_loop().run_in_executor(None, run)
@@ -187,7 +189,7 @@ def accurate(audio: UploadFile = File(...), prompt: str = Form(""), highpass_hz:
     import mlx_whisper
     x = _highpass(_wav16k(audio.file.read()), highpass_hz)
     t0 = time.time()
-    with gpu.using():
+    with gpu.using(f"accurate {len(x) / 16000:.0f} s audio"):
         r = mlx_whisper.transcribe(x, path_or_hf_repo=ACCURATE_MODEL, language="en", initial_prompt=prompt or None,
                                    condition_on_previous_text=False, temperature=0)
     return {"text": r["text"].strip(), "model": ACCURATE_MODEL.split("/")[-1], "audio_s": round(len(x) / 16000, 2),
@@ -204,7 +206,7 @@ async def transcribe(audio: UploadFile = File(...), meta: str = Form("{}")):
     wav.write_bytes(await audio.read())
     wav.with_suffix(".json").write_text(json.dumps(m, indent=2))
 
-    with gpu.using():
+    with gpu.using(f"transcribe {wav.name}"):
         out = engine.transcribe(wav)
     out["net_id"] = None
     if _db:

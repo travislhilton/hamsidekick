@@ -128,6 +128,29 @@ def test_without_mlx_everything_is_a_no_op(monkeypatch):
 def test_every_decode_on_the_server_goes_through_the_gpu_lock():
     from pathlib import Path
     src = (Path(__file__).resolve().parent.parent / "transcribe" / "server.py").read_text()
-    assert src.count("with gpu.using():") == 3, "/accurate, /accurate/context and /transcribe"
+    assert src.count("with gpu.using(f\"") == 3, "/accurate, /accurate/context and /transcribe"
     assert "_accurate_lock" not in src
-    assert "gpu.start_idle_watcher()" in src and "gpu.configure()" in src
+    assert "gpu.start_idle_watcher()" in src and "gpu.configure()" in src and "gpu.start_watchdog()" in src
+
+
+def test_a_decode_that_never_ends_says_not_ok_then_restarts_the_service(fakes, monkeypatch):
+    """2026-11-15: one decode ran 30 h holding the lock; /health still said ok, so every station's upload timed out."""
+    monkeypatch.setattr(gpu, "STUCK_S", 1200.0)
+    monkeypatch.setattr(gpu, "STUCK_EXIT_S", 1500.0)
+    exits = []
+    assert gpu.busy_s() is None and not gpu.stuck() and not gpu.watchdog_check(exit=exits.append)
+    with gpu.using("context final 840 s audio, 30 clips, both"):
+        t0 = gpu._busy[0]
+        assert not gpu.stuck(t0 + 600) and gpu.stuck(t0 + 1300)
+        assert not gpu.watchdog_check(t0 + 1300, exit=exits.append)
+        assert gpu.watchdog_check(t0 + 1600, exit=exits.append) and exits == [70]
+        assert gpu.status()["busy_s"] is not None
+    assert gpu.busy_s() is None and gpu.status()["stuck"] is False
+
+
+def test_health_is_not_ok_while_a_decode_is_stuck(monkeypatch):
+    from transcribe import server
+    monkeypatch.setattr(server.gpu, "status", lambda: {"stuck": True, "busy_s": 5000})
+    assert server.health()["ok"] is False
+    monkeypatch.setattr(server.gpu, "status", lambda: {"stuck": False, "busy_s": None})
+    assert server.health()["ok"] is True

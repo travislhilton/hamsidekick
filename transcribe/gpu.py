@@ -15,6 +15,12 @@ when the requests stop:
   A net sends a request every few seconds, so it never unloads mid-net. 0 keeps the model loaded.
 
 `using()` is also the one-Whisper-at-a-time lock every decode on this host goes through.
+
+* A DECODE THAT NEVER ENDS RESTARTS THE SERVICE. 2026-11-15: one decode ran on the GPU for 30 hours, holding the lock;
+  every station's upload waited 15 min and timed out, while /health still said ok, so no station used its own PC.
+  Now /health says not ok once a decode has run `STT_STUCK_S` (default 1200 s: a final block is at most 15 min of
+  audio, done in 1-3 min), so the stations do the pass themselves, and the watchdog ends the process after
+  `STT_STUCK_EXIT_S` (default 1500 s) so launchd (KeepAlive) starts a fresh one. A Python thread cannot be stopped.
 """
 from __future__ import annotations
 
@@ -27,10 +33,14 @@ from contextlib import contextmanager
 IDLE_UNLOAD_S = float(os.environ.get("STT_IDLE_UNLOAD_S", "600"))
 CACHE_LIMIT_GB = float(os.environ.get("STT_MLX_CACHE_GB", "4"))
 CHECK_EVERY_S = 60.0
+STUCK_S = float(os.environ.get("STT_STUCK_S", "1200"))
+STUCK_EXIT_S = float(os.environ.get("STT_STUCK_EXIT_S", "1500"))
 
 lock = threading.Lock()
 _last_used = 0.0          # monotonic seconds of the last decode's end; 0 = never used since start-up
 _watcher: threading.Thread | None = None
+_dog: threading.Thread | None = None
+_busy: tuple[float, str] | None = None     # (monotonic start, what) of the decode holding the lock
 
 
 def _mx():
@@ -65,15 +75,62 @@ def release_cache() -> None:
 
 
 @contextmanager
-def using():
-    """Run one decode: one Whisper on the GPU at a time, the cache handed back after it, the idle clock restarted."""
-    global _last_used
+def using(what: str = "decode"):
+    """Run one decode: one Whisper on the GPU at a time, the cache handed back after it, the idle clock restarted.
+    `what` names it in the log if it never ends."""
+    global _last_used, _busy
     with lock:
+        _busy = (time.monotonic(), what)
         try:
             yield
         finally:
+            _busy = None
             release_cache()
             _last_used = time.monotonic()
+
+
+def busy_s(now: float | None = None) -> float | None:
+    """Seconds the running decode has held the GPU, or None when none is running."""
+    b = _busy
+    return None if b is None else (time.monotonic() if now is None else now) - b[0]
+
+
+def stuck(now: float | None = None) -> bool:
+    b = busy_s(now)
+    return b is not None and STUCK_S > 0 and b >= STUCK_S
+
+
+def watchdog_check(now: float | None = None, exit=os._exit) -> bool:
+    """End the process when a decode has run past STUCK_EXIT_S (launchd starts a new one). True when it did."""
+    b, w = busy_s(now), _busy
+    if b is None or STUCK_EXIT_S <= 0 or b < STUCK_EXIT_S:
+        return False
+    print(f"gpu: a decode ({w[1] if w else '?'}) has run {b:.0f} s; restarting the service", flush=True)
+    exit(70)
+    return True
+
+
+def start_watchdog() -> None:
+    """A daemon thread, apart from the idle watcher (which waits on the decode lock). Idempotent."""
+    global _dog
+    if STUCK_EXIT_S <= 0 or (_dog is not None and _dog.is_alive()):
+        return
+
+    def run():
+        warned = False
+        while True:
+            time.sleep(CHECK_EVERY_S)
+            try:
+                if stuck() and not warned:
+                    print(f"gpu: a decode ({_busy[1] if _busy else '?'}) has run {busy_s():.0f} s: "
+                          "/health says not ok", flush=True)
+                warned = stuck()
+                watchdog_check()
+            except Exception as e:  # noqa: BLE001
+                print(f"gpu: watchdog check failed: {e!r}", flush=True)
+
+    _dog = threading.Thread(target=run, name="whisper-watchdog", daemon=True)
+    _dog.start()
 
 
 def loaded() -> bool:
@@ -129,6 +186,9 @@ def status() -> dict:
     out = {"whisper_loaded": loaded(), "idle_unload_s": IDLE_UNLOAD_S}
     idle = idle_s()
     out["idle_s"] = round(idle) if idle is not None else None
+    b = busy_s()
+    out["busy_s"] = round(b) if b is not None else None
+    out["stuck"] = stuck()
     if mx is not None:
         out["gpu_active_gb"] = round(mx.get_active_memory() / 2**30, 2)
         out["gpu_cache_gb"] = round(mx.get_cache_memory() / 2**30, 2)
