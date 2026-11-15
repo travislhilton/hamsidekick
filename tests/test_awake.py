@@ -8,16 +8,25 @@ def test_held_while_a_radio_listens():
 
 
 def test_released_when_every_radio_is_paused_and_nothing_queued():
-    assert wanted("listening", [{"id": "a", "paused": True}], [{"state": "done"}]) == (False, "no radio listening")
+    assert wanted("listening", [{"id": "a", "paused": True}], [{"state": "done"}]) == (False, "every radio paused")
 
 
 def test_held_while_the_accurate_pass_has_work():
-    assert wanted("listening", [{"id": "a", "paused": True}], [{"state": "running"}])[0]
+    assert wanted("traffic", [{"id": "a", "paused": True}, {"id": "b"}], [{"state": "running"}])[0]
     assert wanted("listening", [], [{"state": "queued"}])[0]
+
+
+def test_every_radio_paused_lets_go_on_every_mode():
+    """Owner 2026-11-14: "performance mode should turn off if all radios are on pause"."""
+    paused = [{"id": "a", "paused": True}, {"id": "b", "paused": True}]
+    for mode in ("traffic", "listening", "always"):
+        assert wanted(mode, paused, [{"state": "running"}], busy=True, net_on="ARES", viewer=True) == \
+            (False, "every radio paused")
 
 
 def test_modes():
     assert wanted("always", [], [])[0] is True
+    assert wanted("always", [{"id": "a", "paused": False}], [])[0] is True
     assert wanted("off", [{"id": "a", "paused": False}], [{"state": "running"}])[0] is False
 
 

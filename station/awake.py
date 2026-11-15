@@ -18,7 +18,7 @@ while a transmission is received or transcribed or the accurate pass has work, a
 minutes after the last transmission; between those the PC keeps the operator's own plan and screen sleep, and a
 radio still listens: a transmission that starts on a dark screen is held from its first moment), "listening" (the
 whole time a radio listens: with no net schedule that is around the clock), "always" (whenever the station runs),
-"off". The owner's laptop stayed lit all evening on "listening" with one radio always on (2026-11-05).
+"off". On every mode but "off", every radio paused lets go (owner 2026-11-14). The owner's laptop stayed lit all evening on "listening" with one radio always on (2026-11-05).
 On "traffic", a dashboard open in a browser (and for 2 minutes after the last one closes) holds too while a radio
 listens (owner, 2026-11-07): an operator watching the log wants every transmission at full speed, and a laptop that
 dropped into Modern Standby between transmissions broke its live GPU engine (every transmission read "The.").
@@ -45,9 +45,11 @@ def wanted(mode: str, radios: list[dict], accurate_jobs: list[dict], busy: bool 
     last transmission ended (None: none yet); net_on = the name of a scheduled net on the air now."""
     if mode == "off":
         return False, "keep_awake: off"
+    live = [r.get("name") or r.get("id") or "?" for r in radios if not r.get("paused")]
+    if radios and not live:                       # every radio paused: back to the operator's own power settings,
+        return False, "every radio paused"        # whatever the mode or the accurate pass (owner 2026-11-14)
     if mode == "always":
         return True, "keep_awake: always"
-    live = [r.get("name") or r.get("id") or "?" for r in radios if not r.get("paused")]
     if mode == "listening" and live:
         return True, "listening: " + ", ".join(sorted(map(str, live)))
     if any(j.get("state") in ("queued", "running") for j in accurate_jobs):

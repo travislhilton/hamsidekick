@@ -752,6 +752,7 @@ class Station:
             self._save(saved)
             radio = dict(self.radios[rid])
         print(f"{datetime.now():%H:%M:%S} {rid} {'PAUSED' if paused else 'RESUMED'} by the {by}", flush=True)
+        threading.Thread(target=self._keep_awake_tick, daemon=True).start()   # every radio paused: let go now
         self.bus.publish("radios", {"radios": list(self.radios.values()), "net": self.schedule_now()})
         return radio
 
