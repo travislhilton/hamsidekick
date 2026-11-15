@@ -235,3 +235,97 @@ def test_antenna_gains_match_the_published_models_within_a_db_or_two():
     w = [g("whip", f, 0, 30) - g("vertical", f, 0, 30) for f in (3.9, 7.2, 14.2)]
     assert w[0] < w[1] < w[2] < 0                                              # whip efficiency improves going up
 
+
+
+# ---------------------------------------------------------------- worldwide (owner 2026-11-14) --------------------
+HOME = (39.8, -89.6)                        # the example area (Springfield, IL)
+
+
+def _dx(f, far, hour, when=None):
+    from datetime import datetime, timezone
+    w = when or datetime(2026, 11, 16, hour, 30, tzinfo=timezone.utc)
+    return HP.estimate(f, HP.great_circle_km(HOME, far), f"{hour:02d}:30", "dipole", 10, 100, 150, None, w, None,
+                       "average", (HOME, far))
+
+
+def test_long_paths_follow_the_sun_over_each_hop():
+    """Known openings from the US Midwest in November near solar maximum, 10 m dipole, 100 W: 20 m to Europe in its
+    afternoon, closed at our midnight; 15 m to South America in the afternoon; 20 m to Japan in our evening."""
+    eu, ba, jp = (50.1, 8.7), (-34.6, -58.4), (35.7, 139.7)
+    assert _dx(14.2, eu, 16)["pct_hear"] >= 70 and _dx(14.2, eu, 4)["pct_hear"] <= 10
+    assert _dx(21.3, ba, 19)["pct_hear"] >= 80 and _dx(21.3, ba, 7)["pct_hear"] <= 10
+    assert _dx(14.2, jp, 23)["pct_hear"] >= 40 and _dx(14.2, jp, 15)["pct_hear"] <= 10
+    e = _dx(14.2, eu, 16)
+    assert "auroral" in e["why"] and e["hops"] >= 2                       # the great circle crosses the oval
+    regional = HP.estimate(3.9, 500, "19:00", "dipole", 10, 100, 150)      # the regional calibration is unchanged
+    assert 20 <= regional["snr_hear"] <= 32
+
+
+def test_geometry_helpers():
+    assert abs(HP.great_circle_km(HOME, (50.1, 8.7)) - 7247) < 30
+    assert abs(HP.bearing(HOME, (50.1, 8.7)) - 44.4) < 1                    # north-east to Europe
+    pts = HP.control_points(HOME, (50.1, 8.7), 3)
+    assert len(pts) == 3 and pts[0][0] > HOME[0]
+    long = HP.control_points(HOME, (50.1, 8.7), 4, long=True)
+    assert HP.great_circle_km(HOME, long[0]) > 3000                         # the other way round
+    assert HP.geomag_lat(64.8, -147.7) > 60 > HP.geomag_lat(39.8, -89.6) > 45
+
+
+def test_the_reach_table_names_regions_bands_and_hours():
+    from datetime import date
+    t = HP.reach_table(HOME, "dipole", 10, 100, 150, day=date(2026, 11, 16))
+    by = {r["id"]: r for r in t}
+    assert "caribbean" not in by or by["caribbean"]["km"] >= HP.NEAR_KM     # close regions belong to the regional search
+    eu = {w["band"] for w in by["europe"]["windows"]}
+    assert {"20 m", "15 m"} <= eu
+    w20 = next(w for w in by["europe"]["windows"] if w["band"] == "20 m")
+    assert 10 <= w20["from"] <= 14 and 18 <= w20["to"] <= 23 and w20["best"] >= HP.DX_MIN_PCT
+    assert by["japan"]["windows"] and t[0]["windows"]
+    weak = HP.reach_table(HOME, "whip", 0, 5, 150, day=date(2026, 11, 16))  # a 5 W whip hears far less
+    assert sum(len(r["windows"]) for r in weak) < sum(len(r["windows"]) for r in t)
+
+
+DXNET = {"name": "Pacific Rim DX Net", "freq_mhz": 14.3, "mode": "USB", "repeat": "weekly", "weekdays": ["Mon"],
+         "start": "23:30", "time_zone": "UTC", "lat": 35.7, "lon": 139.7, "region": "japan",
+         "source_url": "https://example.net/dx"}
+
+
+def test_worldwide_search_uses_the_reach_table_and_keeps_only_what_is_heard(tmp_path, xai_key):
+    sent = []
+    heard = dict(DXNET)
+    deaf = dict(DXNET, name="Morning Asia Net", start="15:30")             # 20 m to Japan at 15:30 UTC: closed
+    noplace = dict(DXNET, name="Somewhere Net", lat=None, lon=None, region=None)
+    by_region = dict(DXNET, name="South America Net", freq_mhz=21.3, start="19:30", lat=None, lon=None,
+                     region="s_america")
+    st, f = _finder(tmp_path, [], seen=sent)
+
+    def post(key, body, timeout):                                        # the regional and the worldwide answer
+        sent.append(body)
+        dx = "around the world" in body["input"][0]["content"]
+        return _answer([heard, deaf, noplace, by_region] if dx else [HFNET])
+    f.post = post
+    st._save({})
+    f.settings({"gps": {"lat": HOME[0], "lon": HOME[1]}})
+    f.settings({"hf": {"antenna": "dipole", "height_m": 10, "power_w": 100}, "dx": True})
+    s = f.search("HF")
+    asks = [b["input"][0]["content"] for b in sent]
+    assert len(asks) == 2 and any("UTC hours" in a and "Japan (japan" in a for a in asks)   # regional + worldwide
+    names = {n["name"]: n for n in s["nets"]}
+    assert "Pacific Rim DX Net" in names and names["Pacific Rim DX Net"]["group"] == "DX"
+    assert names["Pacific Rim DX Net"]["region_label"] == "Japan" and names["Pacific Rim DX Net"]["distance_km"] > 9000
+    assert "South America Net" in names and names["South America Net"]["dist_src"] == "region"
+    assert "Morning Asia Net" not in names and "Somewhere Net" not in names
+    why = " ".join(s["left_out"])
+    assert "Morning Asia Net: heard here about" in why and "Somewhere Net: no place given" in why
+    assert s["by_band"]["DX"]["km"] == NF.MAX_HF_KM and s["dx"] is True and s["dx_table"]
+    f.settings({"dx": False})
+    sent.clear()
+    s = f.search("HF")
+    assert len(sent) == 1 and not any(n.get("group") == "DX" for n in s["nets"])   # off: worldwide results go
+
+
+def test_hf_distance_is_no_longer_capped_at_5000_km(tmp_path, xai_key):
+    st, f = _finder(tmp_path, [])
+    assert f.settings({"hf_km": 15000})["hf_km"] == 15000
+    with pytest.raises(ValueError, match="20000"):
+        f.settings({"hf_km": 30000})

@@ -159,6 +159,9 @@ def make_handler(station):
                 return self._json(station.local_names())
             if u.path == "/api/netfind":                         # Nets -> Find nets (netfind.py)
                 return self._json(_finder(station).state())
+            if u.path == "/api/netfind/reach":                   # what this HF setup hears around the world today
+                f = _finder(station)
+                return self._json({"table": f.reach_table(wait=True) or []})
             if u.path == "/api/nets/unassigned":                 # Nets: nets with no radio here, in groups (netassign.py)
                 from . import netassign
                 return self._json(netassign.groups(station))

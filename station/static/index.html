@@ -1946,7 +1946,17 @@ function nfVals(){const v=id=>$(id)?$(id).value:undefined,o={};
   if($("nfKm"))o.km=v("nfKm");if($("nfHfKm"))o.hf_km=v("nfHfKm");
   if($("nfAnt"))o.hf={antenna:v("nfAnt"),height_m:$("nfHt")?v("nfHt"):"",power_w:v("nfPw"),good_from_km:v("nfGood1"),good_to_km:v("nfGood2"),ground:v("nfGnd")};
   const ints=[...document.querySelectorAll("[data-nfint]")];if(ints.length)o.interests=ints.filter(x=>x.checked).map(x=>x.dataset.nfint);
+  if($("nfDx"))o.dx=$("nfDx").checked;
   return o}
+// what this HF setup hears around the world today (station/hfprop.reach_table): UTC hours shown as this PC's time
+function nfHour(h){const t=new Date();t.setUTCHours(h%24,0,0,0);return t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+function nfReachHtml(){const t=NF.reach;if(t===undefined)return"";if(t===null)return'<p class="small muted">Working out the paths… (a few seconds)</p>';
+  const on=t.filter(r=>r.windows.length),off=t.filter(r=>!r.windows.length);
+  if(!on.length)return'<p class="small muted">With this setup the model finds no part of the world heard often enough today. A higher antenna, a vertical or a beam, or more power, changes that.</p>';
+  return `<table class="nlist small"><thead><tr><th>Region</th><th>Band and your time (how often you hear it)</th></tr></thead><tbody>${on.map(r=>`<tr><td><b>${esc(r.label)}</b><div class="muted">${r.km.toLocaleString()} km</div></td><td>${r.windows.slice(0,5).map(w=>`<span style="white-space:nowrap">${esc(w.band)} ${w.from===0&&w.to===24?"all day":`${nfHour(w.from)}–${nfHour(w.to)}`} <span class="muted">(${w.best}%${w.send!==w.best?`, they hear you ${w.send}%`:""})</span></span>`).join(" · ")}</td></tr>`).join("")}</tbody></table>
+    ${off.length?`<p class="small muted">Not heard often enough today: ${esc(off.map(r=>r.label).join(", "))}.</p>`:""}`}
+async function nfLoadReach(){if(NF.reachLoading)return;NF.reachLoading=true;NF.reach=null;renderFind();
+  try{NF.reach=(await api("/api/netfind/reach")).table}catch(e){NF.reach=[]}NF.reachLoading=false;if($("nfBox"))renderFind()}
 function nfRule(n){const r=n.repeat||{},d=(r.weekdays||[]).join(", ");const th=x=>x===-1?"last":x+(["th","st","nd","rd"][x%10>3||[11,12,13].includes(x%100)?0:x%10]);
   const days=(r.weekdays||[]).length===7?"Every day":r.freq==="monthly"?`${(r.nth||[]).map(th).join(" & ")} ${d} of the month`:`Every ${d}`;
   return `${days} at ${n.start}, ${n.duration_min} min${n.utc?' <span class="small muted">(given in UTC; your time shown)</span>':n.zone_moved?' <span class="small muted">(another time zone; your time shown)</span>':""}`}
@@ -1969,7 +1979,7 @@ async function renderFind(){
   const radios=R.radios.length?`Your radios (${esc(R.radios.join(", "))}) record <b>${[R.VU?"VHF/UHF":"",R.HF?"HF":""].filter(Boolean).join(" and ")||"neither HF nor VHF/UHF"}</b>, so ${both?"both are":"only that is"} searched.`:'<span class="bad">No radio on this PC yet: add one in Radios first.</span>';
   const pickBands=both?`<label>Search <select id="nfBands"><option value=""${bands===""?" selected":""}>VHF/UHF and HF</option><option value="VU"${bands==="VU"?" selected":""}>VHF/UHF only</option><option value="HF"${bands==="HF"?" selected":""}>HF only</option></select></label>`:"";
   const vu=R.VU&&bands!=="HF",hf=R.HF&&bands!=="VU";
-  const dist=`${vu?`<label>VHF/UHF within <input id="nfKm" type="number" min="1" max="500" value="${d.km}" style="width:5em"> km</label>`:""}${hf?` <label>HF within <input id="nfHfKm" type="number" min="50" max="5000" value="${d.hf_km}" style="width:6em"> km</label>`:""}`;
+  const dist=`${vu?`<label>VHF/UHF within <input id="nfKm" type="number" min="1" max="500" value="${d.km}" style="width:5em"> km</label>`:""}${hf?` <label>HF within <input id="nfHfKm" type="number" min="50" max="${d.max_hf_km||20000}" value="${d.hf_km}" style="width:6em"> km</label>`:""}`;
   const akind=(d.antennas.find(a=>a.id===d.hf.antenna)||{}).kind;
   const hfset=hf?`<div class="row nfrow"><b>Your HF setup</b> <label>Antenna <select id="nfAnt">${d.antennas.map(a=>`<option value="${a.id}"${d.hf.antenna===a.id?" selected":""}>${esc(a.label)}</option>`).join("")}</select></label>
       <label${akind==="h"?"":" hidden"} title="Height above ground (an inverted V: its apex). A low wire fires straight up (nearby nets, NVIS), a high one fires low (distant nets)">Height${d.hf.antenna==="invv"?" (apex)":""} <input id="nfHt" type="number" min="0" max="100" step="0.5" value="${d.hf.height_m}" style="width:5em"> m</label>
@@ -1977,11 +1987,13 @@ async function renderFind(){
       <label>Power <input id="nfPw" type="number" min="1" max="1500" value="${d.hf.power_w}" style="width:5em"> W</label>${d.hf.set?"":' <span class="small warnc">check these: they decide which HF nets you can hear and reach</span>'}</div>
     <div class="row nfrow"><label title="From your own listening: the distances where HF stations come in well. It replaces the antenna model's pattern: closer than this is your skip zone, farther needs more hops.">You hear HF stations well from <input id="nfGood1" type="number" min="20" max="4000" value="${(d.hf.good_km||[])[0]||""}" placeholder="e.g. 400" style="width:6em"> to <input id="nfGood2" type="number" min="20" max="4000" value="${(d.hf.good_km||[])[1]||""}" placeholder="600" style="width:6em"> km</label> <span class="small muted">optional: leave empty to use the antenna model</span></div>
     <div class="row nfrow"><b>HF nets wanted</b> ${d.interests.map(i=>`<label class="chk"><input type="checkbox" data-nfint="${i.id}"${i.on?" checked":""}> ${esc(i.label)}</label>`).join("")}</div>
+    <div class="row nfrow"><label class="chk" title="A second HF search: DX, international, maritime and expedition nets in the parts of the world this setup hears, on those bands, at those hours. Only nets you probably hear when they meet are kept. Adds one search (about $0.10–0.30)."><input type="checkbox" id="nfDx"${d.dx?" checked":""}> <b>Also search worldwide</b>: nets around the world this antenna can probably hear (${d.dx_keep_pct}% or better when they meet)</label></div>
+    <details class="small" id="nfReachBox"${NF.reachOpen||d.dx?" open":""}><summary><b>What you can hear around the world today</b> <span class="muted">with this antenna and power: each hop's sun, the highest usable frequency, daytime and auroral absorption, the long path too</span></summary>${nfReachHtml()}</details>
     <p class="small muted">HF reach uses ${d.hf.good_km?"your proven range":"your antenna's pattern"} at each path's takeoff angle, the sun over the path when the net next meets (time of day and season), and today's solar flux: <b>${d.sfi.value}</b> (${esc(d.sfi.source)}).</p>`:"";
-  const bb=d.by_band||{},gname={VU:"VHF/UHF",HF:"HF"};
-  const status=["VU","HF"].filter(g=>(g==="VU"?vu:hf)).map(g=>{const b=bb[g];return b?`<b>${gname[g]}</b>: searched ${esc(new Date(b.at*1000).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}))} within ${b.km} km, ${b.found} found${b.error?` <span class="bad">(failed: ${esc(b.error)})</span>`:""}`:`<b>${gname[g]}</b>: <span class="warnc">not searched yet: press Search</span>`}).join(" · ");
+  const bb=d.by_band||{},gname={VU:"VHF/UHF",HF:"HF",DX:"Worldwide"};
+  const status=["VU","HF","DX"].filter(g=>(g==="VU"?vu:g==="HF"?hf:hf&&d.dx)).map(g=>{const b=bb[g];return b?`<b>${gname[g]}</b>: searched ${esc(new Date(b.at*1000).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}))} ${g==="DX"?"where you hear":`within ${b.km} km`}, ${b.found} found${b.error?` <span class="bad">(failed: ${esc(b.error)})</span>`:""}`:`<b>${gname[g]}</b>: <span class="warnc">not searched yet: press Search</span>`}).join(" · ");
   const busy=NF.busy||d.busy;
-  const go=`<div class="row"><button class="primary" data-nfgo${busy||!loc||!(vu||hf)?" disabled":""}>${busy?"Searching… clubs, ARES/RACES groups, repeater pages (up to a minute)":d.at?"Search again":"Search"}</button>
+  const go=`<div class="row"><button class="primary" data-nfgo${busy||!loc||!(vu||hf)?" disabled":""}>${busy?`Searching… clubs, ARES/RACES groups, repeater pages${hf&&d.dx?", nets around the world":""} (up to a minute)`:d.at?"Search again":"Search"}</button>
       <span class="small muted">${status?status+"<br>":""}${d.at?`Last searched ${esc(new Date(d.at*1000).toLocaleString([],{weekday:"short",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}))}${d.searched?` near ${esc(d.searched.where)}, ${esc(d.searched.bands.join(" + "))}`:""}${d.cost_usd!=null?` · cost $${d.cost_usd}`:""}. Results are kept a week.`:"One search costs about $0.10–0.30 of xAI and takes up to a minute."}</span></div>`;
   const msg=NF.msg?`<p class="${NF.msg.bad?"bad":"ok"}">${esc(NF.msg.text)}</p>`:"";
   const inBand=(d.nets||[]).filter(n=>bands===""||(bands==="HF")===(n.band==="HF"));
@@ -1993,11 +2005,11 @@ async function renderFind(){
   const chip=(c,pct)=>`<span class="np k-${c==="likely"?"ready":c==="maybe"?"tune":"cant"}" style="padding:0 6px">${c}${pct!=null?" "+pct+"%":""}</span>`;
   const rows=nets.map(n=>{const rid=NF.radio[n.id]!==undefined?NF.radio[n.id]:(n.radio||"");
     return `<tr class="${NF.sel.has(n.id)?"picked":""}"><td class="ck"><input type="checkbox" data-nfpick="${n.id}"${NF.sel.has(n.id)?" checked":""} aria-label="Select ${esc(n.name)}"></td>
-    <td><b>${esc(n.name)}</b>${n.kind&&n.band==="HF"?` <span class="np" style="padding:0 6px">${esc((d.interests.find(i=>i.id===n.kind)||{}).label||n.kind)}</span>`:""}${n.wide?' <span class="small muted">covers your area</span>':""}${n.emergency?' <span class="badge emergency">Emergency</span>':""}
+    <td><b>${esc(n.name)}</b>${n.region_label?` <span class="np k-ready" style="padding:0 6px" title="Found by the worldwide search">${esc(n.region_label)}</span>`:""}${n.kind&&n.band==="HF"?` <span class="np" style="padding:0 6px">${esc((d.interests.find(i=>i.id===n.kind)||{}).label||n.kind)}</span>`:""}${n.wide?' <span class="small muted">covers your area</span>':""}${n.emergency?' <span class="badge emergency">Emergency</span>':""}
       <div class="small muted">${esc([n.org,n.area,n.distance_km!=null?`${n.dist_src==="computed"?"":"~"}${n.distance_km} km${n.dist_src==="computed"?"":" (search's estimate)"}`:""].filter(Boolean).join(" · "))}${n.note?` · ${esc(n.note)}`:""}</div></td>
     <td>${nfRule(n)}</td>
     <td class="f">${Number(n.freq_mhz).toFixed(3)} MHz ${esc(n.mode)}${n.offset_mhz!=null?`<div class="small muted">${n.offset_mhz>0?"+":""}${n.offset_mhz} MHz${n.tone_hz?` · tone ${n.tone_hz}`:""}</div>`:n.tone_hz?`<div class="small muted">tone ${n.tone_hz}</div>`:""}</td>
-    <td>${n.prop?`<div title="${esc(n.prop.why)}">Hear ${chip(n.prop.chance,n.prop.pct_hear)}</div><div title="${esc(n.prop.why)}" class="small">Check in ${chip(n.prop.checkin,n.prop.pct_send)}</div><div class="small muted" title="${esc(n.prop.why)}">${n.prop.km} km · ${n.prop.snr_hear!=null?`${n.prop.hops} hop${n.prop.hops>1?"s":""} at ${n.prop.takeoff}°`:`skips (MUF ${n.prop.muf} MHz)`}${n.prop.dark!=null?(n.prop.dark?" · dark":" · daylight"):""}</div><details class="small"><summary>why</summary>${esc(n.prop.why)}</details>`:'<span class="small muted">—</span>'}</td>
+    <td>${n.prop?`<div title="${esc(n.prop.why)}">Hear ${chip(n.prop.chance,n.prop.pct_hear)}</div><div title="${esc(n.prop.why)}" class="small">Check in ${chip(n.prop.checkin,n.prop.pct_send)}</div><div class="small muted" title="${esc(n.prop.why)}">${n.prop.km.toLocaleString()} km${n.prop.long_path?" the long way round":""} · ${n.prop.snr_hear!=null?`${n.prop.hops} hop${n.prop.hops>1?"s":""} at ${n.prop.takeoff}°`:`skips (MUF ${n.prop.muf} MHz)`}${n.prop.dark!=null?(n.prop.dark?" · dark":" · daylight"):""}</div><details class="small"><summary>why</summary>${esc(n.prop.why)}</details>`:'<span class="small muted">—</span>'}</td>
     <td><select data-nfradio="${n.id}" aria-label="Radio for ${esc(n.name)}"><option value="">no radio</option>${tgt.map(r=>`<option value="${esc(r.id)}"${rid===r.id?" selected":""}>${esc(r.name)}</option>`).join("")}</select>${n.radio_why&&rid===n.radio?`<div class="small muted">${esc(n.radio_why)}</div>`:""}</td>
     <td class="small"><a href="${esc(n.source_url)}" target="_blank" rel="noopener noreferrer">source</a><div class="${n.source_opened?"muted":"warnc"}">${n.source_opened?"opened by the search":"not opened: check it"}</div></td></tr>`}).join("");
   const farNote=far.length?`<p class="small"><label class="chk"><input type="checkbox" data-nfhidefar${NF.hideFar?" checked":""}> Hide ${far.length} HF net${far.length===1?"":"s"} you probably can't hear at ${far.length===1?"its":"their"} hour</label></p>`:"";
@@ -2013,7 +2025,9 @@ async function renderFind(){
     catch(e){NF.msg={bad:true,text:e.message};renderFind()}};          // a field change saves quietly: no redraw swallows the next click
   const km=$("nfKm");if(km)km.onchange=()=>save({km:km.value});
   const hk=$("nfHfKm");if(hk)hk.onchange=()=>save({hf_km:hk.value});
-  const ant=$("nfAnt"),pw=$("nfPw"),ht=$("nfHt");if(ant){const f=()=>save({hf:nfVals().hf},false);   // never redraw while typing
+  const dx=$("nfDx");if(dx)dx.onchange=()=>{NF.d.dx=dx.checked;save({dx:dx.checked});if(dx.checked){NF.reachOpen=true;if(!NF.reach)nfLoadReach();else renderFind()}};
+  const rb=$("nfReachBox");if(rb){rb.ontoggle=()=>{NF.reachOpen=rb.open;if(rb.open&&NF.reach===undefined)nfLoadReach()};if(rb.open&&NF.reach===undefined)setTimeout(nfLoadReach,0)}
+  const ant=$("nfAnt"),pw=$("nfPw"),ht=$("nfHt");if(ant){const f=()=>save({hf:nfVals().hf},false).then(()=>{if(NF.reach!==undefined&&!NF.reachLoading){NF.reach=undefined;if(NF.reachOpen)nfLoadReach()}});   // never redraw while typing
     const gd=$("nfGnd");ant.onchange=()=>{const k=(NF.d.antennas.find(a=>a.id===ant.value)||{}).kind;if(ht)ht.closest("label").hidden=k!=="h";if(gd)gd.closest("label").hidden=k==="h";f()};pw.onchange=f;if(ht)ht.onchange=f;if(gd)gd.onchange=f;
     const g1=$("nfGood1"),g2=$("nfGood2");const fg=()=>{if((g1.value&&g2.value)||(!g1.value&&!g2.value))f()};g1.onchange=fg;g2.onchange=fg}
   document.querySelectorAll("[data-nfint]").forEach(x=>x.onchange=()=>{const v=nfVals().interests;if(v.length)save({interests:v})});
@@ -2021,7 +2035,7 @@ async function renderFind(){
 }
 document.addEventListener("click",async e=>{
   const t=e.target;if(!t.closest||!t.closest("#nfBox"))return;
-  if(t.closest("[data-nfback]")){NV.finding=false;NF.d=null;NF.sel.clear();renderSchedule(true);return}
+  if(t.closest("[data-nfback]")){NV.finding=false;NF.d=null;NF.reach=undefined;NF.sel.clear();renderSchedule(true);return}
   if(t.closest("[data-nfaddr]")){NF.addr=true;renderFind();return}
   if(t.closest("[data-nfaddrsave]")){try{NF.d=await post("/api/netfind/settings",{address:$("nfAddr").value,gps:null});NF.addr=false;NF.msg=null}catch(err){NF.msg={bad:true,text:err.message}}renderFind();return}
   if(t.closest("[data-nfgeo]")){NF.geoTried=false;const ok=await nfGeo();NF.msg=ok?null:{bad:true,text:"This PC did not give a location (Windows Settings → Privacy → Location, or the browser blocked it). Use an address instead."};if(!ok)NF.addr=true;renderFind();return}

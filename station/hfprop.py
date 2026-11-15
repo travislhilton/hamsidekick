@@ -15,6 +15,13 @@ A small sky-wave model, not a forecast. It works out, for the net's frequency, d
 so a poor receive antenna costs less than it does on transmit). "Check in": this station's power and antenna, heard on
 net control's dipole. SNR 12 dB and up = likely, 3-12 = maybe, below = unlikely; the percentage allows for conditions
 varying several dB from night to night.
+
+Long paths (owner 2026-11-14: "at certain times of the day I can hear Japan, China, Antarctica, Russia, South
+America"): with both ends known, every hop has its own control point on the great circle, each with its own sun
+(as ITU-R P.533 does): the path's MUF is the lowest hop's, the D-layer absorption is summed hop by hop (a path half
+in darkness loses only on its sunlit half: the gray line), hops through the auroral oval (60-75 deg geomagnetic) lose
+more, and the long path round the other side of the earth is tried too. `reach_table` runs that for world regions x
+bands x hours: what this station can hear, when, before any search.
 """
 from __future__ import annotations
 
@@ -27,7 +34,11 @@ R = 6371.0
 H_F2 = 300.0
 H_D = 80.0
 MIN_TAKEOFF = 3.0
-EXCESS_DB = 30.0             # polarization, defocusing, deviative losses: calibrates 100 W dipoles over 500 km at night to ~S8
+EXCESS_DB = 6.0              # polarization, defocusing, deviative losses (ITU-R P.533's system loss is ~6-9 dB)
+RESIDUAL_K = 650.0           # + K/(f+1.4)^2 once per path: the absorption left at night (E / lower F region): 24 dB
+#                              on 80 m, 9 on 40, 3 on 20. Together: 100 W dipoles over 500 km at night on 80 m ~S8, as
+#                              before (2026-11-14: the flat 30 dB that did that closed every 20 m DX path)
+GROUND_DB = 1.0              # per ground reflection between hops
 NCS = {"antenna": "dipole", "height_m": 15.0, "power_w": 100.0}
 TYPICAL_SFI = 130.0
 
@@ -180,11 +191,66 @@ def sun_over(when_utc, lat: float, lon: float) -> dict:
     z = solar_zenith(when_utc, lat, lon)
     zl = solar_zenith(when_utc - timedelta(hours=1.5), lat, lon)
     d = max(0.0, math.cos(math.radians(z))) ** 0.75
-    f2 = max(0.0, math.cos(math.radians(zl))) ** 0.6 if zl < 90 else 0.45 * math.exp(-(zl - 90) / 28)
+    f2 = max(0.0, math.cos(math.radians(zl))) ** 0.3 if zl < 90 else 0.45 * math.exp(-(zl - 90) / 28)
+    # ^0.3: a Chapman layer's peak density goes as cos(zenith)^0.5, foF2 as its square root (was ^0.6, which left
+    # winter days at 50 deg N at half their foF2 and closed 15-20 m to Europe at midday)
     doy = when_utc.timetuple().tm_yday
     winter = math.cos(2 * math.pi * (doy - 15) / 365) * (1 if lat >= 0 else -1)   # +1 mid-January (north)
     return {"zenith": z, "d": d, "f2": max(f2, 0.0), "day_x": 1 + 0.15 * winter, "night_x": 1 - 0.25 * winter,
             "sun_up": z < 90}
+
+
+GEOMAG_POLE = (80.8, -72.6)      # the north geomagnetic pole (IGRF-14 dipole, 2025)
+AURORAL_DB = 3.0                 # per hop with its control point in the auroral oval (60-75 deg geomagnetic), quiet sun
+POLAR_CAP_DB = 2.0               # per hop inside the polar cap (above 75 deg)
+EARTH_KM = 2 * math.pi * R
+
+
+def geomag_lat(lat: float, lon: float) -> float:
+    la, lo = math.radians(lat), math.radians(lon)
+    pla, plo = map(math.radians, GEOMAG_POLE)
+    return math.degrees(math.asin(math.sin(la) * math.sin(pla) + math.cos(la) * math.cos(pla) * math.cos(lo - plo)))
+
+
+def bearing(a: tuple, b: tuple) -> float:
+    """Initial great-circle bearing from a to b, degrees from north."""
+    la1, lo1, la2, lo2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    y = math.sin(lo2 - lo1) * math.cos(la2)
+    x = math.cos(la1) * math.sin(la2) - math.sin(la1) * math.cos(la2) * math.cos(lo2 - lo1)
+    return (math.degrees(math.atan2(y, x)) + 360) % 360
+
+
+def great_circle_km(a: tuple, b: tuple) -> float:
+    la1, lo1, la2, lo2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 2 * R * math.asin(min(1.0, math.sqrt(h)))
+
+
+def destination(a: tuple, brg: float, km: float) -> tuple:
+    la1, lo1, b, d = math.radians(a[0]), math.radians(a[1]), math.radians(brg), km / R
+    la2 = math.asin(math.sin(la1) * math.cos(d) + math.cos(la1) * math.sin(d) * math.cos(b))
+    lo2 = lo1 + math.atan2(math.sin(b) * math.sin(d) * math.cos(la1), math.cos(d) - math.sin(la1) * math.sin(la2))
+    return math.degrees(la2), (math.degrees(lo2) + 540) % 360 - 180
+
+
+def control_points(a: tuple, b: tuple, n: int, long: bool = False) -> list[tuple]:
+    """The midpoint of each of n equal hops from a to b (the long way round when `long`)."""
+    d = great_circle_km(a, b)
+    brg = bearing(a, b)
+    if long:
+        d, brg = EARTH_KM - d, (brg + 180) % 360
+    return [destination(a, brg, d * (i + 0.5) / n) for i in range(n)]
+
+
+def control(when_utc, lat: float, lon: float) -> dict:
+    """sun_over at one hop's control point, plus its geomagnetic latitude and what that does to the layers."""
+    c = sun_over(when_utc, lat, lon)
+    gm = abs(geomag_lat(lat, lon))
+    c["gmlat"] = gm
+    c["aurora_db"] = AURORAL_DB if 60 <= gm <= 75 else POLAR_CAP_DB if gm > 75 else 0.0
+    # foF2 by latitude: the equatorial anomaly crests (~15 deg geomagnetic) run higher by day, high latitudes lower
+    c["lat_x"] = 1.15 if 8 <= gm <= 22 and c["sun_up"] else 0.85 if gm >= 67 else 1.0
+    return c
 
 
 def takeoff(hop_km: float, h: float = H_F2) -> float:
@@ -206,23 +272,33 @@ def _sec_at(theta: float, h: float) -> float:
     return 1 / math.sqrt(max(1e-4, 1 - s * s))
 
 
-def path(f: float, km: float, hour: float, sfi: float, n: int | None = None, sun: dict | None = None) -> dict:
-    """The path over `n` hops (None: the fewest the geometry allows)."""
+def path(f: float, km: float, hour: float, sfi: float, n: int | None = None, sun: dict | None = None,
+         controls: list[dict] | None = None) -> dict:
+    """The path over `n` hops (None: the fewest the geometry allows). `controls`: one `control()` per hop (a long
+    path): the lowest hop's MUF limits the path, absorption and auroral loss add up hop by hop."""
     if n is None:
         n, th = hops(max(20.0, km))
     else:
         th = takeoff(km / n)
     hop = km / n
-    fo = fof2(hour, sfi, sun)
+    a_unit = _sec_at(th, H_D) * 300.0 * (0.6 + 0.004 * sfi) / (f + 1.4) ** 2
+    aurora = 0.0
+    if controls:
+        fo = min(fof2(hour, sfi, c) * c["lat_x"] for c in controls)
+        absorb = sum(a_unit * max(0.05, c["d"]) for c in controls)
+        aurora = sum(c["aurora_db"] for c in controls)
+    else:
+        fo = fof2(hour, sfi, sun)
+        absorb = n * a_unit * max(0.05, sun["d"] if sun else _day(hour))
     muf = fo * _sec_at(th, H_F2)
     r = f / muf
     muf_db = 0.0 if r <= 0.9 else 3.0 if r <= 1.0 else 12.0 if r <= 1.1 else None
-    dfac = sun["d"] if sun else _day(hour)
-    absorb = n * _sec_at(th, H_D) * 300.0 * max(0.05, dfac) * (0.6 + 0.004 * sfi) / (f + 1.4) ** 2
     slant = n * 2 * math.hypot(hop / 2, H_F2)
     spread = 32.45 + 20 * math.log10(f) + 20 * math.log10(slant)
-    loss = spread + absorb + 2.0 * (n - 1) + EXCESS_DB + (muf_db or 0.0)
-    return {"hops": n, "takeoff": th, "fof2": fo, "muf": muf, "absorb": absorb, "loss": loss, "open": muf_db is not None}
+    residual = RESIDUAL_K / (f + 1.4) ** 2
+    loss = spread + absorb + aurora + residual + GROUND_DB * (n - 1) + EXCESS_DB + (muf_db or 0.0)
+    return {"hops": n, "takeoff": th, "fof2": fo, "muf": muf, "absorb": absorb, "aurora": aurora, "loss": loss,
+            "open": muf_db is not None}
 
 
 def noise_dbm(f: float) -> float:
@@ -243,7 +319,7 @@ def chance_pct(snr: float | None) -> int:
 
 def estimate(f: float, km: float | None, start: str, antenna: str, height_m: float, power_w: float,
              sfi: float = TYPICAL_SFI, good_km: tuple | None = None, when_utc=None, mid: tuple | None = None,
-             ground: str = "average") -> dict:
+             ground: str = "average", ends: tuple | None = None) -> dict:
     """{"chance": hear, "checkin": be heard, "pct_hear", "pct_send", "why", "band", "takeoff", "gain", "muf", "hops",
     "snr_hear", "snr_send"}. `good_km` = (from, to): where the operator hears stations well; it then defines the
     antenna's pattern instead of the model. The best of 1-6 hops is used (a long path may ride several short hops)."""
@@ -260,21 +336,29 @@ def estimate(f: float, km: float | None, start: str, antenna: str, height_m: flo
     dbm = lambda w: 10 * math.log10(max(0.1, w) * 1000)          # noqa: E731
     nz = noise_dbm(f)
     best = None
-    for n in range(n_min, n_min + 6):
-        p = path(f, d, hour, sfi, n, sun)
-        if not p["open"]:
-            if best is None:
-                best = {"p": p, "hear": None, "send": None, "g": g_of(p["takeoff"])}
-            continue
-        th = p["takeoff"]
-        g_me, g_ncs = g_of(th), gain(NCS["antenna"], f, NCS["height_m"], th)
-        g_rx = g_me if good or g_me > -6 else -6 + (g_me + 6) * 0.3   # a weak antenna also hears less noise (a
-        #                                                                 measured sweet spot already includes that)
-        hear = dbm(NCS["power_w"]) + g_ncs + g_rx - p["loss"] - nz
-        send = dbm(power_w) + g_me + g_ncs - p["loss"] - nz
-        if best is None or best["hear"] is None or hear > best["hear"]:
-            best = {"p": p, "hear": hear, "send": send, "g": g_me}
+    # both ends known with the net's date: a control point per hop (the short path; past 8,000 km the long path too)
+    per_hop = ends is not None and when_utc is not None and None not in (*ends[0], *ends[1])
+    ways = [(False, d)] + ([(True, EARTH_KM - d)] if per_hop and d > 8000 else [])
+    for long_way, dd in ways:
+        n0, _ = hops(dd)
+        for n in range(n0, n0 + (6 if not long_way else 3)):
+            ctl = [control(when_utc, *pt) for pt in control_points(ends[0], ends[1], n, long_way)] if per_hop else None
+            p = path(f, dd, hour, sfi, n, sun, ctl)
+            p["long"], p["km"] = long_way, dd
+            if not p["open"]:
+                if best is None:
+                    best = {"p": p, "hear": None, "send": None, "g": g_of(p["takeoff"])}
+                continue
+            th = p["takeoff"]
+            g_me, g_ncs = g_of(th), gain(NCS["antenna"], f, NCS["height_m"], th)
+            g_rx = g_me if good or g_me > -6 else -6 + (g_me + 6) * 0.3   # a weak antenna also hears less noise (a
+            #                                                                 measured sweet spot already includes that)
+            hear = dbm(NCS["power_w"]) + g_ncs + g_rx - p["loss"] - nz
+            send = dbm(power_w) + g_me + g_ncs - p["loss"] - nz
+            if best is None or best["hear"] is None or hear > best["hear"]:
+                best = {"p": p, "hear": hear, "send": send, "g": g_me}
     p, hear, send, g_me = best["p"], best["hear"], best["send"], best["g"]
+    d = p.get("km", d)
     th = p["takeoff"]
     name = ANTENNAS[antenna][0]
     hh = f"{int(hour):02d}:{int(round(hour % 1 * 60)):02d}"
@@ -292,14 +376,17 @@ def estimate(f: float, km: float | None, start: str, antenna: str, height_m: flo
             zone = f" {round(d)} km is closer than your antenna's sweet spot: its signal goes up too steeply."
         elif good and d <= good[1] * p["hops"] and d >= good[0] * p["hops"]:
             zone = " In your antenna's sweet spot."
-        why = (f"{band_of(f)} at {hh}, {round(d)} km: {p['hops']} hop{'s' if p['hops'] > 1 else ''} of "
+        why = (f"{band_of(f)} at {hh}, {round(d)} km{' the long way round' if p.get('long') else ''}: "
+               f"{p['hops']} hop{'s' if p['hops'] > 1 else ''} of "
                f"{round(d / p['hops'])} km, takeoff {th:.0f}°; highest usable frequency {p['muf']:.1f} MHz (solar flux "
-               f"{round(sfi)}); daytime absorption {p['absorb']:.0f} dB. {ant_words[0].upper() + ant_words[1:]}: "
+               f"{round(sfi)}); daytime absorption {p['absorb']:.0f} dB"
+               + (f"; through the auroral zone {p['aurora']:.0f} dB" if p.get("aurora") else "")
+               + f". {ant_words[0].upper() + ant_words[1:]}: "
                f"{g_me:+.0f} dBi at {th:.0f}°.{zone} Signal over noise: hearing {hear:+.0f} dB, checking in with "
                f"{power_w:g} W {send:+.0f} dB")
     return {"chance": _word(hear), "checkin": _word(send), "pct_hear": chance_pct(hear), "pct_send": chance_pct(send),
             "why": why, "band": band_of(f), "takeoff": round(th), "gain": round(g_me, 1), "muf": round(p["muf"], 1),
-            "hops": p["hops"], "km": round(d), "dark": (not sun["sun_up"]) if sun else None, "snr_hear": None if hear is None else round(hear),
+            "hops": p["hops"], "km": round(d), "long_path": bool(p.get("long")), "dark": (not sun["sun_up"]) if sun else None, "snr_hear": None if hear is None else round(hear),
             "snr_send": None if send is None else round(send)}
 
 
@@ -331,3 +418,82 @@ def _fetch(url):
     req = urllib.request.Request(url, headers={"User-Agent": "HAM-Sidekick-Station"})
     with urllib.request.urlopen(req, timeout=6) as r:
         return json.loads(r.read())
+
+
+# ---------------------------------------------------------------- what this station can hear around the world -----
+# Each region: a few places it is heard from (the best of them counts), and what to look for there. The coordinates
+# are cities and research stations, public; they stand for the region in the path model, nothing more.
+REGIONS = {
+    "japan": ("Japan", ((35.7, 139.7), (43.1, 141.4), (33.6, 130.4)), "JARL and Japanese clubs' nets, English-language nets"),
+    "china": ("China, Taiwan and Hong Kong", ((39.9, 116.4), (31.2, 121.5), (25.0, 121.5), (22.3, 114.2)),
+              "CRAC, CTARL and HARTS nets"),
+    "korea": ("Korea", ((37.6, 127.0), (35.2, 129.1)), "KARL nets"),
+    "se_asia": ("Southeast Asia and the Philippines", ((14.6, 121.0), (1.35, 103.8), (13.8, 100.5), (-6.2, 106.8)),
+                "PARA, ORARI, RAST and regional nets"),
+    "india": ("India and South Asia", ((28.6, 77.2), (19.1, 72.9), (13.1, 80.3)), "ARSI and Indian nets"),
+    "russia_w": ("European Russia", ((55.75, 37.6), (59.9, 30.3), (56.8, 60.6)), "SRR and Russian nets"),
+    "russia_e": ("Siberia and the Russian Far East", ((55.0, 82.9), (52.3, 104.3), (43.1, 131.9), (64.7, 177.5)),
+                 "SRR and Far East nets"),
+    "europe": ("Europe", ((51.5, -0.1), (50.1, 8.7), (48.9, 2.35), (41.9, 12.5), (59.3, 18.1), (52.2, 21.0)),
+               "national society nets (RSGB, DARC, REF, ARI, SSA, PZK), Europe-wide and English-language nets"),
+    "mideast": ("Middle East", ((25.2, 55.3), (31.8, 35.2), (24.7, 46.7)), "regional and English-language nets"),
+    "africa": ("Africa", ((-26.2, 28.0), (-33.9, 18.4), (-1.3, 36.8), (6.5, 3.4), (30.0, 31.2)),
+               "SARL, ARRL-affiliated and African nets"),
+    "s_america": ("South America", ((-34.6, -58.4), (-23.5, -46.6), (-12.0, -77.0), (4.7, -74.1), (-33.4, -70.7)),
+                  "LABRE, RCA and Latin American nets (Spanish / Portuguese / English)"),
+    "caribbean": ("Caribbean and Central America", ((18.5, -66.1), (18.0, -76.8), (19.4, -99.1), (9.9, -84.1)),
+                  "Caribbean emergency (CEWN), hurricane and regional nets"),
+    "antarctica": ("Antarctica", ((-77.8, 166.7), (-64.8, -64.0), (-62.2, -58.9), (-67.6, 62.9)),
+                   "Antarctic base and expedition schedules, the Antarctic net"),
+    "australia": ("Australia", ((-33.9, 151.2), (-37.8, 145.0), (-31.95, 115.9), (-27.5, 153.0)), "WIA and Australian nets"),
+    "nz_pacific": ("New Zealand and the Pacific", ((-36.8, 174.8), (-41.3, 174.8), (-17.7, 168.3), (-18.1, 178.4)),
+                   "NZART, Pacific island and maritime nets"),
+    "hawaii": ("Hawaii", ((21.3, -157.9), (19.7, -155.1)), "Hawaii nets and Pacific maritime nets"),
+    "alaska": ("Alaska and the Arctic", ((61.2, -149.9), (64.8, -147.7), (71.3, -156.8)), "Alaska and Arctic nets"),
+}
+DX_BANDS = (("160 m", 1.9), ("80 m", 3.8), ("40 m", 7.18), ("20 m", 14.25), ("17 m", 18.13), ("15 m", 21.3),
+            ("12 m", 24.95), ("10 m", 28.45))
+DX_MIN_PCT = 60                 # a window: the hours this station hears the region at least this often
+NEAR_KM = 2500                  # a region this close is the regional search's, not the worldwide one's
+
+
+def reach_table(home: tuple, antenna: str, height_m: float, power_w: float, sfi: float = TYPICAL_SFI,
+                ground: str = "average", good_km: tuple | None = None, day=None, min_pct: int = DX_MIN_PCT) -> list[dict]:
+    """For each region: the bands and UTC hours (on `day`, default today) this station probably hears it, with the
+    chance of being heard back. [{"id", "label", "km", "windows": [{"band", "mhz", "from", "to" (UTC hour, exclusive),
+    "best", "send"}]}], the regions with the most and best windows first; regions closer than NEAR_KM left out."""
+    from datetime import date, datetime, timezone
+    day = day or date.today()
+    out = []
+    for rid, (label, pts, _) in REGIONS.items():
+        kms = [great_circle_km(home, p) for p in pts]
+        if min(kms) < NEAR_KM:
+            continue
+        wins = []
+        for band, f in DX_BANDS:
+            hear, send = [0] * 24, [0] * 24
+            for h in range(24):
+                when = datetime(day.year, day.month, day.day, h, 30, tzinfo=timezone.utc)
+                for p, km in zip(pts, kms):
+                    e = estimate(f, km, f"{h:02d}:30", antenna, height_m, power_w, sfi, good_km, when, None, ground,
+                                 (home, p))
+                    if e["pct_hear"] > hear[h]:
+                        hear[h], send[h] = e["pct_hear"], e["pct_send"]
+            on = [x >= min_pct for x in hear]
+            if all(on):
+                wins.append({"band": band, "mhz": f, "from": 0, "to": 24, "best": max(hear), "send": max(send)})
+                continue
+            start = next((i for i in range(24) if not on[i]), 0)     # walk round the clock from a closed hour
+            run = []
+            for k in range(1, 25):
+                i = (start + k) % 24
+                if on[i]:
+                    run.append(i)
+                if run and (not on[i] or k == 24):
+                    wins.append({"band": band, "mhz": f, "from": run[0], "to": (run[-1] + 1) % 24 or 24,
+                                 "best": max(hear[j] for j in run), "send": max(send[j] for j in run)})
+                    run = []
+        wins.sort(key=lambda w: (-w["best"], -((w["to"] - w["from"]) % 24)))
+        out.append({"id": rid, "label": label, "km": round(min(kms)), "windows": wins})
+    out.sort(key=lambda r: (-len(r["windows"]), -max([w["best"] for w in r["windows"]] or [0]), r["km"]))
+    return out

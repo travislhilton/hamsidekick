@@ -9,6 +9,11 @@ browser reports (or station_lat/station_lon in station.yaml); else the address t
 when the ZIP table is installed). Only a rounded position (0.1 degree, about 10 km) and the 4-character grid go to
 xAI, never a street address: an address is reduced to its ZIP or "town, state".
 
+Worldwide (owner 2026-11-14: "schedule nets that are possible to reach around the world ... with my antenna choice on
+appropriate bands"): with "Also search worldwide" on, a third search looks for DX, international, maritime and
+expedition nets in the regions, on the bands and inside the UTC hours station/hfprop.reach_table says this setup
+hears (no distance limit), and only nets this station probably hears when they next meet (DX_KEEP_PCT) are kept.
+
 Search results are AI-found and may be stale: a net is offered only with a frequency, a start time, its days and a
 source link; each says whether the search actually opened that source. Results are kept a week (data/netfind.json),
 so reopening the list costs nothing; "Search again" asks afresh (one search: roughly 10-60 s and about $0.10-0.30).
@@ -28,6 +33,8 @@ from . import schedule as sched
 
 DEFAULT_KM = 50            # VHF/UHF: how far to look (owner: settable, 50 km by default)
 DEFAULT_HF_KM = 800        # HF: regional nets (80 / 40 m reach this far at night with a simple antenna)
+MAX_HF_KM = 20000          # half way round the earth (owner 11-14: "don't restrict to 5000 km")
+DX_KEEP_PCT = 50           # worldwide: kept only when this station hears the net at least this often at its hour
 KEEP_S = 7 * 86400
 MODEL = "grok-4.20-0309-non-reasoning"
 TIMEOUT_S = 240
@@ -218,6 +225,36 @@ def _prompt(loc: dict, want: dict, km: int, hf_km: int, modes: list[str], hf: di
         "include nets on 160, 80, 60 and 40 m for regional coverage and 20 m and up for long distances.\n") + _FIELDS % 40
 
 
+def _utc_windows(table: list[dict], per_region: int = 4) -> str:
+    lines = []
+    for r in table:
+        if not r["windows"]:
+            continue
+        w = "; ".join(f"{x['band']} {x['from']:02d}-{x['to'] % 24:02d} UTC" for x in r["windows"][:per_region])
+        lines.append(f"- {r['label']} ({r['id']}, about {r['km']:,} km; look for {hfprop.REGIONS[r['id']][2]}): {w}")
+    return "\n".join(lines)
+
+
+def _dx_prompt(loc: dict, modes: list[str], hf: dict, table: list[dict]) -> str:
+    """The worldwide search: nets where, when and on the bands the path model says this station hears."""
+    ant = hfprop.ANTENNAS.get(hf.get("antenna"), hfprop.ANTENNAS["efhw"])[0]
+    return ("You find amateur radio HF nets around the world for a listening station near " + _where_words(loc)
+            + ". Its radios do: " + ", ".join(modes) + f". Its HF setup: {ant}, {hf.get('height_m', 10):g} m up, "
+            f"{hf.get('power_w', 100):g} W. Only list a net you found on a page, with that page's URL; never guess a "
+            "frequency or time. Prefer pages updated in the last two years.\n"
+            "A propagation model (this antenna, today's solar flux, the sun over each path) says the station hears "
+            "these regions on these bands at these UTC hours:\n" + _utc_windows(table) + "\n"
+            "Find nets in THOSE regions, on THOSE bands, that meet inside those UTC hours (or within an hour of them): "
+            "DX nets and DX list nets, international and English-language nets, the national amateur radio society's "
+            "nets, maritime mobile and sailing nets, Antarctic, island and expedition schedules, IARU region and "
+            "international emergency nets, and long-running special-interest nets. Search the national societies' "
+            "pages, net directories, maritime net lists and recent forum posts. Give each net's start time as "
+            "published (UTC where the page gives UTC) and its home or net control's location as lat/lon; set "
+            "\"region\" to the region's id in brackets above.\n") + _FIELDS.replace(
+        "\"kind\": one of emergency traffic social technical special,",
+        "\"region\": the region id, \"kind\": one of emergency traffic social technical special,") % 40
+
+
 def _post(key: str, body: dict, timeout: float) -> dict:
     req = urllib.request.Request("https://api.x.ai/v1/responses", data=json.dumps(body).encode(),
                                  headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
@@ -297,8 +334,9 @@ def _distance_km(a, b) -> float | None:
 
 
 def _clean(raw: dict, seen: set[str], want: dict, km: int, hf_km: int, modes: list[str],
-           home: dict | None = None) -> tuple[dict | None, str]:
-    """One model row -> a net the page can offer, or (None, why it was left out)."""
+           home: dict | None = None, dx: bool = False) -> tuple[dict | None, str]:
+    """One model row -> a net the page can offer, or (None, why it was left out). `dx`: the worldwide search (no
+    distance limit; the net's place is needed to work out the path: its own lat/lon, else its region's)."""
     if not isinstance(raw, dict):
         return None, "not a net"
     name = " ".join(str(raw.get("name") or "").split())[:80]
@@ -349,7 +387,17 @@ def _clean(raw: dict, seen: set[str], want: dict, km: int, hf_km: int, modes: li
     if home and home.get("lat") is not None and nlat is not None and nlon is not None \
             and -90 <= nlat <= 90 and -180 <= nlon <= 180 and (nlat, nlon) != (0, 0):
         dist, dist_src = _distance_km((home["lat"], home["lon"]), (nlat, nlon)), "computed"   # great circle from here
-    limit = hf_km if band == "HF" else km
+    region = str(raw.get("region") or "").strip().lower()
+    region = region if region in hfprop.REGIONS else None
+    if dx:
+        if dist_src != "computed" and region and home and home.get("lat") is not None:
+            nlat, nlon = hfprop.REGIONS[region][1][0]
+            dist, dist_src = _distance_km((home["lat"], home["lon"]), (nlat, nlon)), "region"
+        if dist_src not in ("computed", "region"):
+            return None, f"{name}: no place given, so its path can't be worked out"
+        if band != "HF":
+            return None, f"{name}: not HF"
+    limit = MAX_HF_KM if dx else hf_km if band == "HF" else km
     wide = band == "HF" and bool(raw.get("serves_station_area"))       # a state / regional / national net
     if dist is not None and dist > limit * 1.25 and not wide:
         return None, f"{name}: about {round(dist)} km away"
@@ -363,7 +411,9 @@ def _clean(raw: dict, seen: set[str], want: dict, km: int, hf_km: int, modes: li
            "ncs": (str(raw.get("ncs") or "").strip()[:40] or None), "emergency": bool(raw.get("emergency")),
            "band": band, "area": str(raw.get("area") or "").strip()[:80], "distance_km": round(dist) if dist else None,
            "dist_src": dist_src if dist else None,
-           "lat": nlat if dist_src == "computed" else None, "lon": nlon if dist_src == "computed" else None,
+           "lat": nlat if dist_src in ("computed", "region") else None,
+           "lon": nlon if dist_src in ("computed", "region") else None,
+           "group": "DX" if dx else "HF" if band == "HF" else "VU", "region": region,
            "source_url": src[:400], "source_opened": _norm_url(src) in seen, "utc": tz == "UTC",
            "zone_moved": moved and tz != "UTC",
            "org": str(raw.get("org") or "").strip()[:80] or None, "wide": wide,
@@ -424,10 +474,17 @@ def _mark(st, nets: list[dict], hf: dict | None = None, sfi: float = hfprop.TYPI
             if home.get("lat") is not None:
                 here = (home["lat"], home["lon"])
                 mid = _midpoint(here, (n["lat"], n["lon"])) if n.get("lat") is not None else here
+            ends = ((home["lat"], home["lon"]), (n["lat"], n["lon"])) \
+                if home.get("lat") is not None and n.get("lat") is not None else None   # a control point per hop
             n["prop"] = hfprop.estimate(n["freq_mhz"], n.get("distance_km"), n["start"], hf["antenna"], hf["height_m"],
                                         hf["power_w"], sfi, tuple(hf["good_km"]) if hf.get("good_km") else None,
-                                        when, mid, hf.get("ground") or "average")
+                                        when, mid, hf.get("ground") or "average", ends)
+            if n.get("region"):
+                n["region_label"] = hfprop.REGIONS[n["region"]][0]
     return nets
+
+
+GROUP_NAMES = {"VU": "VHF/UHF", "HF": "HF", "DX": "worldwide HF"}
 
 
 class Finder:
@@ -437,6 +494,8 @@ class Finder:
         self.fetch = fetch                                      # NOAA's solar flux (hfprop.solar_flux); None = the web
         self.lock = threading.Lock()
         self.busy = False
+        self._table = (None, None)                              # (key, reach_table) for today's settings
+        self._tabling = False
 
     def key(self):
         from . import secrets
@@ -451,6 +510,41 @@ class Finder:
                 dd["sfi"] = c
                 _save(self.st, dd)
         return v, src
+
+    def _table_key(self, d: dict, sfi: float):
+        loc = location(self.st) or {}
+        if loc.get("lat") is None:
+            return None
+        h = self._hf(d)
+        return (round(loc["lat"], 1), round(loc["lon"], 1), h["antenna"], h["height_m"], h["power_w"], h["ground"],
+                tuple(h["good_km"] or ()), round(sfi / 5) * 5, date.today().isoformat())
+
+    def reach_table(self, d: dict | None = None, sfi: float | None = None, wait: bool = False) -> list[dict] | None:
+        """What this setup hears around the world today (hfprop.reach_table: a few seconds), cached for the day and
+        these settings. Not ready yet: None, and it is worked out in the background (or now, with `wait`)."""
+        d = d if d is not None else _load(self.st)
+        sfi = sfi if sfi is not None else self._sfi(d)[0]
+        key = self._table_key(d, sfi)
+        if key is None:
+            return None
+        if self._table[0] == key:
+            return self._table[1]
+
+        def work():
+            try:
+                h = self._hf(d)
+                t = hfprop.reach_table((key[0], key[1]), h["antenna"], h["height_m"], h["power_w"], sfi, h["ground"],
+                                       tuple(h["good_km"]) if h.get("good_km") else None)
+                self._table = (key, t)
+            finally:
+                self._tabling = False
+        if wait:
+            work()
+            return self._table[1]
+        if not self._tabling:
+            self._tabling = True
+            threading.Thread(target=work, daemon=True, name="netfind-reach").start()
+        return None
 
     def state(self) -> dict:
         d = _load(self.st)
@@ -467,8 +561,12 @@ class Finder:
         order = {"likely": 0, "maybe": 1, "unlikely": 2}
         nets.sort(key=lambda n: (n["band"] == "HF", order.get((n.get("prop") or {}).get("chance"), 0),
                                  n["distance_km"] if n["distance_km"] is not None else 9999, n["name"].casefold()))
+        hf_on = reach(self.st)["HF"]
+        key = self._table_key(d, sfi) if hf_on else None
+        table = self._table[1] if key is not None and self._table[0] == key else None   # GET /api/netfind/reach
         return {"key": bool(self.key()), "location": location(self.st), "km": d.get("km", DEFAULT_KM),
-                "hf_km": d.get("hf_km", DEFAULT_HF_KM), "reach": reach(self.st), "hf": hf,
+                "hf_km": d.get("hf_km", DEFAULT_HF_KM), "max_hf_km": MAX_HF_KM, "reach": reach(self.st), "hf": hf,
+                "dx": bool(d.get("dx")), "dx_table": table, "dx_min_pct": hfprop.DX_MIN_PCT, "dx_keep_pct": DX_KEEP_PCT,
                 "antennas": [{"id": k, "label": v[0], "kind": v[1]} for k, v in hfprop.ANTENNAS.items()],
                 "grounds": [{"id": k, "label": v[0]} for k, v in hfprop.GROUNDS.items()],
                 "interests": [{"id": k, "label": v[0], "on": k in self._interests(d)} for k, v in INTERESTS.items()],
@@ -501,8 +599,8 @@ class Finder:
                 d["km"] = int(km)
             if "hf_km" in body:
                 km = _num(body.get("hf_km"))
-                if not km or not 50 <= km <= 5000:
-                    raise ValueError("HF distance must be 50 to 5000 km")
+                if not km or not 50 <= km <= MAX_HF_KM:
+                    raise ValueError(f"HF distance must be 50 to {MAX_HF_KM} km")
                 d["hf_km"] = int(km)
             if "hf" in body:
                 h = body.get("hf") or {}
@@ -523,6 +621,8 @@ class Finder:
                 gr = h.get("ground") if h.get("ground") in hfprop.GROUNDS else hfprop.DEFAULT["ground"]
                 d["hf"] = {"antenna": h["antenna"], "height_m": round(ht, 1), "power_w": int(p), "good_km": good,
                            "ground": gr}
+            if "dx" in body:
+                d["dx"] = bool(body.get("dx"))
             if "interests" in body:
                 v = [i for i in body.get("interests") or [] if i in INTERESTS]
                 if not v:
@@ -543,11 +643,13 @@ class Finder:
             _save(self.st, d)
         return self.state()
 
-    def _one(self, key, loc, group, km, hf_km, modes, hf, interests) -> dict:
-        """One web search for one band group ("VU" or "HF"): {"rows", "seen", "cost", "error"}."""
-        want = {"VU": group == "VU", "HF": group == "HF"}
-        body = {"model": MODEL, "max_tool_calls": 30 if group == "HF" else 24, "tools": [{"type": "web_search"}],
-                "input": [{"role": "user", "content": _prompt(loc, want, km, hf_km, modes, hf, interests)}]}
+    def _one(self, key, loc, group, km, hf_km, modes, hf, interests, table=None) -> dict:
+        """One web search for one group ("VU", "HF" or "DX": worldwide): {"rows", "seen", "cost", "error"}."""
+        want = {"VU": group == "VU", "HF": group in ("HF", "DX")}
+        text = _dx_prompt(loc, modes, hf, table or []) if group == "DX" else \
+            _prompt(loc, want, km, hf_km, modes, hf, interests)
+        body = {"model": MODEL, "max_tool_calls": 30 if group != "VU" else 24, "tools": [{"type": "web_search"}],
+                "input": [{"role": "user", "content": text}]}
         try:
             resp = self.post(key, body, TIMEOUT_S)
         except Exception as e:  # noqa: BLE001
@@ -565,7 +667,7 @@ class Finder:
         """Search now. `body` may carry the page's current settings (km, hf_km, hf, interests): saved first, so a
         field still being edited is never lost to the click. Both band groups: two searches in parallel; one group:
         the other group's earlier results are kept."""
-        body = {k: v for k, v in (body or {}).items() if k in ("km", "hf_km", "hf", "interests")}
+        body = {k: v for k, v in (body or {}).items() if k in ("km", "hf_km", "hf", "interests", "dx")}
         if body:
             self.settings(body)
         key = self.key()
@@ -576,6 +678,15 @@ class Finder:
             raise ValueError("say where the station is: a grid square in Settings, this PC's location, or an address")
         r = reach(self.st)
         groups = [g for g, ok in (("VU", r["VU"]), ("HF", r["HF"])) if ok and bands in (None, "", g)]
+        d0 = _load(self.st)
+        table = None
+        if "HF" in groups and d0.get("dx"):
+            if loc.get("lat") is None:
+                raise ValueError("the worldwide search needs the station's position (a grid square or this PC's "
+                                 "location), not just an address")
+            table = self.reach_table(d0, wait=True)
+            if any(t["windows"] for t in table or []):
+                groups.append("DX")
         if not groups:
             raise ValueError("no radio here records " + ({"HF": "HF", "VU": "VHF/UHF"}.get(bands or "", "HF or VHF/UHF"))
                              + " nets: add a radio (or set its type in Radios) first")
@@ -588,7 +699,7 @@ class Finder:
         try:
             res: dict[str, dict] = {}
             ths = [threading.Thread(target=lambda g=g: res.__setitem__(g, self._one(key, loc, g, km, hf_km, r["modes"],
-                                                                                      hf, ints)), daemon=True)
+                                                                                      hf, ints, table)), daemon=True)
                    for g in groups]
             for t in ths:
                 t.start()
@@ -596,19 +707,26 @@ class Finder:
                 t.join(TIMEOUT_S + 10)
             prev = (d.get("last") or {}) if time.time() - (d.get("last") or {}).get("at", 0) < KEEP_S else {}
             by_band = dict(prev.get("by_band") or {})
-            nets = [n for n in prev.get("nets") or [] if ("HF" if n.get("band") == "HF" else "VU") not in groups]
+            grp = lambda n: n.get("group") or ("HF" if n.get("band") == "HF" else "VU")   # noqa: E731
+            nets = [n for n in prev.get("nets") or [] if grp(n) not in groups
+                    and not (grp(n) == "DX" and "HF" in groups)]               # worldwide off: its old results go too
             out = [x for x in prev.get("left_out_by") or [] if x.get("g") not in groups]
             ids = {n["id"] for n in nets}
             cost, errors = 0.0, []
             for g in groups:
                 one = res.get(g) or {"rows": [], "seen": set(), "cost": None, "error": "timed out"}
-                want = {"VU": g == "VU", "HF": g == "HF"}
+                want = {"VU": g == "VU", "HF": g in ("HF", "DX")}
                 kept = 0
                 for raw in one["rows"]:
                     b = _rng((raw or {}).get("freq_mhz") if isinstance(raw, dict) else None)
-                    if b and ("HF" if b == "HF" else "VU") != g:
+                    if b and ("HF" if b == "HF" else "VU") != ("HF" if g == "DX" else g):
                         continue                                # the other group's search covers it
-                    n, why = _clean(raw, one["seen"], want, km, hf_km, r["modes"], loc)
+                    n, why = _clean(raw, one["seen"], want, km, hf_km, r["modes"], loc, dx=g == "DX")
+                    if n and g == "DX" and n["id"] not in ids:  # worldwide: only what this setup probably hears
+                        p = _mark(self.st, [dict(n)], hf, self._sfi(d)[0])[0].get("prop") or {}
+                        if p.get("pct_hear", 0) < DX_KEEP_PCT:
+                            n, why = None, (f"{n['name']}: heard here about {p.get('pct_hear', 0)}% of the time when "
+                                            f"it meets ({p.get('band', '')} at {n['start']} your time)")
                     if n and n["id"] not in ids:
                         ids.add(n["id"])
                         nets.append(n)
@@ -617,16 +735,16 @@ class Finder:
                         out.append({"g": g, "why": why})
                 cost += one["cost"] or 0.0
                 if one["error"]:
-                    errors.append(f"the {'HF' if g == 'HF' else 'VHF/UHF'} search failed ({one['error']})")
+                    errors.append(f"the {GROUP_NAMES[g]} search failed ({one['error']})")
                 by_band[g] = {"at": time.time(), "found": len(one["rows"]), "kept": kept, "error": one["error"],
-                              "km": hf_km if g == "HF" else km,
+                              "km": MAX_HF_KM if g == "DX" else hf_km if g == "HF" else km,
                               "interests": [INTERESTS[i][0] for i in ints] if g == "HF" else None}
                 print(f"netfind: {g} search: {len(one['rows'])} found, {kept} kept, ${(one['cost'] or 0):.3f}"
                       + (f", error {one['error']}" if one["error"] else ""), flush=True)
             last = {"at": time.time(), "nets": nets, "left_out_by": out[:80], "left_out": [x["why"] for x in out][:80],
                     "cost_usd": round(cost, 3), "by_band": by_band,
                     "searched": {"where": loc.get("label"), "km": km, "hf_km": hf_km,
-                                 "bands": [{"VU": "VHF/UHF", "HF": "HF"}[g] for g in groups]},
+                                 "bands": [GROUP_NAMES[g] for g in groups]},
                     "error": "; ".join(errors) or (None if nets else "the search found no nets with a source page")}
             with self.lock:
                 d = _load(self.st)

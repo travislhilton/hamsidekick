@@ -290,6 +290,15 @@ you chose is remembered. Each column shows:
   **Move to Not heard** / **Keep it**. **Find nets** lists a found net that matches a Not heard one (same frequency and
   start, or same name) apart, under "not heard here", and adds it only with **Add anyway** (it then leaves Not heard).
   Kept in `data/nets_unheard.json`.
+- **Find nets around the world** (owner 2026-11-14): in Nets → Find nets, **What you can hear around the world today**
+  lists, for your antenna, height, power and today's solar flux, each part of the world (Japan, China, Russia,
+  Europe, South America, Antarctica, the Pacific…) with the bands and the hours (your time) you hear it at least 60%
+  of the time, worked out with no search and no cost. **Also search worldwide** adds a search for DX, international,
+  national-society, maritime, Antarctic / expedition and IARU emergency nets in exactly those regions, bands and
+  hours, and keeps a net only when you hear it at least half the time when it next meets; the others are listed under
+  "left out" with their figure. Long paths are worked out hop by hop (each hop's own sun, the weakest hop's highest
+  usable frequency, daytime and auroral absorption, and the long path round the other side). HF distance for the
+  regional search can now be set up to 20,000 km.
 - **How you hear the radio** follows Radios → **Audio from**: a cable in a handheld's speaker / earphone jack turns
   the radio's speaker off, so turn on Windows Sound → Recording → that input → Properties → Listen → **Listen to this
   device**; a data jack (FTM-150R DATA) or a USB radio (IC-705) leaves the radio's speaker on.
