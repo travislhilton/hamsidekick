@@ -18,7 +18,8 @@ same work took 0.5 s instead of 6 s. The hold starts at a transmission's first m
 nets costs nothing. **Settings → Full speed and screen on**: *during nets and traffic* (the default, `traffic`), *the
 whole time a radio listens* (`listening`: with a radio always on and no schedule, that is around the clock — the
 owner's laptop stayed lit all evening that way), *always*, *never* (`off`); `keep_awake:` in `station.yaml` is the
-starting value, `keep_awake_quiet_min:` (10) the minutes after traffic. With every radio paused it finishes the accurate
+starting value, `keep_awake_quiet_min:` (10) the minutes after traffic. The header shows **⚡ Performance mode** while it holds and **○ Performance off** otherwise
+(hover for why; click for Settings → This PC). With every radio paused it finishes the accurate
 pass at full speed, then lets go on every choice and your own plan and mode come back.
 **Settings → This PC** (`station/pccheck.py`) says what the station changes and whether it is holding right now (and
 why), shows the speeds this PC measured and the processor's speed while it measured, lists the power settings that

@@ -376,6 +376,13 @@ class Station:
         if changed:
             self.bus.publish("radios", {"radios": list(self.radios.values()), "net": self.schedule_now()})
 
+    def awake_view(self) -> dict:
+        """Performance mode for the dashboard header: on (full speed, screen on, the station's power plan), why, and
+        whether this PC can do it at all (Windows only)."""
+        a = getattr(self, "awake", None)
+        return {"on": bool(getattr(a, "held", False)), "why": self.awake_why, "mode": self.awake_mode,
+                "can": bool(getattr(a, "ok", False))}
+
     def _keep_awake_tick(self):
         from .awake import wanted
         lk = self.__dict__.setdefault("_awake_lock", threading.Lock())
@@ -397,9 +404,12 @@ class Station:
             want, why = wanted(self.awake_mode, radios, acc.status() if acc else [], busy=busy,
                                quiet_s=None if self.last_traffic is None else time.time() - self.last_traffic,
                                net_on=net, quiet_min=self.awake_quiet_min, viewer=self.dashboard_open())
+            was = self.awake_view()
             self.awake_why = why
             if self.awake.set(want):
                 print(f"{datetime.now():%H:%M:%S} keep awake: {'on' if want else 'off'} ({why})", flush=True)
+            if self.awake_view() != was:                 # the dashboard's Performance mode status
+                self.bus.publish("pc", {"awake": self.awake_view()})
         except Exception as e:  # noqa: BLE001 — power management never stops the station
             print(f"keep awake: {type(e).__name__}: {e}", flush=True)
 
@@ -2272,4 +2282,5 @@ class Station:
                     "accurate_server": self.accurate.server() if getattr(self, "accurate", None) else None,
                     "aicost": self.costs.warnings(),
                     "pc": {"slow": self.slowwatch.state(),
-                           "notice": not (self._saved().get("pc") or {}).get("notice_seen"), "mode": self.awake_mode}}
+                           "notice": not (self._saved().get("pc") or {}).get("notice_seen"), "mode": self.awake_mode,
+                           "awake": self.awake_view()}}

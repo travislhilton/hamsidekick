@@ -482,7 +482,7 @@ table.acc tr.grp td{color:var(--muted);font-size:11px;text-transform:uppercase;l
 table.costt{border-collapse:collapse;margin:6px 0;font-size:13px}table.costt td,table.costt th{padding:2px 10px 2px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere}
 a.btn{display:inline-block;padding:4px 10px;border:1px solid var(--line,#888);border-radius:6px;text-decoration:none;color:inherit;margin-right:6px}
 #pcSet ul{margin:4px 0 6px 18px;padding:0}#pcSet li.bad{color:#c0392b}#pcSet .fix{color:var(--muted)}
-.st{white-space:nowrap;color:var(--muted)}.st.ok{color:var(--ok)}.st.warn{color:var(--warn)}.st.bad{color:var(--bad)}
+.st{white-space:nowrap;color:var(--muted)}button.st.perf{background:none;border:0;padding:0;margin:0;font:inherit;cursor:pointer;opacity:.75}button.st.perf.on{opacity:1;font-weight:600}.st.ok{color:var(--ok)}.st.warn{color:var(--warn)}.st.bad{color:var(--bad)}
 #settings .savebar{position:sticky;bottom:-16px;background:var(--panel);border-top:1px solid var(--line);margin:12px -16px -16px;padding:10px 16px;z-index:2}
 button:disabled{cursor:not-allowed}
 .wlsend{font-size:15px;padding:8px 16px;font-weight:700}
@@ -1671,7 +1671,16 @@ function renderEngine(e){if(e)ENG=e;e=ENG;if(!e)return;
     :'<span class="st warn" title="The home server is not reachable: the accurate pass waits for it (checked every minute). The live text is not affected.">● Home server offline</span>';
   else if(sv==="unknown")acc='<span class="st" title="Checking the home server…">◌ Home server</span>';
   else if(w)acc='<span class="st ok" title="The accurate second pass runs on this PC">● Accurate on this PC</span>';
-  $("engine").innerHTML=live+(acc?" "+acc:"")}
+  $("engine").innerHTML=live+(acc?" "+acc:"")+perfMode()}
+const PERFWHY={"every radio paused":"every radio is paused","no radio listening":"no radio is listening","listening, no traffic":"no net or traffic right now",
+  "keep_awake: off":"Settings: Never","keep_awake: always":"Settings: Always","receiving / transcribing":"a transmission is being received or transcribed",
+  "dashboard open":"a dashboard is open","accurate pass running":"the accurate pass has work","accurate pass running (every radio paused)":"the accurate pass is finishing (every radio paused)"};
+function perfWhy(w){return PERFWHY[w]||w||""}
+function perfMode(){const a=(S.pc||{}).awake;if(!a||!a.can)return"";   // Windows only (station/awake.py)
+  const why=perfWhy(a.why);
+  return a.on?` <button type="button" class="st perf on" onclick="openPC()" title="Performance mode: full speed, screen held on, the HAM Sidekick Station power plan at Best performance${why?" — because "+esc(why):""}. Your own power settings come back when it ends. Click for This PC.">⚡ Performance mode</button>`
+    :` <button type="button" class="st perf" onclick="openPC()" title="Performance mode is off: your own power plan, screen and sleep settings apply${why?" — "+esc(why):""}. Click for This PC.">○ Performance off</button>`}
+function openPC(){$("openSettings").click();setTimeout(()=>{const h=$("pcSet");if(h)h.scrollIntoView({block:"start"})},300)}
 function all(){renderRadios();renderNet();renderHints();renderHeard();renderFeed();renderAlerts();renderUrgent()}
 async function lookup(call){
   call=call.trim().toUpperCase();if(!call)return;
@@ -1770,7 +1779,7 @@ function connect(){
   es.addEventListener("radios",e=>{const d=JSON.parse(e.data);S.radios=d.radios;S.net=d.net;renderRadios();renderNet()});
   es.addEventListener("m",e=>onMeter(JSON.parse(e.data)));
   es.addEventListener("engines",e=>renderEngine(JSON.parse(e.data)));
-  es.addEventListener("pc",e=>{const d=JSON.parse(e.data);S.pc=Object.assign(S.pc||{},{slow:d.slow});renderPCNote();if($("settings").open&&d.checks)renderPC(d)});
+  es.addEventListener("pc",e=>{const d=JSON.parse(e.data);S.pc=Object.assign(S.pc||{},"slow" in d?{slow:d.slow}:{},d.awake?{awake:d.awake}:{});renderPCNote();renderEngine();if($("settings").open&&d.checks)renderPC(d)});
   es.addEventListener("schedule",e=>{const d=JSON.parse(e.data);S.schedule=d.schedule;S.net=d.net;if(d.unheard)S.unheard=d.unheard;renderRadios();renderNet();if($("netsDlg").open&&NV.tab==="schedule")renderSchedule(false)});
   es.addEventListener("alerts",e=>{S.alerts=JSON.parse(e.data).alerts;renderAlerts()});
   es.addEventListener("urgent",e=>{S.urgent=JSON.parse(e.data).urgent;renderUrgent()});

@@ -86,3 +86,31 @@ def test_traffic_mode_holds_only_around_traffic_and_nets():
 
 def test_listening_mode_unchanged():
     assert wanted("listening", [{"id": "a", "paused": False}], [], quiet_s=9999)[0]
+
+
+def test_the_dashboard_shows_performance_mode_and_hears_when_it_changes(tmp_path):
+    """Owner 2026-11-14: "show performance mode status on the dashboard" (header: ⚡ Performance mode / off)."""
+    from tests.test_netsummary import _station
+    st, _ = _station(tmp_path)
+
+    class Fake:
+        ok, held = True, False
+
+        def set(self, want):
+            changed, self.held = want != self.held, want
+            return changed
+    st.awake = Fake()
+    sent = []
+    pub = st.bus.publish
+    st.bus.publish = lambda kind, d: (sent.append((kind, d)) if kind == "pc" else None) or pub(kind, d)
+    st.awake_mode = "always"
+    st._keep_awake_tick()
+    assert sent[-1] == ("pc", {"awake": {"on": True, "why": "keep_awake: always", "mode": "always", "can": True}})
+    assert st.snapshot()["pc"]["awake"]["on"] is True
+    n = len(sent)
+    st._keep_awake_tick()
+    assert len(sent) == n                                                 # unchanged: nothing sent
+    for rid in list(st.radios):
+        st.set_paused(rid, True)
+    st._keep_awake_tick()
+    assert sent[-1][1]["awake"]["on"] is False and sent[-1][1]["awake"]["why"] == "every radio paused"
