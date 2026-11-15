@@ -201,6 +201,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}dialog label{display:block;margin:8p
 dialog select{font:inherit;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);max-width:100%}
 dialog textarea{width:100%;font:13px/1.4 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);padding:6px}
 dialog h3{margin:0 0 8px}dialog h4{margin:12px 0 4px;font-size:14px;color:var(--muted);text-transform:uppercase}
+details.setsec>summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:6px}details.setsec>summary::-webkit-details-marker{display:none}
+details.setsec>summary h4{display:inline}details.setsec>summary::before{content:"▾";color:var(--muted);font-size:12px;order:0}details.setsec:not([open])>summary::before{content:"▸"}
+details.setsec>summary h4{order:1}
 .lnent{border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:6px 0}.lnent .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 8px}.lnent label{margin:2px 0}.lnent textarea{width:100%;font-size:13px}
 .row{margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.chk{display:flex!important;gap:6px;align-items:center;margin:3px 0!important}
 .chk input{display:inline!important;margin:0!important;width:auto}.tolist{max-height:180px;overflow:auto}
@@ -570,7 +573,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <h4>This PC</h4><div id="pcSet" class="small"></div>
   <h4>Net alerts</h4><div id="alertSet" class="small"></div>
   <h4>Learned fixes</h4><div id="learnSet" class="small"></div>
-  <h4>Local names</h4><div id="lnSet" class="small"></div>
+  <details class="setsec" id="lnDet" open><summary><h4>Local names</h4></summary><div id="lnSet" class="small"></div></details>
   <h4>Share settings with another station</h4><div id="shareSet" class="small"></div>
   <h4>AI costs <span class="muted small" style="text-transform:none">(xAI: what this station spends, and the account)</span></h4><div id="costSet" class="small"></div><div id="mgmtKeySet" class="small"></div>
   <h4>Station agent (optional) <a class="small" href="/help/sidekick" target="_blank" rel="noopener" style="font-weight:400">Sidekick card (set up and use, printable)</a></h4><div id="agentSet" class="small"></div><div id="keySet" class="small"></div>
@@ -2860,6 +2863,9 @@ function renderShare(){
 }
 // ----- Settings → Local names (station/localnames.py): the area's clubs, repeaters and web sites -----
 let LN=null;
+// Settings → Local names folds (owner 11-14); the choice is remembered in this browser
+(()=>{const d=$("lnDet");if(!d)return;try{if(localStorage.getItem("hamsidekick.lnOpen")==="0")d.open=false}catch(e){}
+  d.addEventListener("toggle",()=>{try{localStorage.setItem("hamsidekick.lnOpen",d.open?"1":"0")}catch(e){}})})();
 async function loadLocalNames(){try{LN=await api("/api/local-names")}catch(e){LN={names:[],nets:[],area:"",err:e.message}}renderLocalNames()}
 function lnEntryHtml(e,i){
   const also=(e.also||[]).map(a=>`${a.heard} = ${a.say}`).join("\n");
