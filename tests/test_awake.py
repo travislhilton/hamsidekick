@@ -12,7 +12,7 @@ def test_released_when_every_radio_is_paused_and_nothing_queued():
 
 
 def test_held_while_the_accurate_pass_has_work():
-    assert wanted("traffic", [{"id": "a", "paused": True}, {"id": "b"}], [{"state": "running"}])[0]
+    assert wanted("listening", [{"id": "a", "paused": True}], [{"state": "running"}])[0]
     assert wanted("listening", [], [{"state": "queued"}])[0]
 
 
@@ -20,8 +20,11 @@ def test_every_radio_paused_lets_go_on_every_mode():
     """Owner 2026-11-14: "performance mode should turn off if all radios are on pause"."""
     paused = [{"id": "a", "paused": True}, {"id": "b", "paused": True}]
     for mode in ("traffic", "listening", "always"):
-        assert wanted(mode, paused, [{"state": "running"}], busy=True, net_on="ARES", viewer=True) == \
+        assert wanted(mode, paused, [{"state": "done"}], busy=True, net_on="ARES", viewer=True) == \
             (False, "every radio paused")
+        assert wanted(mode, paused, [{"state": "running"}])[0]           # the accurate pass finishes at full speed
+        assert wanted(mode, paused, [{"state": "queued"}])[0]
+    assert not wanted("off", paused, [{"state": "running"}])[0]
 
 
 def test_modes():
