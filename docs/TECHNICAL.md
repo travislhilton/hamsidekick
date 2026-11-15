@@ -279,3 +279,11 @@ not guess terrain, so it calls this module and treats its numbers as the answer.
 - **Not modelled**: buildings, trees and indoor loss (only as `clutter_db`), ducting and troposcatter, multipath,
   repeater coverage and antenna patterns (antennas are assumed aimed at each other). Deygout with three edges can
   still be pessimistic over long rolling paths; treat a few dB either way as noise.
+
+## VARA chat and file transfer (`station/vara.py`)
+
+`Vara` drives the VARA modem over its TCP command and data ports (threads, a selector, reconnecting every few
+seconds; idle while Winlink Express is open) and speaks this project's HSK1 framing on the data port: see
+[VARA.md](VARA.md). Transmit permission is injected (`tx_allowed`) and checked before every transmission, PTT is
+VARA's own or the station's (`ptt_mode`, with a 600 s watchdog), and `ENCRYPT` is refused. Tested against two
+bridged fake modems (`tests/test_vara.py`); not yet against a real VARA. The dashboard and server wiring are separate.

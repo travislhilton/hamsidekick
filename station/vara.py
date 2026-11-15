@@ -1,0 +1,720 @@
+"""Keyboard chat and file transfer over VARA HF / VARA FM (owner 2026-11-15: "add chat and file transfer over VARA FM
+and VARA HF").
+
+VARA (the modem) is driven over its TCP interface, the one Winlink Express, Pat and chat programs use:
+
+  command port (8300)  ASCII lines ending in CR, both ways: we send MYCALL, LISTEN, CHAT ON, CONNECT, CQFRAME...;
+                       VARA answers OK / WRONG and reports CONNECTED, DISCONNECTED, BUFFER, PTT ON/OFF, BUSY, SN,
+                       PENDING, CANCELPENDING, REGISTERED, IAMALIVE, MISSING SOUNDCARD, CQFRAME (a CQ heard)
+  data port (8301)     the connected session's bytes, in whatever chunks the link delivers them
+
+On top of the data port this station speaks its own small, published framing, "HSK1" (docs/VARA.md). It is not
+VarAC's protocol (unpublished, and its terms forbid rebuilding it); it talks to other stations running this program,
+and a plain VARA terminal still gets readable text.
+
+    HSK1 <call>\\n                                  each side, once, right after CONNECTED
+    MSG <seq> <len>\\n<len bytes of UTF-8>          a chat message
+    FILE <seq> <name> <size> <sha256>\\n<size bytes>  a file (name percent-encoded, no spaces)
+    ACK <seq>\\n | NAK <seq> <reason>\\n              the receiver's answer to a FILE
+
+A station that never sends "HSK1 " is a plain terminal: its bytes are shown as chat lines and our chat goes to it as
+plain text lines; files are not offered to it. During a file the modem is set to COMPRESSION FILES, otherwise TEXT.
+
+Received files go to data/vara/inbox/ (a quarantine folder: names cleaned, a size limit, the SHA-256 checked, and an
+executable kind given a ".blocked" ending so a double-click never runs it). Everything sent and received is appended
+to data/vara/YYYY-MM.jsonl.
+
+Transmitting (Part 97): every transmission this class can cause goes through `tx_allowed()` first, injected by the
+station (operator present, the radio's transmit switch on): CONNECT, CQFRAME, LISTEN/CHAT ON (VARA answers calls by
+itself while listening), every byte written to the data port (chat, files, and the protocol's own HSK1/ACK/NAK; a
+refusal mid-session aborts the link), and a station-keyed PTT. There is no auto-reply, beacon, relay or forwarding:
+only the protocol's handshake and file receipts are sent without a key press, inside a session the operator opened or
+accepted by listening. No ENCRYPT command is ever sent (97.113: no messages obscured in meaning); `_cmd` refuses one.
+
+PTT: "vara" (VARA keys the radio itself: its own COM / RA-Board / CAT setting; we only show it) or "station" (VARA's
+PTT ON/OFF orders key the radio through the injected `ptt(on)`, the station's Transmitter). A watchdog aborts the link
+when the PTT stays on, or a file waits for its receipt, longer than `watchdog_s` (600 s).
+
+One client at a time: VARA serves one program. While Winlink Express is open (`winlink_open()`), this class neither
+connects to VARA nor holds it; when Express opens while we are idle, we let go.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import selectors
+import socket
+import threading
+import time
+import urllib.parse
+from datetime import datetime
+from pathlib import Path
+
+CMD_PORT, DATA_PORT = 8300, 8301
+KINDS = ("hf", "fm")
+PTT_MODES = ("vara", "station")
+MAX_FILE = 5 * 1024 * 1024
+MAX_CHAT = 4000
+MAX_HEADER = 1024
+WATCHDOG_S = 600.0
+RECONNECT_S = 5.0
+BLOCKED = {".exe", ".bat", ".cmd", ".com", ".ps1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".msi", ".msp", ".scr",
+           ".lnk", ".dll", ".hta", ".jar", ".reg", ".cpl", ".pif", ".sys"}
+CALL_RE = re.compile(r"^[A-Z0-9]{3,7}(-([1-9]|1[0-5]|T|R))?$")
+
+
+class VaraRefused(RuntimeError):
+    """An action refused before anything was sent (no transmit permission, not connected, a bad argument)."""
+
+
+def clean_name(name: str) -> str:
+    """A received file name made safe for the inbox: no folders, no odd characters, never empty or hidden."""
+    base = re.split(r"[\\/]", str(name or ""))[-1]
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", base).lstrip(".")[:80] or "file"
+    stem, dot, ext = base.rpartition(".")
+    if dot and ("." + ext.lower()) in BLOCKED:
+        base += ".blocked"
+    return base
+
+
+class Vara:
+    def __init__(self, data_dir, mycall: str, kind: str = "hf", host: str = "127.0.0.1", cmd_port: int = CMD_PORT,
+                 data_port: int = DATA_PORT, tx_allowed=None, ptt=None, ptt_mode: str = "vara",
+                 winlink_open=None, on_event=None, bw: int | None = None, max_file: int = MAX_FILE,
+                 watchdog_s: float = WATCHDOG_S, reconnect_s: float = RECONNECT_S, clock=time.time,
+                 tick_s: float = 0.5):
+        call = str(mycall or "").strip().upper()
+        if not CALL_RE.match(call):
+            raise ValueError("set your callsign first (3-7 letters and digits, an optional -SSID)")
+        if kind not in KINDS:
+            raise ValueError("VARA kind is hf or fm")
+        if ptt_mode not in PTT_MODES:
+            raise ValueError("PTT is keyed by vara or by the station")
+        if ptt_mode == "station" and ptt is None:
+            raise ValueError("PTT by the station needs the station's transmitter")
+        if bw is not None and bw not in (500, 2300, 2750):
+            raise ValueError("VARA HF bandwidth is 500, 2300 or 2750 Hz")
+        self.dir = Path(data_dir) / "vara"
+        self.mycall, self.kind, self.host, self.ports = call, kind, host, (int(cmd_port), int(data_port))
+        self.tx_allowed = tx_allowed or (lambda: (False, "transmitting is not allowed"))
+        self.ptt, self.ptt_mode = ptt, ptt_mode
+        if winlink_open is None:
+            from .winlink import express_running as winlink_open
+        self.winlink_open = winlink_open
+        self.on_event = on_event or (lambda name, data: None)
+        self.bw, self.max_file, self.watchdog_s = bw, int(max_file), float(watchdog_s)
+        self.reconnect_s, self.clock, self.tick_s = float(reconnect_s), clock, float(tick_s)
+        self.lock = threading.RLock()
+        self.wlock = threading.Lock()
+        self.stop_ev = threading.Event()
+        self.cmd_sock = self.data_sock = None
+        self._cmd_buf = b""
+        self._threads: list[threading.Thread] = []
+        self.listening = False
+        self.st = {"link": "down", "session": "idle", "peer": None, "via": [], "bw": None, "buffer": 0,
+                   "ptt": False, "busy": False, "sn": None, "registered": None, "alive_at": None,
+                   "soundcard_ok": True, "last_reply": None, "last_cmd": None, "listening": False,
+                   "peer_proto": None, "sending": None, "cq_heard": [], "error": None, "kind": kind,
+                   "mycall": call, "ptt_mode": ptt_mode}
+        self._reset_session()
+
+    # ------------------------------------------------------------------ public ---------------------------------
+    def state(self) -> dict:
+        with self.lock:
+            s = dict(self.st)
+            s["cq_heard"] = list(s["cq_heard"])
+            s["sending"] = dict(s["sending"]) if s["sending"] else None
+            return s
+
+    def available(self) -> tuple[bool, str]:
+        if self._winlink():
+            return False, "Winlink Express is open and uses VARA: close it first"
+        if self.st["link"] != "up":
+            return False, self.st["error"] or "VARA is not running (start VARA, then wait a few seconds)"
+        return True, ""
+
+    def start(self):
+        if any(t.is_alive() for t in self._threads):
+            return
+        self.stop_ev.clear()
+        self._threads = [threading.Thread(target=self._run, name="vara-link", daemon=True),
+                         threading.Thread(target=self._ticker, name="vara-watchdog", daemon=True)]
+        for t in self._threads:
+            t.start()
+
+    def stop(self):
+        self.stop_ev.set()
+        self._ptt(False)
+        self._close()
+        for t in self._threads:
+            if t is not threading.current_thread():
+                t.join(2)
+
+    def listen(self, on: bool):
+        """Answer calls (VARA answers by itself while listening, so this needs transmit permission) or stop."""
+        self._need_link()
+        if on:
+            self._need_tx()
+            self._cmd("CHAT ON")                         # CHAT ON includes LISTEN ON (VARA's own spec)
+        else:
+            self._cmd("LISTEN OFF")
+        with self.lock:
+            self.listening = self.st["listening"] = bool(on)
+        self._emit("status", self.state())
+
+    def connect(self, dest: str, via=()):
+        dest = str(dest or "").strip().upper()
+        via = [str(v).strip().upper() for v in via or () if str(v).strip()]
+        if not CALL_RE.match(dest) or any(not CALL_RE.match(v) for v in via):
+            raise VaraRefused("that is not a callsign")
+        if via and self.kind != "fm":
+            raise VaraRefused("digipeaters are VARA FM only")
+        self._need_link()
+        if self.st["session"] != "idle":
+            raise VaraRefused("already in a session: disconnect first")
+        self._need_tx()
+        self._cmd("CHAT ON")                             # keyboard timing (and listening, for the answer)
+        with self.lock:
+            self.st["session"], self.st["peer"], self.st["via"] = "connecting", dest, via
+        self._cmd(f"CONNECT {self.mycall} {dest}" + (" via " + " ".join(via) if via else ""))
+        self._log({"kind": "call", "dir": "out", "peer": dest, "via": via})
+        self._emit("status", self.state())
+
+    def disconnect(self):
+        self._need_link()
+        self._cmd("DISCONNECT")
+
+    def abort(self, why: str = "operator"):
+        """Drop the link at once (VARA's dirty disconnect) and let go of the PTT."""
+        try:
+            self._cmd("ABORT")
+        except Exception:  # noqa: BLE001 - abort must never raise
+            pass
+        self._ptt(False)
+        self._log({"kind": "abort", "why": why})
+        self._emit("abort", {"why": why})
+
+    def cq(self, via=()):
+        self._need_link()
+        self._need_tx()
+        if self.kind == "hf":
+            self._cmd(f"CQFRAME {self.mycall} {self.bw or 2300}")
+        else:
+            self._cmd(f"CQFRAME {self.mycall}" + "".join(" " + str(v).upper() for v in via or ()))
+        self._log({"kind": "cq", "dir": "out"})
+
+    def send_chat(self, text: str) -> int:
+        text = str(text or "").replace("\r\n", "\n").strip()
+        if not text:
+            raise VaraRefused("nothing to send")
+        if len(text) > MAX_CHAT:
+            raise VaraRefused(f"a message is at most {MAX_CHAT} characters")
+        self._need_session()
+        with self.lock:
+            seq = self._next_seq()
+            raw = self.st["peer_proto"] == "raw"
+        body = text.encode("utf-8")
+        frame = (text.replace("\n", "\r\n") + "\r\n").encode("utf-8") if raw else \
+            f"MSG {seq} {len(body)}\n".encode() + body
+        self._data(frame)
+        self._log({"kind": "chat", "dir": "out", "peer": self.st["peer"], "seq": seq, "text": text})
+        self._emit("chat_sent", {"seq": seq, "text": text})
+        return seq
+
+    def send_file(self, path=None, name: str | None = None, data: bytes | None = None) -> int:
+        if data is None:
+            p = Path(path)
+            if not p.is_file():
+                raise VaraRefused("no such file")
+            if p.stat().st_size > self.max_file:
+                raise VaraRefused(f"a file is at most {self.max_file // 1024} KB over VARA")
+            data, name = p.read_bytes(), name or p.name
+        if len(data) > self.max_file:
+            raise VaraRefused(f"a file is at most {self.max_file // 1024} KB over VARA")
+        name = clean_name(name or "file")
+        self._need_session()
+        if self.st["peer_proto"] != "HSK1":
+            raise VaraRefused("the other station has not answered with this program's handshake: files need it")
+        sha = hashlib.sha256(data).hexdigest()
+        with self.lock:
+            seq = self._next_seq()
+            self.out_files[seq] = {"seq": seq, "name": name, "size": len(data), "sha256": sha, "at": self.clock()}
+            self.st["sending"] = {"seq": seq, "name": name, "size": len(data), "left": len(data)}
+        self._cmd("COMPRESSION FILES")
+        self._data(f"FILE {seq} {urllib.parse.quote(name, safe='')} {len(data)} {sha}\n".encode() + data)
+        self._log({"kind": "file", "dir": "out", "peer": self.st["peer"], "seq": seq, "name": name,
+                   "size": len(data), "sha256": sha})
+        self._emit("file_sending", {"seq": seq, "name": name, "size": len(data)})
+        return seq
+
+    # ------------------------------------------------------------------ guards ---------------------------------
+    def _need_link(self):
+        ok, why = self.available()
+        if not ok:
+            raise VaraRefused(why)
+
+    def _need_tx(self):
+        r = self.tx_allowed()
+        ok, why = (r, "") if isinstance(r, bool) else (bool(r[0]), r[1] if len(r) > 1 else "")
+        if not ok:
+            raise VaraRefused(why or "transmitting is not allowed now")
+
+    def _need_session(self):
+        self._need_link()
+        if self.st["session"] != "connected":
+            raise VaraRefused("not connected to a station")
+        self._need_tx()
+
+    def _winlink(self) -> bool:
+        try:
+            return bool(self.winlink_open())
+        except Exception:  # noqa: BLE001
+            return False
+
+    # ------------------------------------------------------------------ the sockets ----------------------------
+    def _cmd(self, line: str):
+        if "ENCRYPT" in line.upper():
+            raise VaraRefused("encryption is not allowed on amateur radio (Part 97.113)")
+        s = self.cmd_sock
+        if s is None:
+            raise VaraRefused("VARA is not running")
+        with self.wlock:
+            s.sendall((line + "\r").encode("ascii", "replace"))
+        with self.lock:
+            self.st["last_cmd"] = line
+
+    def _data(self, b: bytes):
+        """Every byte to the other station: transmit permission first; refused mid-session = the link is aborted."""
+        r = self.tx_allowed()
+        ok = r if isinstance(r, bool) else bool(r[0])
+        if not ok:
+            self.abort("transmitting is no longer allowed")
+            raise VaraRefused((r[1] if not isinstance(r, bool) and len(r) > 1 else "") or "transmitting is not allowed")
+        s = self.data_sock
+        if s is None:
+            raise VaraRefused("VARA is not running")
+        with self.wlock:
+            s.sendall(b)
+
+    def _open(self) -> bool:
+        try:
+            c = socket.create_connection((self.host, self.ports[0]), timeout=3)
+            d = socket.create_connection((self.host, self.ports[1]), timeout=3)
+        except OSError as e:
+            with self.lock:
+                self.st["error"] = f"VARA is not running ({type(e).__name__})"
+            return False
+        c.settimeout(None)
+        d.settimeout(None)
+        self.cmd_sock, self.data_sock = c, d
+        self._cmd_buf = b""
+        with self.lock:
+            self.st.update(link="up", error=None)
+        self._cmd(f"MYCALL {self.mycall}")
+        self._cmd("LISTEN ON" if self.listening else "LISTEN OFF")
+        self._cmd("COMPRESSION TEXT")
+        if self.kind == "hf":
+            self._cmd("P2P SESSION")
+            self._cmd("CWID ON")                                   # newer VARA; an older one answers WRONG
+            if self.bw:
+                self._cmd(f"BW{self.bw}")
+        self._emit("status", self.state())
+        return True
+
+    def _close(self):
+        for s in (self.cmd_sock, self.data_sock):
+            if s is not None:
+                try:
+                    s.close()
+                except OSError:
+                    pass
+        self.cmd_sock = self.data_sock = None
+        was = self.st["link"]
+        with self.lock:
+            self.st["link"] = "down"
+        if self.st["session"] != "idle":
+            self._ended("VARA closed")
+        if was == "up":
+            self._emit("status", self.state())
+
+    def _run(self):
+        while not self.stop_ev.is_set():
+            if self._winlink():
+                with self.lock:
+                    self.st["error"] = "Winlink Express is open and uses VARA"
+                self.stop_ev.wait(self.reconnect_s)
+                continue
+            if not self._open():
+                self.stop_ev.wait(self.reconnect_s)
+                continue
+            sel = selectors.DefaultSelector()
+            sel.register(self.cmd_sock, selectors.EVENT_READ, "cmd")
+            sel.register(self.data_sock, selectors.EVENT_READ, "data")
+            last_wl = time.monotonic()
+            try:
+                while not self.stop_ev.is_set():
+                    for key, _ in sel.select(timeout=0.2):
+                        try:
+                            chunk = key.fileobj.recv(65536)
+                        except OSError:
+                            chunk = b""
+                        if not chunk:
+                            raise ConnectionError("VARA closed the connection")
+                        (self._on_cmd_bytes if key.data == "cmd" else self._on_data)(chunk)
+                    if time.monotonic() - last_wl > self.reconnect_s:      # Express opened while we were idle: let go
+                        last_wl = time.monotonic()
+                        if self.st["session"] == "idle" and self._winlink():
+                            raise ConnectionError("Winlink Express opened")
+            except (ConnectionError, OSError) as e:
+                with self.lock:
+                    self.st["error"] = str(e)
+            finally:
+                sel.close()
+                self._ptt(False)
+                self._close()
+            self.stop_ev.wait(self.reconnect_s)
+
+    # ------------------------------------------------------------------ VARA -> us -----------------------------
+    def _on_cmd_bytes(self, chunk: bytes):
+        self._cmd_buf += chunk
+        while True:
+            m = re.search(rb"[\r\n]", self._cmd_buf)
+            if not m:
+                if len(self._cmd_buf) > MAX_HEADER:
+                    self._cmd_buf = b""
+                return
+            line, self._cmd_buf = self._cmd_buf[:m.start()], self._cmd_buf[m.end():]
+            line = line.decode("ascii", "replace").strip()
+            if line:
+                self._on_status(line)
+
+    def _on_status(self, line: str):
+        w = line.split()
+        k = w[0].upper()
+        if k == "CONNECTED" and len(w) >= 3:
+            src, dst = w[1].upper(), w[2].upper()
+            rest = w[3:]
+            via = []
+            if rest and rest[0].lower() == "via":
+                via = [x.upper() for x in rest[1:] if not x.isdigit()]
+            bw = next((int(x) for x in reversed(rest) if x.isdigit()), None)
+            peer = dst if src.split("-")[0] == self.mycall.split("-")[0] else src
+            with self.lock:                          # bytes may already be here (two sockets): keep the buffer;
+                self.st.update(session="connected", peer=peer, via=via, bw=bw,   # the last session's end cleared it
+                               peer_proto=self.st["peer_proto"])
+                self.session_at = self.clock()
+            self._log({"kind": "connected", "peer": peer, "via": via, "bw": bw,
+                       "dir": "out" if src.split("-")[0] == self.mycall.split("-")[0] else "in"})
+            self._emit("connected", {"peer": peer, "via": via, "bw": bw})
+            try:
+                self._data(f"HSK1 {self.mycall}\n".encode())
+            except VaraRefused:
+                pass
+        elif k == "DISCONNECTED":
+            self._ended("disconnected")
+        elif k == "BUFFER" and len(w) > 1 and w[1].isdigit():
+            n = int(w[1])
+            with self.lock:
+                self.st["buffer"] = n
+                if self.st["sending"]:
+                    self.st["sending"]["left"] = min(self.st["sending"]["size"], n)
+            self._emit("buffer", {"bytes": n, "sending": self.state()["sending"]})
+        elif k == "PTT" and len(w) > 1:
+            on = w[1].upper() == "ON"
+            if on and self.ptt_mode == "station":
+                r = self.tx_allowed()
+                if not (r if isinstance(r, bool) else bool(r[0])):
+                    self.abort("VARA wanted to transmit but transmitting is not allowed")
+                    return
+            with self.lock:
+                self.st["ptt"] = on
+                self.ptt_on_at = self.clock() if on else None
+            self._ptt(on)
+            self._emit("ptt", {"on": on})
+        elif k == "BUSY" and len(w) > 1:
+            with self.lock:
+                self.st["busy"] = w[1].upper() == "ON"
+            self._emit("busy", {"on": self.st["busy"]})
+        elif k == "SN" and len(w) > 1:
+            try:
+                v = float(w[1])
+            except ValueError:
+                return
+            with self.lock:
+                self.st["sn"] = v
+            self._emit("sn", {"sn": v})
+        elif k == "IAMALIVE":
+            with self.lock:
+                self.st["alive_at"] = self.clock()
+        elif k == "MISSING" and len(w) > 1 and w[1].upper() == "SOUNDCARD":
+            with self.lock:
+                self.st["soundcard_ok"] = False
+                self.st["error"] = "VARA lost the sound card (often RF or high SWR): restart the PC"
+            self._ptt(False)
+            self._emit("soundcard", {"ok": False})
+        elif k == "CQFRAME" and len(w) > 1:
+            bw = next((int(x) for x in w[2:] if x.isdigit()), None)
+            heard = {"call": w[1].upper(), "bw": bw, "via": [x.upper() for x in w[2:] if not x.isdigit()],
+                     "at": self.clock()}
+            with self.lock:
+                self.st["cq_heard"] = ([heard] + [h for h in self.st["cq_heard"] if h["call"] != heard["call"]])[:20]
+            self._log({"kind": "cq", "dir": "in", "peer": heard["call"]})
+            self._emit("cq_heard", heard)
+        elif k in ("PENDING", "CANCELPENDING"):
+            with self.lock:
+                if self.st["session"] == "idle" and k == "PENDING":
+                    self.st["session"] = "pending"
+                elif self.st["session"] == "pending" and k == "CANCELPENDING":
+                    self.st["session"] = "idle"
+            self._emit(k.lower(), {})
+        elif k == "REGISTERED" and len(w) > 1:
+            with self.lock:
+                self.st["registered"] = w[1].upper()
+        elif k == "LINK" and len(w) > 1:
+            with self.lock:
+                self.st["registered"] = self.st["registered"] if w[1].upper() == "REGISTERED" else None
+        elif k in ("OK", "WRONG"):
+            with self.lock:
+                self.st["last_reply"] = k
+            if k == "WRONG":
+                self._emit("wrong", {"command": self.st["last_cmd"]})
+        else:
+            self._emit("vara", {"line": line})
+
+    def _ended(self, why: str):
+        with self.lock:
+            peer = self.st["peer"]
+            out = list(self.out_files.values())
+            partial = self.pending
+            self._reset_session()
+            self.st.update(session="idle", peer=None, via=[], bw=None, peer_proto=None, sending=None, buffer=0)
+        for f in out:
+            self._emit("file_failed", {"seq": f["seq"], "name": f["name"], "why": "the link closed before the receipt"})
+        if partial and partial.get("kind") == "file":
+            self._emit("file_rejected", {"seq": partial["seq"], "name": partial["name"], "why": "the link closed"})
+        self._log({"kind": "disconnected", "peer": peer, "why": why})
+        self._emit("disconnected", {"peer": peer, "why": why})
+        if not self.listening and self.cmd_sock is not None:
+            try:
+                self._cmd("LISTEN OFF")                         # CONNECT turned CHAT ON (and listening) on
+            except (OSError, VaraRefused):
+                pass
+
+    # ------------------------------------------------------------------ the other station -> us ----------------
+    def _reset_session(self):
+        self.buf = bytearray()
+        self.mode = "start"                     # start | hsk | raw
+        self.pending = None                     # a MSG / FILE body being read
+        self.out_files: dict[int, dict] = {}
+        self.seq = 0
+        self.session_at = None
+        self.ptt_on_at = None
+
+    def _next_seq(self) -> int:
+        self.seq += 1
+        return self.seq
+
+    def _on_data(self, chunk: bytes):
+        with self.lock:
+            self.buf += chunk
+        while self._step():
+            pass
+
+    def _step(self) -> bool:
+        """Handle what the buffer holds. True when something was consumed (call again)."""
+        b = self.buf
+        if self.pending:
+            p = self.pending
+            take = min(p["need"], len(b))
+            if not take:
+                return False
+            if not p.get("discard"):
+                p["body"] += b[:take]
+            p["need"] -= take
+            del b[:take]
+            if p["need"] == 0:
+                self.pending = None
+                self._finish(p)
+            return True
+        if not b:
+            return False
+        if self.mode == "start":
+            head = bytes(b[:5])
+            if head == b"HSK1 "[:len(head)] and len(head) < 5:
+                return False
+            self.mode = "hsk" if head == b"HSK1 " else "raw"
+            with self.lock:
+                self.st["peer_proto"] = "HSK1" if self.mode == "hsk" else "raw"
+            return True
+        if self.mode == "raw":
+            m = re.search(rb"[\r\n]", b)
+            if not m:
+                if len(b) > MAX_CHAT:
+                    text, self.buf = bytes(b).decode("utf-8", "replace"), bytearray()
+                    self._chat_in(None, text)
+                    return True
+                return False
+            line = bytes(b[:m.start()])
+            del b[:m.end()]
+            text = line.decode("utf-8", "replace").strip()
+            if text:
+                self._chat_in(None, text)
+            return True
+        nl = b.find(b"\n")
+        if nl < 0:
+            if len(b) > MAX_HEADER:
+                self._emit("protocol", {"why": "a header line too long: dropped"})
+                del b[:]
+            return False
+        line = bytes(b[:nl]).decode("utf-8", "replace").strip()
+        del b[:nl + 1]
+        self._header(line)
+        return True
+
+    def _header(self, line: str):
+        w = line.split()
+        if not w:
+            return
+        k = w[0].upper()
+        try:
+            if k == "HSK1":
+                self._emit("handshake", {"peer": w[1].upper() if len(w) > 1 else None})
+            elif k == "MSG" and len(w) == 3:
+                n = int(w[2])
+                if not 0 <= n <= MAX_CHAT * 4:
+                    raise ValueError("chat too long")
+                self.pending = {"kind": "msg", "seq": int(w[1]), "need": n, "body": bytearray()}
+                if n == 0:
+                    p, self.pending = self.pending, None
+                    self._finish(p)
+            elif k == "FILE" and len(w) == 5:
+                seq, size, sha = int(w[1]), int(w[3]), w[4].lower()
+                name = clean_name(urllib.parse.unquote(w[2]))
+                if size < 0 or not re.fullmatch(r"[0-9a-f]{64}", sha):
+                    raise ValueError("bad FILE header")
+                p = {"kind": "file", "seq": seq, "name": name, "size": size, "sha256": sha, "need": size,
+                     "body": bytearray()}
+                if size > self.max_file:
+                    p["discard"] = f"too large ({size} bytes; this station takes up to {self.max_file})"
+                self.pending = p
+                if size == 0:
+                    self.pending = None
+                    self._finish(p)
+            elif k in ("ACK", "NAK") and len(w) >= 2:
+                self._receipt(k == "ACK", int(w[1]), " ".join(w[2:]))
+            else:
+                self._emit("protocol", {"why": f"unknown line: {line[:60]}"})
+        except ValueError as e:
+            self._emit("protocol", {"why": f"{e}: {line[:60]}"})
+
+    def _finish(self, p: dict):
+        if p["kind"] == "msg":
+            self._chat_in(p["seq"], bytes(p["body"]).decode("utf-8", "replace"))
+            return
+        if p.get("discard"):
+            return self._reject(p, p["discard"])
+        body = bytes(p["body"])
+        if hashlib.sha256(body).hexdigest() != p["sha256"]:
+            return self._reject(p, "checksum mismatch")
+        inbox = self.dir / "inbox"
+        inbox.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.fromtimestamp(self.clock()).strftime("%Y%m%d-%H%M%S")
+        peer = re.sub(r"[^A-Z0-9-]", "", str(self.st["peer"] or "unknown"))
+        dest = inbox / f"{stamp}-{peer}-{p['name']}"
+        i = 1
+        while dest.exists():
+            dest = inbox / f"{stamp}-{peer}-{i}-{p['name']}"
+            i += 1
+        dest.write_bytes(body)
+        try:
+            self._data(f"ACK {p['seq']}\n".encode())
+        except VaraRefused:
+            pass
+        info = {"seq": p["seq"], "name": p["name"], "size": len(body), "sha256": p["sha256"], "path": str(dest),
+                "peer": self.st["peer"]}
+        self._log({"kind": "file", "dir": "in", **info})
+        self._emit("file_received", info)
+
+    def _reject(self, p: dict, why: str):
+        try:
+            self._data(f"NAK {p['seq']} {why}\n".encode())
+        except VaraRefused:
+            pass
+        self._log({"kind": "file", "dir": "in", "seq": p["seq"], "name": p["name"], "rejected": why,
+                   "peer": self.st["peer"]})
+        self._emit("file_rejected", {"seq": p["seq"], "name": p["name"], "why": why})
+
+    def _chat_in(self, seq, text: str):
+        self._log({"kind": "chat", "dir": "in", "peer": self.st["peer"], "seq": seq, "text": text})
+        self._emit("chat", {"seq": seq, "text": text, "peer": self.st["peer"], "raw": seq is None})
+
+    def _receipt(self, ok: bool, seq: int, why: str):
+        with self.lock:
+            f = self.out_files.pop(seq, None)
+            if self.st["sending"] and self.st["sending"]["seq"] == seq:
+                self.st["sending"] = None
+            more = bool(self.out_files)
+        if f is None:
+            return
+        if not more:
+            try:
+                self._cmd("COMPRESSION TEXT")
+            except (OSError, VaraRefused):
+                pass
+        self._log({"kind": "receipt", "seq": seq, "ok": ok, "why": why or None, "peer": self.st["peer"]})
+        self._emit("file_sent" if ok else "file_failed", {"seq": seq, "name": f["name"], "why": why or None})
+
+    # ------------------------------------------------------------------ PTT, watchdog, log -----------------------
+    def _ptt(self, on: bool):
+        if self.ptt_mode != "station" or self.ptt is None:
+            return
+        try:
+            self.ptt(bool(on))
+        except Exception as e:  # noqa: BLE001 - a PTT failure ends the link, never the station
+            with self.lock:
+                self.st["error"] = f"PTT: {type(e).__name__}: {e}"
+            if on:
+                try:
+                    self._cmd("ABORT")
+                except (OSError, VaraRefused):
+                    pass
+
+    def watchdog(self, now: float | None = None) -> str | None:
+        """Abort when the PTT has been on, or a file has waited for its receipt, longer than watchdog_s. Returns why."""
+        now = self.clock() if now is None else now
+        why = None
+        with self.lock:
+            if self.ptt_on_at is not None and now - self.ptt_on_at > self.watchdog_s:
+                why = f"the transmitter was on for over {self.watchdog_s:.0f} s"
+            elif any(now - f["at"] > self.watchdog_s for f in self.out_files.values()):
+                why = f"a file waited over {self.watchdog_s:.0f} s for its receipt"
+            if why:
+                self.ptt_on_at = None
+                self.st["ptt"] = False
+        if why:
+            self.abort(why)
+            self._emit("watchdog", {"why": why})
+        return why
+
+    def _ticker(self):
+        while not self.stop_ev.wait(self.tick_s):
+            try:
+                self.watchdog()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _log(self, entry: dict):
+        try:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            t = datetime.fromtimestamp(self.clock())
+            with open(self.dir / f"{t:%Y-%m}.jsonl", "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"at": t.isoformat(timespec="seconds"), **entry}, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+
+    def _emit(self, name: str, data: dict):
+        try:
+            self.on_event(name, data)
+        except Exception:  # noqa: BLE001 - a listener never stops the link
+            pass
