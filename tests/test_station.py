@@ -612,3 +612,13 @@ def test_settings_has_a_panel_per_tab_and_links_open_their_tab():
         assert f'id="{el}"' in dlg
     assert 'function openCosts(){openSettings("costs")}' in idx and 'function openPC(){openSettings("pc")}' in idx
     assert 'openSettings("ai")' in idx
+
+
+def test_every_pop_up_has_a_close_at_the_top():
+    """Owner 2026-11-16: "For any of the pop up views we need a close link/button added so that the user doesn't have to
+    scroll all the way to the bottom": a pinned ✕ is added to every dialog without a header bar, through Esc's path."""
+    from station.server import STATIC
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'document.querySelectorAll("dialog").forEach(d=>{if(d.querySelector(":scope>.dhead .x' in html
+    assert "function closeDlg(d){const ev=new Event(\"cancel\",{cancelable:true})" in html
+    assert ".dlgxw{position:sticky" in html
