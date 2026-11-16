@@ -373,7 +373,7 @@ dialog.big{max-width:min(980px,96vw);height:min(88dvh,920px);padding:0;flex-dire
 button.x{font-size:16px;line-height:1;padding:5px 10px}
 /* A close at the top of every pop-up (owner 2026-11-16: "so that the user doesn't have to scroll all the way to the bottom"):
    pinned to the corner while the dialog scrolls; dialogs with a header bar (.dhead) already have theirs. */
-.dlgxw{position:sticky;top:-16px;height:0;z-index:6;display:flex;justify-content:flex-end;align-items:flex-start;margin:-6px -6px 0 0}
+.newbuild{position:sticky;top:0;z-index:50;background:var(--chip,#1e3a8a);color:#fff;padding:8px 16px;display:flex;gap:10px;align-items:center;justify-content:center}.dlgxw{position:sticky;top:-16px;height:0;z-index:6;display:flex;justify-content:flex-end;align-items:flex-start;margin:-6px -6px 0 0}
 .dlgxw .x{flex:none;height:auto;min-height:32px;background:var(--panel);box-shadow:0 1px 4px rgba(0,0,0,.18);border-radius:8px}
 dialog:has(>.dlgxw)>:nth-child(2) h3:first-child,dialog:has(>.dlgxw)>:nth-child(2)>h3{padding-right:44px}
 .ntabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;flex:none}
@@ -495,7 +495,7 @@ a.btn{display:inline-block;padding:4px 10px;border:1px solid var(--line,#888);bo
 #varaDlg{width:min(720px,calc(100vw - 32px))}
 #bpDlg{width:min(1100px,calc(100vw - 32px))}
 .bpt td,.bpt th{vertical-align:top}.bpt tr.ch td:first-child{padding-left:1.4em}.bpt tr.ch td{background:var(--okbg)}
-.bpt tr.flag td{box-shadow:inset 3px 0 0 var(--warn)}.bpt td{font-family:inherit}.bpt .bps{display:block;margin-bottom:2px}.bppv span{font-weight:600;margin-right:6px;white-space:nowrap}.bppv .no{opacity:.4;text-decoration:line-through;font-weight:400}
+.bpt tr.flag td{box-shadow:inset 3px 0 0 var(--warn)}.bpt tr.tuned td{background:color-mix(in srgb,var(--accent,#1f4fbf) 10%,var(--panel))}.bpt tr.tuned td:first-child{box-shadow:inset 4px 0 0 var(--accent,#1f4fbf)}.bpt tr.tuned.flag td:first-child{box-shadow:inset 4px 0 0 var(--accent,#1f4fbf),inset 7px 0 0 var(--warn)}.bptag{padding:0 6px;margin:0 4px 3px 0;display:inline-block;font-weight:600}.bpt tr.flash td{animation:bpflash 1.6s}@keyframes bpflash{0%,40%{background:color-mix(in srgb,var(--accent,#1f4fbf) 28%,var(--panel))}}.bpt td{font-family:inherit}.bpt .bps{display:block;margin-bottom:2px}.bppv span{font-weight:600;margin-right:6px;white-space:nowrap}.bppv .no{opacity:.4;text-decoration:line-through;font-weight:400}
 .bpband{margin:14px 0 4px}.bpband h4{display:inline;margin-right:.5em}
 @media print{body>*:not(#bpDlg){display:none!important}#bpDlg{position:static;width:auto;border:0;box-shadow:none}#bpDlg .noprint{display:none!important}.nlistwrap{overflow:visible!important}}
 .wlwhere{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}.wlw{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
@@ -1441,6 +1441,7 @@ function renderRtabs(){
   selectRadio(SEL);
 }
 function renderRadios(){
+  if($("bpDlg")&&$("bpDlg").open&&BP.d){const sig=bpTunedSig();if(sig!==BP.tsig){BP.tsig=sig;setTimeout(renderBP,0)}}
   const box=$("radios");
   if(!S.radios.length){const n=(S.schedule||[]).length;
     box.innerHTML=`<div class="radio firstradio"><h2 style="margin:0 0 6px;font-size:18px;color:var(--ink)">No radio yet</h2><p>Connect the radio's audio to this PC (a USB sound card or interface such as a Digirig), then add it here. Each radio needs its own sound input, never the one VARA or Winlink uses.</p>${n?`<p class="muted">${n} net${n>1?"s are":" is"} scheduled and will be recorded once a radio that can hear ${n>1?"them":"it"} is added.</p>`:""}<p><button class="primary" id="addFirstRadio">+ Add a radio</button></p></div>`;
@@ -1962,9 +1963,16 @@ document.addEventListener("submit",async e=>{
   catch(err){errEl().textContent="not saved: station unreachable"}
 });
 $("netsDlg").addEventListener("cancel",e=>{if(FIX&&FIX.where==="min"){e.preventDefault();fixClose()}});
+// A dashboard left open across an install would keep the old page: on every (re)connect compare the build, and
+// reload, or offer Reload while a pop-up is open or something is being typed (owner 2026-11-16: no close at the top)
+let PAGE0=null;
+async function pageCheck(){try{const p=(await api("/api/page")).page;if(!PAGE0){PAGE0=p;return}if(p===PAGE0)return;
+  const busy=[...document.querySelectorAll("dialog")].some(d=>d.open)||(document.activeElement&&/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
+  if(!busy){location.reload();return}
+  if(!$("newBuild")){const b=document.createElement("div");b.id="newBuild";b.className="newbuild";b.innerHTML='A new version of the station is installed. <button class="primary small" onclick="location.reload()">Reload</button>';document.body.prepend(b)}}catch(e){}}
 function connect(){
   const es=new EventSource("/events");
-  es.onopen=()=>{$("conn").textContent="● live";$("conn").className="ok"};
+  es.onopen=()=>{$("conn").textContent="● live";$("conn").className="ok";pageCheck()};
   es.onerror=()=>{$("conn").textContent="● reconnecting…";$("conn").className="bad"};
   es.addEventListener("snapshot",e=>{const d=JSON.parse(e.data);Object.assign(S,d);if(!PL.d)plansLoad().then(renderRadios);$("me").textContent=d.callsign?d.callsign+" station":"HAM Sidekick Station";renderEngine(d.engines);all();renderPCNote();if($("netsDlg").open&&NV.tab==="schedule")renderSchedule(false)});   // Nets opened before the first data arrived fills in
   es.addEventListener("tx",e=>{const t=JSON.parse(e.data);upsertTx(t);if(t.status==="final")boardSoon(t.radio)});
@@ -2131,6 +2139,13 @@ async function bpOpen(){BP.msg=null;if(!$("bpDlg").open)$("bpDlg").showModal();$
 const AUTHN={coordinator:"State coordinator",local:"Local plan",kept:"Your channel",arrl:"ARRL",fcc:"FCC"};
 function bpDial(x){const st=x.from<30?0.0005:0.005,m=Math.round((x.from+x.to)/2/st)*st;return +Math.min(x.to,Math.max(x.from,m)).toFixed(4)}
 function bpMhz(x){return Number(x).toFixed(4).replace(/0+$/,"").replace(/\.$/,"")}
+// What each radio (and its VARA modem) is tuned to right now, marked in the band plan (owner 2026-11-16)
+function bpTuned(){return (S.radios||[]).filter(r=>r.freq_mhz).map(r=>{const m=vModem(r.id);
+  return {id:r.id,name:r.name||r.id,f:+r.freq_mhz,mode:r.mode||"",vara:m&&m.cfg.use!=="winlink"&&m.cfg.enabled?"VARA "+(m.cfg.kind==="hf"?"HF":"FM"):m?"VARA "+(m.cfg.kind==="hf"?"HF":"FM")+" (Winlink Express)":""}})}
+function bpChanHit(r,t){const tol=r.from<30?0.001:0.0025;return Math.abs(t.f-r.from)<=tol}
+function bpRangeHit(x,t){return t.f>=x.from-1e-6&&t.f<=x.to+1e-6}
+function bpTag(t,here){return `<span class="np k-tune bptag" title="${esc(t.name)} is tuned to ${bpMhz(t.f)} MHz ${esc(t.mode)} now${t.vara?" · "+esc(t.vara):""}">📻 ${esc(t.name)}${here?"":" · "+bpMhz(t.f)}${t.vara?" · "+esc(t.vara):""}</span>`}
+function bpTunedSig(){return bpTuned().map(t=>t.id+":"+t.f+":"+t.mode).join("|")}
 function renderBP(){
   const d=BP.d,box=$("bpBody");if(!d){box.innerHTML=`<p class="bad">${esc(BP.msg?BP.msg.text:"Not available")}</p><div class="row"><button onclick="$('bpDlg').close()">Close</button></div>`;return}
   const cls=d.license_class,read=d.read||[];
@@ -2140,11 +2155,13 @@ function renderBP(){
     if(!r.privileges)return"";const k=r.privileges;if(!k.phone&&!k.data&&!k.cw)return'<span class="muted">none</span>';
     return `<span class="bppv">${[["phone","Phone"],["data","Data"],["cw","CW"]].map(([x,l])=>`<span class="${k[x]?"":"no"}">${l}</span>`).join("")}</span>`};
   const rowOk=r=>(BP.chans||r.type!=="channel")&&(!BP.flags||r.flags.length)&&(!BP.mine||!cls||(r.type==="channel"?r.privileges===true:r.privileges&&(r.privileges.phone||r.privileges.data||r.privileges.cw)));
-  const tables=shown.map(b=>{const rows=b.rows.filter(rowOk).sort(hiFirst);if(!rows.length)return"";
+  const tuned=bpTuned();
+  const tunedOn=(rows)=>{const by=new Map();tuned.forEach(t=>{const ch=rows.find(r=>r.type==="channel"&&bpChanHit(r,t)),rg=rows.find(r=>r.type==="range"&&bpRangeHit(r,t));const r=ch||rg;if(r){if(!by.has(r))by.set(r,[]);by.get(r).push(t)}});return by};
+  const tables=shown.map(b=>{const rows=b.rows.filter(rowOk).sort(hiFirst);if(!rows.length)return"";const tb=tunedOn(rows);
     return `<div class="bpband"><h4>${esc(b.band)}</h4><span class="small muted">${bpMhz(b.from)}–${bpMhz(b.to)} MHz${b.flags?` · <span class="warnc">${b.flags} to check</span>`:""}</span></div>
-    <div class="nlistwrap"><table class="nlist bpt"><thead><tr><th>MHz</th><th>Use</th>${cls?"<th>You</th>":""}<th>Sources · notes</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.type==="channel"?"ch":""}${r.flags.length?" flag":""}">
+    <div class="nlistwrap"><table class="nlist bpt"><thead><tr><th>MHz</th><th>Use</th>${cls?"<th>You</th>":""}<th>Sources · notes</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.type==="channel"?"ch":""}${r.flags.length?" flag":""}${tb.has(r)?" tuned":""}"${tb.has(r)?` data-bptuned="${esc(tb.get(r).map(t=>t.id).join(" "))}"`:""}>
       <td class="f">${r.type==="channel"?`${bpMhz(r.from)}${r.mode?" "+esc(r.mode):""}${r.offset_mhz?` <span class="muted">${r.offset_mhz>0?"+":""}${r.offset_mhz}${r.tone_hz?" · "+r.tone_hz:""}</span>`:""}`:`${bpMhz(r.from)}–${bpMhz(r.to)}`}</td>
-      <td><b>${esc(r.use||"")}</b>${r.kept?' <span class="np k-ready" style="padding:0 6px">your channel</span>':""}${r.priority?` <span class="np k-tune" style="padding:0 6px">${esc(r.priority)}</span>`:""}<div class="small muted">${esc(AUTHN[r.authority]||"")}${r.by&&r.authority!=="arrl"&&r.authority!=="fcc"?": "+esc(r.by):""}</div></td>
+      <td>${tb.has(r)?`<div class="noprint">${tb.get(r).map(t=>bpTag(t,r.type==="channel")).join(" ")}</div>`:""}<b>${esc(r.use||"")}</b>${r.kept?' <span class="np k-ready" style="padding:0 6px">your channel</span>':""}${r.priority?` <span class="np k-tune" style="padding:0 6px">${esc(r.priority)}</span>`:""}<div class="small muted">${esc(AUTHN[r.authority]||"")}${r.by&&r.authority!=="arrl"&&r.authority!=="fcc"?": "+esc(r.by):""}</div></td>
       ${cls?`<td class="small">${pv(r)}</td>`:""}
       <td class="small">${r.statements.filter(x=>x.authority!=="fcc"||r.statements.length===1).slice(r.type==="channel"?1:1).map(x=>`<span class="bps muted">${esc(AUTHN[x.authority]||"")}${x.authority==="coordinator"||x.authority==="local"?" ("+esc(x.source)+")":""}: ${esc(x.use||"")}</span>`).join("")}${r.flags.map(f=>`<span class="bps warnc">⚠ ${esc(f)}</span>`).join("")}${r.source_url?`<a class="bps noprint" href="${esc(r.source_url)}" target="_blank" rel="noopener noreferrer">source</a>`:""}</td></tr>`).join("")}</tbody></table></div>`}).join("");
   const srcs=read.length?`<details class="small noprint"${BP.srcOpen?" open":""} data-bpsrc><summary><b>Plans read (${read.length})</b>${d.unread?` · ${d.unread} more saved, not chosen`:""}</summary><p class="muted">Choose which plans are in this table: Nets → <button class="linkish" data-bpplans>Plans</button> → Plans and documents.</p><ul>${read.map(x=>`<li><b>${esc(x.title||"")}</b>${x.org?" · "+esc(x.org):""} · ${x.error?`<span class="warnc">could not be read: ${esc(x.error)}</span>`:`${x.segments} segments, ${x.channels} channels`}
@@ -2159,7 +2176,7 @@ function renderBP(){
     if(!cls)return `<p class="warnc">Set your license class (Settings → Sidekick &amp; AI) to see where you may transmit.</p>`;
     if(!rows.length)return intro+'<p class="muted">Nothing open on these bands.</p>';
     const by={};rows.forEach(x=>(by[x.band]=by[x.band]||[]).push(x));
-    return intro+useNote+Object.entries(by).map(([band,xs])=>`<div class="bpband"><h4>${esc(band)}</h4><span class="small muted">${xs.length} open</span></div><div class="nlistwrap"><table class="nlist bpt bpopen"><thead><tr><th>MHz · mode</th><th>What the plans say there</th></tr></thead><tbody>${xs.map(x=>`<tr><td class="f">${bpMhz(x.from)}–${bpMhz(x.to)}<div class="small muted">${esc(x.mode)} · ${Math.round((x.to-x.from)*1000)} kHz</div></td><td class="small">${x.unplanned?'<span class="np k-ready" style="padding:0 6px">unplanned</span>':esc(x.uses.join("; "))}${x.auto?`<div class="warnc">${esc(x.note)}</div>`:""}${k==="data"?fitting(x).map((m,_,a)=>` <button class="small" data-bpuse="${bpDial(x)}" data-radio="${esc(m.radio)}" data-mode="${x.mode==="VARA FM"?"FM":"USB"}" title="Set ${esc(m.name)} to ${bpMhz(bpDial(x))} MHz for VARA">Use ${bpMhz(bpDial(x))}${a.length>1?" on "+esc(m.name):""}</button>`).join(""):""}</td></tr>`).join("")}</tbody></table></div>`).join("")})():"";
+    return intro+useNote+Object.entries(by).map(([band,xs])=>`<div class="bpband"><h4>${esc(band)}</h4><span class="small muted">${xs.length} open</span></div><div class="nlistwrap"><table class="nlist bpt bpopen"><thead><tr><th>MHz · mode</th><th>What the plans say there</th></tr></thead><tbody>${xs.map(x=>{const on=tuned.filter(t=>bpRangeHit(x,t));return `<tr class="${on.length?"tuned":""}"${on.length?` data-bptuned="${esc(on.map(t=>t.id).join(" "))}"`:""}><td class="f">${bpMhz(x.from)}–${bpMhz(x.to)}<div class="small muted">${esc(x.mode)} · ${Math.round((x.to-x.from)*1000)} kHz</div></td><td class="small">${on.length?`<div class="noprint">${on.map(t=>bpTag(t,false)).join(" ")}</div>`:""}${x.unplanned?'<span class="np k-ready" style="padding:0 6px">unplanned</span>':esc(x.uses.join("; "))}${x.auto?`<div class="warnc">${esc(x.note)}</div>`:""}${k==="data"?fitting(x).map((m,_,a)=>` <button class="small" data-bpuse="${bpDial(x)}" data-radio="${esc(m.radio)}" data-mode="${x.mode==="VARA FM"?"FM":"USB"}" title="Set ${esc(m.name)} to ${bpMhz(bpDial(x))} MHz for VARA">Use ${bpMhz(bpDial(x))}${a.length>1?" on "+esc(m.name):""}</button>`).join(""):""}</td></tr>`}).join("")}</tbody></table></div>`).join("")})():"";
   const bands=`<option value="all">All bands</option><option value="hf"${BP.band==="hf"?" selected":""}>HF</option><option value="vu"${BP.band==="vu"?" selected":""}>VHF / UHF</option>${d.bands.slice().reverse().map(b=>`<option${BP.band===b.band?" selected":""}>${esc(b.band)}</option>`).join("")}`;
   const nflags=d.bands.reduce((n,b)=>n+b.flags,0);
   box.innerHTML=`<h3><a class="small noprint" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;float:right">Card (printable)</a>Band plan${d.location?` <span class="muted small">near ${esc(d.location)}</span>`:""}</h3>
@@ -2170,6 +2187,7 @@ function renderBP(){
      ${BP.view!=="table"?"":`<label class="chk"><input type="checkbox" data-bpflags${BP.flags?" checked":""}> Only what to check${nflags?` (${nflags})`:""}</label>
      <label class="chk"><input type="checkbox" data-bpchans${BP.chans?" checked":""}> Channels</label>`}
      <button class="small" onclick="window.print()">Print</button></div>
+   ${tuned.length?`<p class="small noprint bptunedline"><b>Tuned now:</b> ${tuned.map(t=>`<button class="linkish small" data-bpgo="${esc(t.id)}" title="Show ${esc(t.name)}'s frequency in the table">📻 ${esc(t.name)} ${bpMhz(t.f)} MHz ${esc(t.mode)}${t.vara?" · "+esc(t.vara):""}</button>`).join(" · ")} <span class="muted">(highlighted below)</span></p>`:""}
    ${BP.msg?`<p class="${BP.msg.bad?"bad":"ok"}">${esc(BP.msg.text)}</p>`:""}${BP.view==="table"?srcs+(tables||'<p class="muted">Nothing matches.</p>'):open}
    <p class="small muted">US rules: 47 CFR 97.301 / 97.305. Band plans are voluntary agreements; the FCC rules are the law.</p>
    <div class="row noprint"><button onclick="$('bpDlg').close()">Close</button></div>`;
@@ -2185,6 +2203,10 @@ document.addEventListener("change",async e=>{const t=e.target;if(!t.closest||!t.
   if(body){try{await post("/api/localplans/source",body);BP.d=await api("/api/bandplan/area")}catch(err){BP.msg={bad:true,text:err.message}}renderBP()}});
 document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.closest("#bpDlg"))return;
   const bv=t.closest("[data-bpview]");if(bv){BP.view=bv.dataset.bpview;renderBP();return}
+  const go=t.closest("[data-bpgo]");if(go){const id=go.dataset.bpgo;let row=[...$("bpBody").querySelectorAll("[data-bptuned]")].find(x=>x.dataset.bptuned.split(" ").includes(id));
+    if(!row&&(BP.band!=="all"||BP.mine||BP.flags)){BP.band="all";BP.mine=BP.flags=false;renderBP();row=[...$("bpBody").querySelectorAll("[data-bptuned]")].find(x=>x.dataset.bptuned.split(" ").includes(id))}
+    if(row){row.scrollIntoView({block:"center",behavior:"smooth"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash")}
+    else{const r=(S.radios||[]).find(x=>x.id===id);BP.msg={bad:false,text:`${r?r.name:"That radio"} is not inside any row of this view${BP.view==="table"?"":" (not an open range)"}.`};renderBP()}return}
   const bu=t.closest("[data-bpuse]");if(bu){const rid=bu.dataset.radio,f=+bu.dataset.bpuse;if(!rid)return;const vc={radio:rid};
     const vr=(S.radios||[]).find(r=>r.id===rid)||{};bu.disabled=true;
     try{await post(`/api/radios/${enc(rid)}`,{freq_mhz:f,mode:bu.dataset.mode});BP.msg={bad:false,text:vr.cat&&vr.cat.ok?`${vr.name||vc.radio} tuned to ${bpMhz(f)} MHz ${bu.dataset.mode}. Listen first, then VARA chat… on its card.`:`${vr.name||vc.radio}'s card now says ${bpMhz(f)} MHz ${bu.dataset.mode}: set the radio to it, listen first, then VARA chat… on its card.`}}

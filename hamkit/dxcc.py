@@ -86,7 +86,14 @@ def lookup(call: str, path: str = str(DEFAULT)) -> dict | None:
 def update(path: Path = DEFAULT) -> int:
     from .fcc import _curl
     data = _curl(URL)
-    p, e = parse(data.decode("latin-1"))
+    text = data.decode("latin-1")
+    if re.search(r"<\s*(!doctype|html|head|script)\b", text[:4000], re.I):
+        raise RuntimeError("the country-files site sent a web page instead of cty.dat (a bot check?); "
+                           "the previous file is kept")
+    try:
+        p, e = parse(text)
+    except (ValueError, IndexError) as ex:
+        raise RuntimeError(f"cty.dat could not be read ({ex}); the previous file is kept") from None
     if len(p) < 300:                                   # refuse a truncated or error page
         raise RuntimeError(f"cty.dat looks wrong ({len(p)} prefixes)")
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -229,7 +229,10 @@ if (-not $SkipCallbook) {
   Step "Callbook: FCC license database + country file + ZIP centres (first run ~200 MB)"
   Push-Location $InstallDir
   Run { & $vpy -m hamkit.fcc update }
-  Run { & $vpy -m hamkit.dxcc update }
+  # The country file (country names for DX calls) is a nicety: when its site refuses (a bot check served to cloud
+  # PCs, 2026-11-16) the install goes on, the station runs without country names, and the weekly task tries again.
+  & $vpy -m hamkit.dxcc update
+  if ($LASTEXITCODE -ne 0) { Write-Host "  The country file did not download this time: country names for DX calls come with the weekly update." -ForegroundColor Yellow }
   Run { & $vpy -m hamkit.zipgeo update }    # ZIP centres (1 MB, once): VHF/UHF callsign distances
   Run { & $vpy -m hamkit.places update }    # US state names (2 KB): Sidekick hears a roll call by place
   Pop-Location

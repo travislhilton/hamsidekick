@@ -1,6 +1,8 @@
 """hamkit: glossary, bands, DXCC prefixes, hints and net recognition."""
 from datetime import datetime, timedelta
 
+from pathlib import Path
+
 from hamkit import bands, dxcc, glossary, hints
 
 CTY = """United States:            05:  08:  NA:   37.60:    91.87:     5.0:  K:
@@ -78,3 +80,22 @@ def test_config_yaml_read_as_utf8_on_any_platform():
     hints.load.cache_clear()
     titles = [c.get("title", "") for c in hints.load()["cards"].values()]
     assert any("—" in t for t in titles) and not any("â€" in t for t in titles)
+
+
+def test_dxcc_update_refuses_a_web_page_and_keeps_the_old_file(tmp_path, monkeypatch):
+    """CI 2026-11-16: the country-files site served a bot-check page to a cloud PC; the parser crashed on its CSS
+    ("invalid literal for int(): 'spin 1s ease-out'") and the install stopped. Now a clear error, the old file kept,
+    and the installer goes on."""
+    import pytest
+    from hamkit import fcc
+    old = tmp_path / "cty.dat"
+    old.write_text("kept")
+    monkeypatch.setattr(fcc, "_curl", lambda *a: b"<!DOCTYPE html><html><style>.x{a: spin 1s ease-out: 2: 3}</style>")
+    with pytest.raises(RuntimeError, match="web page"):
+        dxcc.update(old)
+    assert old.read_text() == "kept"
+    monkeypatch.setattr(fcc, "_curl", lambda *a: b"Somewhere: x: y: EU: 1: 2: 3: Q:\n  Q;")
+    with pytest.raises(RuntimeError, match="could not be read"):
+        dxcc.update(old)
+    ps = (Path(__file__).parent.parent / "install" / "windows" / "install.ps1").read_text(encoding="utf-8")
+    assert "Run { & $vpy -m hamkit.dxcc update }" not in ps and "country names for DX calls come with" in ps

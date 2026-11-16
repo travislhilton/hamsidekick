@@ -334,7 +334,7 @@ you chose is remembered. Each column shows:
   (VARA: where a plan sets data aside or no plan names any use, never the CW stretches), clear of every channel in
   the table, your local plans' and the Winlink gateways' included (3 kHz either side on HF, 15–25 kHz on VHF/UHF),
   with room for the whole signal. **Unplanned** (green) marks ranges no plan names any use for; ranges shared with
-  automatic Winlink stations say so. On **Ad hoc VARA**, **Use** sets your VARA radio (the Winlink radio set up for
+  automatic Winlink stations say so. **Tuned now** (2026-11-16) at the top names every radio's frequency (and its VARA modem); the row it sits in (a channel, else the range) is highlighted with the radio's name, in the table and the Ad hoc views, and follows the radio as it is retuned; click a name to jump to its row. On **Ad hoc VARA**, **Use** sets your VARA radio (the Winlink radio set up for
   VARA chat) to the middle of a range that fits its modem (VARA HF or VARA FM): a CAT radio is tuned, otherwise its
   card is set and you set the radio. Both lists run from the highest band down, as the table does. Listen first.
 - **Plans** (Nets → Plans, owner 2026-11-15): the **band plan** is built in (your privileges for phone, data and CW

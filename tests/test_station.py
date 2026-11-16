@@ -623,3 +623,27 @@ def test_every_pop_up_has_a_close_at_the_top():
     assert 'document.querySelectorAll("dialog").forEach(d=>{if(d.querySelector(":scope>.dhead .x' in html
     assert "function closeDlg(d){const ev=new Event(\"cancel\",{cancelable:true})" in html
     assert ".dlgxw{position:sticky" in html
+
+
+def test_an_open_dashboard_reloads_on_a_new_build_and_the_band_plan_marks_what_is_tuned(tmp_path):
+    """Owner 2026-11-16: the ✕ at the top was installed but an open dashboard kept the old page, so every (re)connect
+    compares the page's build (/api/page) and reloads (or offers Reload while a pop-up is open or something is being
+    typed). And "when a radio/modem is tuned to a frequency show it in the band plan with an indicator"."""
+    import json
+    import threading
+    import urllib.request
+    from station.server import STATIC, serve
+    from tests.test_varalink import _st
+    st, _ = _st(tmp_path)
+    srv = serve(st, "127.0.0.1", 0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/api/page") as r:
+            page = json.loads(r.read())["page"]
+    finally:
+        srv.shutdown()
+    assert len(page) == 16
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "pageCheck()};" in html and 'location.reload();return}' in html and "A new version of the station" in html
+    assert "function bpTuned()" in html and "Tuned now:" in html and "data-bptuned" in html and "data-bpgo" in html
+    assert "if($(\"bpDlg\")&&$(\"bpDlg\").open&&BP.d){const sig=bpTunedSig()" in html      # retuning redraws it

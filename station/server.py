@@ -105,6 +105,9 @@ def make_handler(station):
                 return self._send(200, page, "text/html; charset=utf-8")
             if u.path in ("/", "/index.html"):
                 return self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/page":                            # the page's build: an open dashboard reloads on a new one
+                import hashlib
+                return self._json({"page": hashlib.sha256((STATIC / "index.html").read_bytes()).hexdigest()[:16]})
             if u.path.startswith("/winlink-helper/"):           # the Winlink helper for another PC, served from here
                 return self._helper_file(u.path[len("/winlink-helper/"):])
             if u.path == "/api/phone":                         # "Open on a phone": addresses + QR codes
