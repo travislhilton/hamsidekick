@@ -31,7 +31,7 @@ CATS = [("beacon", r"beacon"), ("satellite", r"satellit|\bsat\b"), ("repeater_in
         ("repeater_out", r"\boutputs?\b|repeater(?!.*input)"), ("simplex", r"simplex|calling|tactical"),
         ("data", r"data|packet|digital|aprs|ft8|ft4|rtty|winlink|psk|vara|dstar|d-star|dmr|fusion|c4fm"),
         ("weak", r"weak|ssb|\bcw\b|eme|meteor|moonbounce|sideband"), ("atv", r"\batv\b|television|video"),
-        ("link", r"\blink|control|auxiliary|remote base"), ("experimental", r"experiment|test")]
+        ("link", r"\blink|(?<!automatic-)(?<!automatic )control|auxiliary|remote base"), ("experimental", r"experiment|test")]
 EPS = 0.00049
 
 
@@ -197,3 +197,90 @@ def lookup(table: dict, freq_mhz) -> dict | None:
             rng = [r for r in b["rows"] if r["type"] == "range" and r["from"] - EPS <= f <= r["to"] + EPS]
             return {"band": b["band"], "channel": ch, "range": rng[0] if rng else None}
     return None
+
+
+# ----- open for ad hoc use (owner 2026-11-16: "I also need a way to see unplanned frequency ranges where I can do
+# ad hoc VARA sessions and also Voice sessions") -----
+# Never: beacons, satellites, repeater inputs / outputs, links, ATV, experimental. Voice also avoids the data segments
+# (and on VHF/UHF the weak-signal SSB / CW stretches); VARA avoids weak-signal and FM simplex (that is for voice).
+_NEVER = {"beacon", "satellite", "repeater_in", "repeater_out", "link", "atv", "experimental"}
+_AVOID = {"voice": {"data"}, "data": {"weak", "simplex"}}
+WIDTH = {"voice": 0.003, "data": 0.003}       # an SSB voice or VARA HF (2.75 kHz) signal on HF, kept inside the stretch
+
+
+def _guard(f: float) -> float:
+    """How far from a channel (a calling frequency, FT8, a repeater, a local plan's channel) an ad hoc QSO stays."""
+    return 0.003 if f < 30 else 0.015 if f < 400 else 0.025
+
+
+def open_ranges(table: dict, kind: str) -> list[dict]:
+    """Stretches where the operator may start an ad hoc `kind` ("voice" or "data", e.g. VARA) session: inside their
+    privileges, set aside by no plan for anything else, clear of every channel. Each: {band, from, to, unplanned
+    (no plan names a use there), uses (the plans' words where one does), mode, auto (shared with automatic data
+    stations: Winlink gateways), note}. Needs the license class (table["license_class"]); 60 m (channels only) is left
+    out."""
+    cls = table.get("license_class")
+    if not cls or kind not in WIDTH:
+        return []
+    pk = "phone" if kind == "voice" else "data"
+    out = []
+    for b in table["bands"]:
+        if b["band"] == "60 m":
+            continue
+        hf = b["to"] <= 30
+        if not any(s["authority"] != "fcc" for r in b["rows"] for s in r["statements"]):
+            continue                                      # no plan covers the band (33 cm, 23 cm): nothing to say
+        pieces = []
+        for r in b["rows"]:
+            if r["type"] != "range" or not (r.get("privileges") or {}).get(pk):
+                continue
+            plan = [s for s in r["statements"] if s["authority"] != "fcc"]
+            c = set().union(*(cats(s["use"]) for s in plan)) if plan else set()
+            if c & _NEVER:
+                continue
+            if kind == "data" and ("data" not in c or (hf and "weak" in c)):
+                continue                                  # VARA only where a plan sets data aside (never HF CW)
+            cw_only = any(re.search(r"\bcw\b", (s["use"] or "").lower())
+                          and not re.search(r"ssb|phone|voice|sideband", (s["use"] or "").lower()) for s in plan)
+            if kind == "voice" and (c & _AVOID["voice"] or (not hf and "weak" in c) or cw_only):
+                continue
+            uses = []
+            for s in plan:
+                if s["use"] and s["use"] not in uses:
+                    uses.append(s["use"])
+            near = bool(pieces) and abs(pieces[-1]["to"] - r["from"]) <= EPS
+            if near and pieces[-1]["uses"] == uses:
+                pieces[-1]["to"] = r["to"]
+                continue
+            if near:
+                pieces[-1]["open_hi"] = True
+            pieces.append({"from": r["from"], "to": r["to"], "uses": uses, "unplanned": not plan, "open_lo": near})
+        chans = sorted(r["from"] for r in b["rows"] if r["type"] == "channel")
+        for p in pieces:
+            w = WIDTH[kind] if hf else 0
+            cuts = [(f - _guard(f), f + _guard(f)) for f in chans]
+            if not p["open_lo"]:
+                cuts.append((p["from"], p["from"] + w))   # the whole signal inside the stretch
+            if not p.get("open_hi"):
+                cuts.append((p["to"] - w, p["to"]))
+            free, at = [], p["from"]
+            for a, z in sorted(cuts):
+                if a > at:
+                    free.append((at, min(a, p["to"])))
+                at = max(at, z)
+                if at >= p["to"]:
+                    break
+            if at < p["to"]:
+                free.append((at, p["to"]))
+            for a, z in free:
+                fm = not hf or a >= 29.5                  # 10 m FM (repeaters, simplex) is as wide as VHF FM
+                if z - a < (0.04 if not hf else 0.02 if fm else 0.005 if kind == "voice" else 0.002):
+                    continue
+                mode = ("FM" if fm else "LSB" if a < 10 else "USB") if kind == "voice" and hf else "FM" if kind == "voice" \
+                    else "VARA HF (USB dial)" if hf else "VARA FM"
+                auto = any(x < z and y > a for x, y in bandplan.AUTO_DATA)
+                out.append({"band": b["band"], "from": round(a, 4), "to": round(z, 4), "unplanned": p["unplanned"],
+                            "uses": p["uses"], "mode": mode, "auto": auto,
+                            "note": ("shared with automatic data stations (Winlink gateways, packet): listen first, and "
+                                     "move off a gateway's frequency" if auto else "")})
+    return out

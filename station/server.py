@@ -328,7 +328,8 @@ def make_handler(station):
                       "/api/nets/assign", "/api/netfind/settings", "/api/netfind/search", "/api/netfind/add",
                       "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
-                      "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
+                      "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
+                      "/api/localplans/choose"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "handoff", "takeback")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
             alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss|unskip)", u.path)        # pre-net alert
@@ -430,6 +431,9 @@ def make_handler(station):
                         return self._json(lp.add_net(str(body.get("id") or ""), body.get("radio")))
                     if what == "ingest":                     # read the saved plans again
                         return self._json(lp.ingest(force=bool(body.get("force")), keys=body.get("keys")))
+                    if what == "choose":                     # {key, on, again}: into the band plan or out
+                        return self._json(lp.choose(str(body.get("key") or ""), bool(body.get("on")),
+                                                    bool(body.get("again"))))
                     if what == "source":                     # {key, excluded, authority}
                         return self._json(lp.set_source(str(body.get("key") or ""), body.get("excluded"),
                                                         body.get("authority")))

@@ -14,6 +14,11 @@ the ARES and RACES EMCOMM communication plans and band plans", then "build both"
 * OFFLINE COPIES. Each public plan document (PDF, or a web page as text) is saved under data/localplans/ with the date
   it was fetched, at most MAX_DOC_BYTES; the dashboard serves them back as downloads, so the plan is there with the
   internet down.
+* INTO THE BAND PLAN ONLY WHEN CHOSEN (owner 2026-11-16: "I need a way for the system to ingest those that I choose
+  into the overall band plan table"). Each plan or document has an "In the band plan" tick (Nets -> Plans): ticking
+  one saves its copy if needed and reads it (one xAI call) in the background; unticking leaves it out (the reading is
+  kept, so ticking it again is free). A search never reads anything by itself. A plan file the operator adds is read
+  when it is added and goes in at once (adding it was the choice).
 * USED BY THE STATION. label(freq) names a kept channel and the band plan's use of a frequency (station/bandplan.py):
   the radio cards show it, and Sidekick's context includes it. A channel with a published net schedule can be added
   to the schedule in one step.
@@ -187,6 +192,7 @@ class Plans:
         self.busy = False
         self.saving = False
         self.copy_lock = threading.Lock()
+        self.reading: set[str] = set()               # plans being read into the band plan now (choose)
 
     def docdir(self) -> Path:
         return Path(self.st.data) / "localplans"
@@ -206,15 +212,26 @@ class Plans:
         kept_ids = {k["id"] for k in kept}
         found = [dict(f, kept=f["id"] in kept_ids) for f in last.get("frequencies") or []]
         docs = d.get("docs") or {}
+        ing = d.get("ingested") or {}
         for x in last.get("documents") or []:
             x["saved"] = docs.get(x["url"])
+            x["band"] = self._band(x["url"], ing)
+        files = [dict(x, band=self._band(f"file:{x['id']}", ing)) for x in d.get("files") or []]
         return {"key": bool(self.key()), "location": netfind.location(self.st), "km": d.get("km", DEFAULT_KM),
                 "busy": self.busy, "saving": self.saving, "at": last.get("at"),
                 "stale": bool(last.get("at")) and time.time() - last["at"] > STALE_S,
                 "clubs": last.get("clubs") or [], "documents": last.get("documents") or [], "frequencies": found,
                 "left_out": last.get("left_out") or [], "error": last.get("error"), "cost_usd": last.get("cost_usd"),
-                "changes": last.get("changes") or {}, "kept": kept, "files": d.get("files") or [],
+                "changes": last.get("changes") or {}, "kept": kept, "files": files,
                 "license_class": self._class(), "doc_kinds": DOC_KINDS, "freq_kinds": FREQ_KINDS}
+
+    def _band(self, key: str, ing: dict) -> dict:
+        """One plan's place in the band plan: {"in", "reading", "error", "segments", "channels", "authority"}."""
+        e = ing.get(key) or {}
+        read = bool(e) and not e.get("error")
+        return {"in": read and not e.get("excluded"), "reading": key in self.reading, "read": read,
+                "error": e.get("error"), "segments": len(e.get("segments") or []),
+                "channels": len(e.get("frequencies") or []), "authority": e.get("authority"), "at": e.get("at")}
 
     def settings(self, body: dict) -> dict:
         with self.lock:
@@ -325,12 +342,7 @@ class Plans:
     def _save_copies(self, urls=None):
         from . import knowledge
         with self.copy_lock:                         # one at a time: a second run finds the first one's copies
-            self._copies(urls, knowledge)
-            if self.key():
-                try:
-                    self.ingest()                    # read each saved plan into the consolidated band plan
-                except Exception as e:  # noqa: BLE001
-                    print(f"localplans: ingest failed: {e}", flush=True)
+            self._copies(urls, knowledge)            # (nothing is read into the band plan until chosen: choose())
 
     def _copies(self, urls, knowledge):
         try:
@@ -385,7 +397,7 @@ class Plans:
                 out.append(why)
         return _clean_segments(obj.get("segments")), freqs, out
 
-    def ingest(self, force: bool = False, keys: list[str] | None = None) -> dict:
+    def ingest(self, force: bool = False, keys: list[str] | None = None, include: bool = False) -> dict:
         """Read every saved public plan (not yet read, or `force`) with xAI: its band segments and channels go into
         the consolidated band plan; its channels are also offered under Frequencies found (with the document as the
         source). One call per document."""
@@ -405,7 +417,7 @@ class Plans:
                    "org": m.get("org"), "date": m.get("date"), "url": url,
                    "authority": (done.get(url) or {}).get("authority")
                    or ("coordinator" if rec.get("kind") == "band_plan" else "local"),
-                   "excluded": (done.get(url) or {}).get("excluded", False)}
+                   "excluded": False if include else (done.get(url) or {}).get("excluded", False)}
             try:
                 segs, freqs, _ = self._read_plan(key, ent["title"], self.docdir() / rec["path"])
                 for f in freqs:
@@ -425,6 +437,66 @@ class Plans:
             print(f"localplans: read {ent['title'][:60]}: {len(ent.get('segments') or [])} segments, "
                   f"{len(ent.get('frequencies') or [])} channels{' (' + ent['error'] + ')' if ent.get('error') else ''}",
                   flush=True)
+        return self.state()
+
+    def choose(self, key: str, on: bool, again: bool = False, background: bool = True) -> dict:
+        """The operator's tick on one plan or document (its URL, or "file:<id>"): into the band plan or out of it.
+        In: already read -> it goes in at once; not read yet (or `again`) -> its copy is saved if need be and it is
+        read with xAI in the background (state() shows "reading"). Out: left out; its reading is kept."""
+        key = str(key or "")
+        d = _load(self.st)
+        ing = d.get("ingested") or {}
+        ent = ing.get(key)
+        if not on or (ent and not ent.get("error") and not again):
+            if not ent:
+                if on:
+                    raise ValueError("no such plan")
+                return self.state()
+            return self.set_source(key, excluded=not on)
+        if key.startswith("file:"):
+            raise ValueError("that file could not be read: add it again")
+        doc = next((x for x in (d.get("last") or {}).get("documents") or [] if x["url"] == key), None)
+        if not doc:
+            raise ValueError("no such plan")
+        if not doc.get("public"):
+            raise ValueError("that plan is members-only: it is never fetched. If you have it, add it below as a file")
+        if not self.key():
+            raise ValueError("set the xAI key first (Settings -> Sidekick & AI): it reads the plans")
+        with self.lock:
+            if key in self.reading:
+                return self.state()
+            self.reading.add(key)
+
+        def run():
+            from . import knowledge
+            try:
+                with self.copy_lock:
+                    if not ((_load(self.st).get("docs") or {}).get(key) or {}).get("path"):
+                        self.saving = True
+                        self._copies([key], knowledge)
+                    rec = (_load(self.st).get("docs") or {}).get(key) or {}
+                    if not rec.get("path"):
+                        with self.lock:
+                            d2 = _load(self.st)
+                            d2.setdefault("ingested", {})[key] = {
+                                "at": time.time(), "title": doc["title"], "kind": doc["kind"], "url": key,
+                                "org": doc.get("org"), "error": "no copy could be saved: "
+                                + str(rec.get("error") or "the page did not answer")}
+                            _save(self.st, d2)
+                        return
+                    self.ingest(force=True, keys=[key], include=True)
+            except Exception as e:  # noqa: BLE001
+                print(f"localplans: reading {key[:80]} failed: {e}", flush=True)
+            finally:
+                self.reading.discard(key)
+                try:
+                    self.st.bus.publish("localplans", {"read": key})
+                except Exception:  # noqa: BLE001
+                    pass
+        if background:
+            threading.Thread(target=run, daemon=True, name="localplans-read").start()
+        else:
+            run()
         return self.state()
 
     def set_source(self, key: str, excluded=None, authority=None) -> dict:
@@ -461,6 +533,7 @@ class Plans:
         t["location"] = (netfind.location(self.st) or {}).get("label")
         t["searched_at"] = (d.get("last") or {}).get("at")
         t["key"] = bool(self.key())
+        t["open"] = {k: consolidate.open_ranges(t, k) for k in ("voice", "data")}
         return t
 
     def doc_file(self, sid: str) -> tuple[Path, str, str] | None:

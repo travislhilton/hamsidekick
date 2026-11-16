@@ -2,6 +2,8 @@
 segments and channels, merged with the FCC rules and the ARRL band plan, and every disagreement is flagged."""
 import json
 import threading
+
+import pytest
 import urllib.request
 
 from station import consolidate as C
@@ -61,7 +63,9 @@ def test_saved_plans_are_read_and_the_area_table_is_served(tmp_path, xai_key):
         {"freq_mhz": 147.48, "mode": "FM", "use": "Tactical simplex 1", "kind": "simplex"}]}
     p._text_of = lambda path: "a band plan"
     p.search()
-    p.save_copies()                                   # saved, then read
+    p.save_copies()                                   # saved; nothing is read until the operator chooses it
+    assert p.consolidated()["read"] == [] and p.consolidated()["unread"] == 1
+    p.choose("https://example.org/ares-plan.pdf", True, background=False)
     t = p.consolidated()
     assert t["read"][0]["segments"] == 3 and t["read"][0]["authority"] == "local"     # an ARES plan document
     assert t["read"][0]["channels"] == 1
@@ -91,3 +95,81 @@ def test_segments_are_cleaned():
                               {"from_mhz": 146.52, "use": "calling"}, "junk"])
     assert got == [{"from_mhz": 147.42, "to_mhz": 147.57, "use": "FM simplex"},
                    {"from_mhz": 146.52, "to_mhz": 146.52, "use": "calling"}]
+
+
+def test_the_operator_chooses_which_plans_go_into_the_band_plan(tmp_path, xai_key):
+    """Owner 2026-11-16: "I need a way for the system to ingest those that I choose into the overall band plan
+    table". A tick per plan: read once (its copy saved first if need be), out without reading again, back in free."""
+    st, p, _, got = _plans(tmp_path)
+    reads = []
+
+    def extract(key, sys, user):
+        reads.append(user)
+        return {"segments": COORD["segments"], "frequencies": []}
+    p.extract, p._text_of = extract, (lambda path: "a band plan")
+    p.save_copies = lambda **kw: None                             # (a plan the search did not copy: a repeater list)
+    p.search()
+    url = "https://example.org/ares-plan.pdf"
+    doc = next(x for x in p.state()["documents"] if x["url"] == url)
+    assert doc["band"] == {"in": False, "reading": False, "read": False, "error": None, "segments": 0,
+                           "channels": 0, "authority": None, "at": None}
+    assert got == [] and reads == []                              # a search reads nothing into the plan
+    s = p.choose(url, True, background=False)                     # not saved yet: saved, then read
+    doc = next(x for x in s["documents"] if x["url"] == url)
+    assert got == [url] and len(reads) == 1 and doc["band"]["in"] and doc["band"]["segments"] == 3
+    assert doc["saved"]["path"].endswith(".pdf")
+    r = next(x for x in _rows(p.consolidated(), "2 m") if x["type"] == "range" and x["from"] <= 147.0 <= x["to"])
+    assert r["authority"] == "local"
+    s = p.choose(url, False)                                       # out: the reading is kept
+    assert not next(x for x in s["documents"] if x["url"] == url)["band"]["in"]
+    r = next(x for x in _rows(p.consolidated(), "2 m") if x["type"] == "range" and x["from"] <= 147.0 <= x["to"])
+    assert r["authority"] == "arrl"
+    s = p.choose(url, True, background=False)                      # back in: no second read
+    assert next(x for x in s["documents"] if x["url"] == url)["band"]["in"] and len(reads) == 1
+    p.choose(url, True, again=True, background=False)              # read again on purpose
+    assert len(reads) == 2
+    with pytest.raises(ValueError, match="members-only"):
+        p.choose("https://example.org/races", True)
+    with pytest.raises(ValueError, match="no such plan"):
+        p.choose("https://example.org/nowhere", True)
+
+
+def test_a_plan_whose_copy_cannot_be_saved_says_so(tmp_path, xai_key):
+    st, p, _, _ = _plans(tmp_path)
+    p.fetch = lambda url: (_ for _ in ()).throw(OSError("timed out"))
+    p.search()
+    s = p.choose("https://example.org/ares-plan.pdf", True, background=False)
+    b = next(x for x in s["documents"] if x["kind"] == "ares_plan")["band"]
+    assert not b["in"] and "no copy could be saved" in b["error"] and "timed out" in b["error"]
+
+
+def _at(rows, f):
+    return [x for x in rows if x["from"] <= f <= x["to"]]
+
+
+def test_open_for_ad_hoc_voice_and_vara(tmp_path):
+    """Owner 2026-11-16: "a way to see unplanned frequency ranges where I can do ad hoc VARA sessions and also Voice
+    sessions": inside the class's privileges, nothing else planned there, clear of every channel."""
+    t = C.build("general", [])
+    v, d = C.open_ranges(t, "voice"), C.open_ranges(t, "data")
+    forty = _at(v, 7.2)
+    assert forty and forty[0]["unplanned"] and forty[0]["mode"] == "LSB" and forty[0]["from"] >= 7.178
+    assert not _at(v, 7.15)                                        # General: no phone below 7.175
+    assert not _at(v, 146.52) and not _at(v, 146.51) and _at(v, 146.46)   # the calling frequency kept clear
+    assert not _at(v, 146.94) and not _at(v, 144.39) and not _at(v, 145.9)  # repeaters, APRS, satellites
+    assert not _at(v, 1.82)                                        # 160 m CW
+    assert not _at(v, 14.07) and not _at(d, 14.03) and not _at(d, 14.2)    # data only where a plan sets it aside
+    vara = _at(d, 14.105)
+    assert vara and vara[0]["auto"] and "Winlink" in vara[0]["note"] and vara[0]["mode"].startswith("VARA HF")
+    assert not _at(d, 14.074) and not _at(d, 14.1)                 # FT8, the beacons
+    assert _at(d, 145.05)[0]["mode"] == "VARA FM" and not _at(d, 144.39)
+    assert not any(x["band"] in ("33 cm", "23 cm", "60 m") for x in v + d)
+    tech = C.open_ranges(C.build("technician", []), "voice")
+    assert {x["band"] for x in tech if x["from"] < 30} == {"10 m"} and all(28.3 <= x["from"] for x in tech if x["from"] < 30)
+    assert C.open_ranges(C.build(None, []), "voice") == []         # no class: nothing claimed
+    local = C.build("general", [{"id": "a", "name": "County ARES plan", "authority": "local",
+                                 "segments": [{"from_mhz": 7.25, "to_mhz": 7.26, "use": "Section HF net"}],
+                                 "frequencies": [{"freq_mhz": 7.2, "mode": "LSB", "use": "County HF net"}]}])
+    lv = C.open_ranges(local, "voice")
+    assert not _at(lv, 7.2) and not _at(lv, 7.199) and _at(lv, 7.21)       # a local channel carved out
+    assert _at(lv, 7.255)[0]["uses"] == ["Section HF net"] and not _at(lv, 7.255)[0]["unplanned"]

@@ -54,7 +54,7 @@ AUTO_DATA = [(3.585, 3.6), (7.1, 7.105), (10.14, 10.15), (14.095, 14.0995), (14.
 # The ARRL band plan (voluntary), the parts an operator meets most. (low, high, what). A single frequency: low == high.
 PLAN = [
     # 160 m
-    (1.8, 1.81, "digital modes"), (1.81, 1.81, "QRP CW calling"), (1.84, 1.84, "FT8"), (1.843, 2.0, "SSB, SSTV and other wideband modes"),
+    (1.8, 1.81, "digital modes"), (1.81, 1.843, "CW"), (1.81, 1.81, "QRP CW calling"), (1.84, 1.84, "FT8"), (1.843, 2.0, "SSB, SSTV and other wideband modes"),
     (1.91, 1.91, "SSB QRP"), (1.995, 2.0, "experimental"),
     # 80 m
     (3.5, 3.51, "CW DX window"), (3.56, 3.56, "QRP CW calling"), (3.57, 3.6, "RTTY / data"), (3.573, 3.573, "FT8"),
@@ -98,16 +98,18 @@ PLAN = [
     (144.0, 144.1, "CW and EME"), (144.1, 144.275, "weak-signal CW / SSB"), (144.2, 144.2, "SSB calling"),
     (144.275, 144.3, "beacons"), (144.3, 144.5, "satellite / new OSCAR"), (144.39, 144.39, "APRS (data): do not talk here"),
     (144.5, 144.6, "linear translator inputs"), (144.6, 144.9, "FM repeater inputs"),
-    (144.9, 145.1, "weak signal and FM simplex; packet on 145.01-145.09"), (145.1, 145.2, "linear translator outputs"),
+    (144.9, 145.1, "weak signal and FM simplex"),
+    (145.01, 145.09, "packet (data)"), (145.1, 145.2, "linear translator outputs"),
     (145.2, 145.5, "FM repeater outputs"), (145.5, 145.8, "miscellaneous and experimental (some areas: simplex)"),
     (145.8, 146.0, "satellites: do not transmit except to a satellite"), (146.01, 146.37, "FM repeater inputs"),
     (146.4, 146.58, "FM simplex"), (146.52, 146.52, "national FM simplex calling frequency"),
     (146.61, 147.39, "FM repeater outputs"), (147.42, 147.57, "FM simplex"), (147.6, 147.99, "FM repeater inputs"),
     # 1.25 m
-    (222.0, 222.15, "weak-signal CW / SSB"), (222.1, 222.1, "SSB calling"), (222.32, 223.38, "FM repeater outputs"),
-    (223.4, 223.52, "FM simplex"), (223.5, 223.5, "FM simplex calling"), (223.85, 224.98, "FM repeater outputs"),
+    (222.0, 222.15, "weak-signal CW / SSB"), (222.1, 222.1, "SSB calling"), (222.15, 222.25, "local option (weak signal, repeater inputs, control)"), (222.25, 223.38, "FM repeater inputs"),
+    (223.4, 223.52, "FM simplex"), (223.5, 223.5, "FM simplex calling"), (223.52, 223.64, "digital / packet"),
+    (223.64, 223.7, "links and control"), (223.71, 223.85, "local option"), (223.85, 224.98, "FM repeater outputs"),
     # 70 cm
-    (420.0, 426.0, "ATV and repeater links"), (432.0, 432.07, "EME"), (432.07, 432.1, "weak-signal CW"),
+    (420.0, 426.0, "ATV and repeater links"), (426.0, 432.0, "ATV simplex"), (432.0, 432.07, "EME"), (432.07, 432.1, "weak-signal CW"),
     (432.1, 432.1, "SSB / CW calling"), (432.1, 433.0, "weak-signal mixed modes"), (433.0, 435.0, "auxiliary and repeater links"),
     (435.0, 438.0, "satellites: do not transmit except to a satellite"), (438.0, 444.0, "ATV and repeater links"),
     (442.0, 445.0, "FM repeater inputs and outputs (local option)"), (445.0, 447.0, "shared by local option (simplex in many areas)"),
