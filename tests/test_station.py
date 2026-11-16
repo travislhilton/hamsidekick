@@ -593,3 +593,22 @@ def test_a_radio_nets_row_opens_its_menu_with_skip_for_that_date():
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert 'if(!e.target.closest("#rpick")&&!e.target.closest("[data-rn]"))closePick();' in idx
     assert "data-skipocc" in idx and "/api/alerts/${enc(sk.dataset.skipocc)}/${sk.dataset.v}" in idx
+
+
+def test_settings_has_a_panel_per_tab_and_links_open_their_tab():
+    """Owner 2026-11-15: Settings redesigned into tabs. Every tab has its panel, every field the Save bar saves is on
+    one, and the dashboard's links (AI costs, This PC, the xAI key) open Settings on their own tab."""
+    import re
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    dlg = idx.split('<dialog id="settings"', 1)[1].split("</dialog>", 1)[0]
+    tabs, panels = re.findall(r'data-stab="(\w+)"', dlg), re.findall(r'data-spanel="(\w+)"', dlg)
+    assert tabs == panels and len(tabs) == 7
+    for name in ("callsign", "name", "grid", "winlink_dir", "winlink_account", "reach_km", "ai_summary", "keep_awake",
+                 "keep_weeks"):
+        assert f'name="{name}"' in dlg and f"{name}:[" in idx            # in the form, and in SETF (its tab, dirty)
+    for el in ("costSet", "pcSet", "keySet", "agentSet", "voiceSet", "grokSet", "lnSet", "learnSet", "alertSet",
+               "shareSet", "mgmtKeySet", "setSave", "setErr", "wlNone", "keepNote", "dispTheme", "dispClock"):
+        assert f'id="{el}"' in dlg
+    assert 'function openCosts(){openSettings("costs")}' in idx and 'function openPC(){openSettings("pc")}' in idx
+    assert 'openSettings("ai")' in idx
