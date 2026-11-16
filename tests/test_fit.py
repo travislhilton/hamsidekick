@@ -227,3 +227,57 @@ def test_find_nets_does_not_offer_a_not_heard_net_unless_added_anyway(tmp_path):
     r = f.add(["f1"], anyway=["f1"])
     assert not r["failed"], r["failed"]
     assert len(r["added"]) == 1 and not s.unheard()
+
+
+def test_two_net_tunes_a_second_apart_leave_the_radio_on_the_newer_net(tmp_path):
+    """2026-11-15: a silent net handed the radio to one net, the next tick to another; both CAT threads ran and the
+    radio ended on the older net's frequency while the station listened for the newer one. Now the newest wins."""
+    import threading
+    import time
+    from station.cat import Icom
+    from tests.test_cat import Clock, FakeIC705, TUE, station
+    radio = FakeIC705(freq=7_185_000, mode=0x00)
+    st = station(tmp_path, radio, Clock(TUE.replace(hour=20)), antenna="hf")
+    slow = Icom.tune
+
+    def tune(self, *a, **k):                      # the older request is the slower one, as on the station
+        if a[0] == 3.57:
+            time.sleep(0.3)
+        return slow(self, *a, **k)
+    Icom.tune = tune
+    try:
+        st.cat.on_net("ic", {"name": "Mountain States Net", "freq_mhz": 3.57, "mode": "LSB"}, wait=False)
+        time.sleep(0.05)
+        st.cat.on_net("ic", {"name": "Western Country Cousins Net", "freq_mhz": 3.97, "mode": "LSB"}, wait=False)
+        for th in threading.enumerate():
+            if th.name == "cat-ic":
+                th.join(5)
+    finally:
+        Icom.tune = slow
+    assert radio.freq == 3_970_000 and st.radios["ic"]["freq_mhz"] == 3.97
+    assert st.radios["ic"]["cat"]["tuned_for"] == "Western Country Cousins Net"
+
+
+def test_a_net_is_never_called_silent_while_the_radio_is_on_another_frequency(tmp_path):
+    import copy
+    from datetime import timedelta
+    from station import engine
+    from station.cat import CatControl, Icom
+    from station.core import Station
+    from tests.test_cat import CFG, Clock, FakeIC705, TUE, edge
+    cfg = copy.deepcopy(CFG)
+    cfg["schedule"] = [{"name": "Cousins", "radio": "ic", "freq_mhz": 3.97, "mode": "LSB", "days": ["Wed"],
+                        "start": "20:00", "duration_min": 60},
+                       {"name": "Mountain", "radio": "ic", "freq_mhz": 3.57, "mode": "LSB", "days": ["Wed"],
+                        "start": "20:00", "duration_min": 60}]
+    wed = TUE + timedelta(days=1)
+    radio, clock = FakeIC705(freq=7_185_000, mode=0x00), Clock(wed.replace(hour=19, minute=59))
+    st = Station(cfg, lambda: engine.FakeEngine(), data_dir=tmp_path, clock=clock)
+    st.cat = CatControl(st, lambda c: Icom(radio, c["civ"], c["model"]))
+    st.set_radio_setup("ic", {"antenna": "hf"})
+    edge(st, clock, wed.replace(hour=20, minute=0))
+    first = st.radios["ic"]["listen"]["now"]
+    other = 3.57 if first == "Cousins" else 3.97
+    st.set_radio("ic", other, "LSB")                 # the radio is somewhere else (a lost race, or the operator)
+    edge(st, clock, wed.replace(hour=20, minute=5))
+    assert st.radios["ic"]["listen"]["now"] == first and "switched" not in st.radios["ic"]["listen"]

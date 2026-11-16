@@ -316,9 +316,22 @@ class NetSchedule:
             return None
         if not cur.get("freq_mhz") or float(cur["freq_mhz"]) > QUIET_MAX_MHZ:
             return None
-        if q["key"] != cur["key"] or not q["since"] or at - q["since"] < timedelta(minutes=QUIET_MIN):
+        if q["key"] != cur["key"] or not q["since"]:
             return None
-        if self._heard_since(rid, max(q["since"], at - timedelta(minutes=QUIET_MIN))):
+        # only time on the net's own frequency counts: on 2026-11-15 the radio sat on another net's frequency (two
+        # tunes raced) and the station called the net it never listened to silent, then never went back to it
+        if abs(float(r.get("freq_mhz") or 0) - float(cur["freq_mhz"])) > 0.0015:
+            q["on"] = None
+            return None
+        if not q.get("on"):                       # since the radio got there (its tune time), not before the window
+            try:
+                tuned = datetime.fromisoformat(str(r.get("tuned_at")))
+            except ValueError:
+                tuned = at
+            q["on"] = min(at, max(q["since"], tuned.replace(tzinfo=None)))
+        if at - q["on"] < timedelta(minutes=QUIET_MIN) or r.get("live_tx"):
+            return None
+        if self._heard_since(rid, max(q["on"], at - timedelta(minutes=QUIET_MIN))):
             return None
         alt, _ = listen_window(nets, rid, at, skip=skip, usable=self.usable(rid, at), loses=self.loses(at),
                                dead=q["dead"] | {cur["key"]})
@@ -841,7 +854,7 @@ class NetSchedule:
                 if self._want.get(rid) == want:
                     continue
                 self._heard_end(rid, self._want.get(rid), at)          # the net it leaves: heard or not
-                q["key"], q["since"] = (want or None), at
+                q["key"], q["since"], q["on"] = (want or None), at, None
                 if not want:
                     q["dead"] = set()
                 self._want[rid] = want

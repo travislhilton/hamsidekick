@@ -238,6 +238,10 @@ class CatControl:
         self.last: dict[str, tuple[float, str]] = {}
         self.lock = threading.Lock()
         self.hold: set[str] = set()                 # radios the scan is sweeping: the poll leaves them alone
+        # one tune at a time per radio, and only the newest request: two schedule edges a second apart once raced
+        # and left the radio on the older net's frequency while the station listened for the newer one (2026-11-15)
+        self.gen: dict[str, int] = {}
+        self.tuning: dict[str, threading.Lock] = {}
         for rid, c in self.cfg.items():
             if rid in station.radios:
                 station.radios[rid]["cat"] = {"port": c["port"], "ok": None, "error": None, "tuned_for": None}
@@ -319,8 +323,10 @@ class CatControl:
             raise ValueError(f"CAT: {(self.st.radios[rid].get('cat') or {}).get('error') or 'the radio is not answering'}")
         if not rig.covers(f):
             raise ValueError(f"{f:.4f} MHz is outside what the {rig.model} receives")
+        self._bump(rid)                              # the operator's tune wins over a net tune still waiting
         try:
-            rig.tune(f, mode)
+            with self.tuning[rid]:
+                rig.tune(f, mode)
         except Exception as e:  # noqa: BLE001
             self._drop(rid, str(e))
             raise ValueError(f"CAT: {e}") from None
@@ -346,25 +352,39 @@ class CatControl:
         """The schedule's edge for this radio: a net's window opened (`net`) or closed (None). In a thread."""
         if rid not in self.cfg:
             return
-        t = threading.Thread(target=self._on_net, args=(rid, net, wait), daemon=True, name=f"cat-{rid}")
+        g = self._bump(rid)
+        t = threading.Thread(target=self._on_net, args=(rid, net, wait, g), daemon=True, name=f"cat-{rid}")
         t.start()
         return t
 
-    def _on_net(self, rid, net, wait):
-        try:
-            if net and net.get("freq_mhz"):
-                self._tune_for(rid, net, wait)
-            elif not net:
-                self._put_back(rid)
-        except Exception as e:  # noqa: BLE001
-            self._status(rid, False, f"{type(e).__name__}: {e}")
+    def _bump(self, rid) -> int:
+        with self.lock:
+            self.gen[rid] = self.gen.get(rid, 0) + 1
+            self.tuning.setdefault(rid, threading.Lock())
+            return self.gen[rid]
+
+    def _stale(self, rid, g) -> bool:
+        """A newer tune or put-back was asked for this radio since request `g`: this one does nothing."""
+        return g is not None and self.gen.get(rid) != g
+
+    def _on_net(self, rid, net, wait, g=None):
+        with self.tuning.setdefault(rid, threading.Lock()):
+            if self._stale(rid, g):
+                return
+            try:
+                if net and net.get("freq_mhz"):
+                    self._tune_for(rid, net, wait, g)
+                elif not net:
+                    self._put_back(rid)
+            except Exception as e:  # noqa: BLE001
+                self._status(rid, False, f"{type(e).__name__}: {e}")
 
     def _quiet(self, rid, wait):
         end = time.monotonic() + (QUIET_WAIT_S if wait else 0)
         while self.st.radios.get(rid, {}).get("live_tx") and time.monotonic() < end:
             time.sleep(0.5)
 
-    def _tune_for(self, rid, net, wait):
+    def _tune_for(self, rid, net, wait, g=None):
         rig = self._rig(rid)
         if rig is None:
             return
@@ -382,6 +402,8 @@ class CatControl:
             r["net_freq"] = f                       # back-to-back nets: still put back what came before the first
             self._save_restore(rid, r)
         self._quiet(rid, wait)
+        if self._stale(rid, g):                     # a newer net came while it waited for the transmission to end
+            return
         try:
             rig.tune(f, mode, net.get("offset_mhz"), net.get("tone_hz"))
         except Exception as e:  # noqa: BLE001
