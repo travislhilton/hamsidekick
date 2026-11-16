@@ -281,9 +281,11 @@ Write-Host '  ready (your own power plan stays active; set it for battery life a
 if (-not $SkipModels) {
   # Both benchmarks with the screen and system held awake on the HAM Sidekick power plan (station/pccheck.py): a laptop measured
   # with its screen off runs at a quarter of its speed and would get a slower engine than it can run (2026-11-12).
-  # An update keeps the earlier measurement unless -Remeasure or there is none yet.
+  # An update keeps the earlier measurement unless -Remeasure, there is none yet, or it chose no engine (the station
+  # cannot start then: a PC measured before the CPU fallback in tools/pick_engine.py, 2026-11-16).
   $eng = "$InstallDir\config\engine.yaml"
-  if ($Remeasure -or -not (Test-Path $eng) -or -not (Select-String -Path $eng -Pattern '^accurate:' -Quiet)) {
+  $noFinal = (Test-Path $eng) -and ((-not (Select-String -Path $eng -Pattern '^final:' -Quiet)) -or (Select-String -Path $eng -Pattern '^final:\s*null' -Quiet))
+  if ($Remeasure -or $noFinal -or -not (Test-Path $eng) -or -not (Select-String -Path $eng -Pattern '^accurate:' -Quiet)) {
     Step "Measuring this PC at full speed (screen held on; ~3-8 min, leave the PC plugged in)"
     # The station shares the graphics and switches power plans: off for the measurement. Its task is DISABLED, not
     # only stopped: the 2-minute watchdog trigger started it again mid-measurement (2026-11-12, a test install).
