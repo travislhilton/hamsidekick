@@ -61,7 +61,7 @@ def test_relay_card_and_identify_reminder():
 
 def test_check_in_card_uses_phonetics():
     r = hints.Hinter("W9XYZ").on_transmission("Any check-ins for the net?", [])
-    assert r["cards"][0]["say"][0].startswith("Whiskey Nine Xray Yankee Zulu")
+    assert r["cards"][0]["say"][0].startswith("Whiskey Niner Xray Yankee Zulu")
 
 
 def test_net_recognition_emergency_wins():

@@ -62,3 +62,63 @@ def test_the_gateways_go_into_the_band_plan_from_express_and_hf_is_only_offered(
     p.settings({"km": 300})                                                # a wider reach rebuilds the list
     assert "186 mi" in {g["key"]: g for g in p.state()["gateways"]}["express:vhf"]["title"]
     assert len({g["key"]: g for g in p.state()["gateways"]}["express:vhf"]["list"]) == 3
+
+
+def test_an_old_or_missing_channel_list_asks_the_operator_to_update_it(tmp_path, monkeypatch):
+    """Owner 2026-11-16: "if the list in Winlink has not been updated recently or not updated yet (new instance) ask
+    the user to update their Winlink Channel Selection"."""
+    import os
+    import time
+    inst = _express(tmp_path)
+    st, p, _, _ = _plans(tmp_path)
+    st.where = lambda: HERE
+    monkeypatch.setattr(p, "_installs", lambda: [str(inst)])
+    assert p.state()["winlink_list"]["ask"] is False                     # both lists fresh
+    hf = next(inst.glob("*/Data/" + wc.HF_FILE))
+    old = time.time() - 45 * 86400
+    os.utime(hf, (old, old))
+    n = p.state()["winlink_list"]
+    assert n["ask"] and {k["kind"]: (k["stale"], k["days"]) for k in n["kinds"]} == {"vhf": (False, 0), "hf": (True, 45)}
+    hf.unlink()                                                          # a new Express: never downloaded
+    n = p.consolidated()["winlink_list"]
+    assert n["ask"] and next(k for k in n["kinds"] if k["kind"] == "hf")["missing"]
+    p.settings({"list_snooze": True})                                     # "Remind me in a week"
+    assert p.state()["winlink_list"]["ask"] is False
+    monkeypatch.setattr(p, "_installs", lambda: [])                       # no Winlink Express on this PC: nothing asked
+    assert p.state()["winlink_list"] is None
+
+
+def test_the_page_asks_for_the_update_in_plans_and_the_band_plan():
+    from station.server import STATIC
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "Please update Winlink Express's RMS channel list" in html and "Update Table Via Internet" in html
+    assert html.count("wlListNote(d.winlink_list)") == 2 and "data-wlsnooze" in html
+
+
+def test_a_new_list_from_express_is_picked_up_by_itself(tmp_path, monkeypatch):
+    """Owner 2026-11-16: "update the Winlink Channel Selection whenever they want and the band plan should
+    automatically pick it up": the watcher sees the new file and tells open dashboards."""
+    import os
+    import threading
+    import time
+    inst = _express(tmp_path)
+    st, p, _, _ = _plans(tmp_path)
+    st.where = lambda: HERE
+    told = []
+    st.publish = lambda kind, data: told.append((kind, data))
+    monkeypatch.setattr(p, "_installs", lambda: [str(inst)])
+    p.state()
+    vhf = next(inst.glob("*/Data/" + wc.VHF_FILE))
+    vhf.write_text(VHF + "N0CALL-10|EM59ht|145090000|1200|51|PUBLIC\r\n", encoding="utf-8")
+    later = time.time() + 5
+    os.utime(vhf, (later, later))
+    stop = threading.Event()
+    th = threading.Thread(target=p.watch_express, args=(stop, 0.05), daemon=True)
+    th.start()
+    deadline = time.time() + 3
+    while not told and time.time() < deadline:
+        time.sleep(0.05)
+    stop.set()
+    assert told and told[0] == ("localplans", {"gateways": True})
+    calls = {g["gateway"]["call"] for g in {x["key"]: x for x in p.state()["gateways"]}["express:vhf"]["list"]}
+    assert "N0CALL-10" in calls

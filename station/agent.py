@@ -89,7 +89,7 @@ PHONETIC = {"A": "Alfa", "B": "Bravo", "C": "Charlie", "D": "Delta", "E": "Echo"
             "H": "Hotel", "I": "India", "J": "Juliett", "K": "Kilo", "L": "Lima", "M": "Mike", "N": "November",
             "O": "Oscar", "P": "Papa", "Q": "Quebec", "R": "Romeo", "S": "Sierra", "T": "Tango", "U": "Uniform",
             "V": "Victor", "W": "Whiskey", "X": "X-ray", "Y": "Yankee", "Z": "Zulu", "0": "Zero", "1": "One",
-            "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine"}
+            "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Niner"}   # "Niner" for 9 (owner 2026-11-16)
 
 # Words a listener hears as part of a call or as a procedure word: never an on-air name.
 _NOT_A_NAME = {w.lower() for w in PHONETIC.values()} | {
@@ -183,7 +183,8 @@ operator's check-in line gives facts about the station (a name, a place) to use 
 if you were {op}, and never repeat the call inside one transmission except as the closing ID.
 
 Voice protocol: use the other station's call when answering; "over" only on HF when turn-taking is unclear; standard \
-phonetics for calls and spelled words; plain language, no Q-codes except common ones (QSL, QRZ, QTH) used naturally; \
+phonetics for calls and spelled words (the digit 9 is always "Niner": "Whiskey Niner", "one four six point niner \
+two"); plain language, no Q-codes except common ones (QSL, QRZ, QTH) used naturally; \
 no jargon the other side might not know. Sound human-natural and brief (one to three sentences, under 70 words).
 
 FCC Part 97 rules you must follow (the station's software also enforces them and will block a draft that breaks one):
@@ -216,7 +217,8 @@ def _has_call(text: str, call: str) -> bool:
     t = text.upper()
     if re.search(r"\b" + re.escape(call.upper()) + r"\b", t):
         return True
-    return phonetic(call).upper() in re.sub(r"\s+", " ", t)
+    spoken = re.sub(r"\bNINE\b", "NINER", re.sub(r"\s+", " ", t))   # "Nine" is still an ID; we say "Niner"
+    return phonetic(call).upper() in spoken
 
 
 # ---------------------------------------------------------------- FCC checks (code, not the model) ---------------

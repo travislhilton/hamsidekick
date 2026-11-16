@@ -43,6 +43,7 @@ STALE_MIN = 60
 
 ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
         "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"]
+DIGIT_WORDS = ONES[:9] + ["niner"]          # a digit spoken on its own: 9 is "niner" (owner 2026-11-16)
 TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
 
 
@@ -54,7 +55,7 @@ def words(n) -> str:
         whole, frac = int(n), round(n - int(n), 2)
         if frac == 0.5:
             return f"{words(whole)} and a half"
-        return f"{words(whole)} point {' '.join(ONES[int(d)] for d in f'{frac:.2f}'[2:].rstrip('0'))}"
+        return f"{words(whole)} point {' '.join(DIGIT_WORDS[int(d)] for d in f'{frac:.2f}'[2:].rstrip('0'))}"
     n = int(n)
     if n < 0:
         return "minus " + words(-n)
@@ -83,10 +84,10 @@ def clock_words(iso: str | None) -> str:
     except ValueError:
         return "not reported"
     h, m = t.hour, t.minute
-    hw = ("zero " + ONES[h]) if h < 10 else words(h)
+    hw = ("zero " + DIGIT_WORDS[h]) if h < 10 else words(h)
     if m == 0:
         return f"{hw} hundred"
-    return f"{hw} {('zero ' + ONES[m]) if m < 10 else words(m)}"
+    return f"{hw} {('zero ' + DIGIT_WORDS[m]) if m < 10 else words(m)}"
 
 
 ORD = {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth",

@@ -240,7 +240,7 @@ def test_post_radio_requires_json(station):
 
 def test_short_prompt_carries_frequency_and_phonetic_call(station):
     p = station.prompt_for("ftm")
-    assert p == "Ham radio net on 146.940 MHz. This is W9XYZ, Whiskey Nine Xray Yankee Zulu. Over." and len(p) < 120
+    assert p == "Ham radio net on 146.940 MHz. This is W9XYZ, Whiskey Niner Xray Yankee Zulu. Over." and len(p) < 120
     station.set_radio("ftm", 145.9)
     assert "145.900 MHz" in station.prompt_for("ftm")
 

@@ -3,7 +3,7 @@ for the live text and the accurate pass. Numbers and callsigns are compared digi
 "145.9", "one four five point nine" and "W9XYZ" / "W 9 X Y Z" all compare the same."""
 import re
 
-TEMPLATE = ("This is {call}, {phonetic}, testing speech to text on one four five point nine. "
+TEMPLATE = ("This is {call}, {phonetic}, testing speech to text on one four five point niner. "
             "The quick brown fox jumps over the lazy dog. {call} clear.")
 
 

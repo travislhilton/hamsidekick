@@ -52,6 +52,8 @@ GATEWAYS_KEY, GATEWAYS_TITLE = "search:winlink", "Winlink gateways near you (VHF
 # service codes PUBLIC / EMCOMM, distance from each gateway's grid square
 EXPRESS_KEYS = {"express:vhf": "vhf", "express:hf": "hf"}
 HF_KM = 600                                         # VARA HF gateways: about NVIS reach
+LIST_STALE_DAYS = 30            # older than this, the operator is asked to update Express's channel list (owner 11-16)
+LIST_SNOOZE_S = 7 * 86400
 OFFLINE_KINDS = ("band_plan", "ares_plan", "races_plan", "ics205", "comm_plan")
 
 _SHAPE = (
@@ -257,7 +259,7 @@ class Plans:
         op = (getattr(self.st, "_saved", lambda: {})() or {}).get("operator") or {}
         return winlink.find_installs([op["winlink_dir"]] if op.get("winlink_dir") else [])
 
-    def express_gateways(self) -> None:
+    def express_gateways(self) -> bool:
         """Rebuild the two "from Winlink Express" entries when the channel list, the distance or the station's place
         changed. VHF/UHF goes into the band plan at first; VARA HF is offered (most are far away)."""
         from . import winlink_channels as wc
@@ -266,9 +268,11 @@ class Plans:
         except Exception:  # noqa: BLE001
             where = None
         try:
-            found = wc.files(self._installs())
+            installs = self._installs()
+            found = wc.files(installs)
         except Exception:  # noqa: BLE001
-            found = {}
+            installs, found = [], {}
+        self._xlist = {"installed": bool(installs), "files": found}
         d = _load(self.st)
         km = {"vhf": float(d.get("km", DEFAULT_KM)), "hf": float(d.get("hf_km", HF_KM))}
         ing = d.get("ingested") or {}
@@ -309,6 +313,43 @@ class Plans:
                 d2 = _load(self.st)
                 d2.setdefault("ingested", {}).update({k: ing[k] for k in EXPRESS_KEYS if k in ing})
                 _save(self.st, d2)
+        return changed
+
+    def watch_express(self, stop, every: float = 60) -> None:
+        """Owner 2026-11-16: "update the Winlink Channel Selection whenever they want and the band plan should
+        automatically pick it up": every minute, a new list (or a newly old one) refreshes open dashboards."""
+        last = None
+        while not stop.wait(every):
+            try:
+                changed = self.express_gateways()
+                note = self.list_note()
+                sig = (note or {}).get("ask"), tuple((k["kind"], k["at"]) for k in (note or {}).get("kinds", []))
+                if changed or (last is not None and sig != last):
+                    self.st.publish("localplans", {"gateways": True})
+                last = sig
+            except Exception as e:  # noqa: BLE001
+                print(f"localplans: watching the Winlink Express channel list: {e}", flush=True)
+
+    def list_note(self) -> dict | None:
+        """Owner 2026-11-16: "if the list in Winlink has not been updated recently or not updated yet (new instance) ask
+        the user to update their Winlink Channel Selection". None when Winlink Express is not on this PC."""
+        x = getattr(self, "_xlist", None) or {}
+        if not x.get("installed"):
+            return None
+        now = time.time()
+        kinds = []
+        for kind, label in (("vhf", "VARA FM (VHF/UHF)"), ("hf", "VARA HF")):
+            p = (x.get("files") or {}).get(kind)
+            try:
+                at = p.stat().st_mtime if p else None
+            except OSError:
+                at = None
+            days = int((now - at) // 86400) if at else None
+            kinds.append({"kind": kind, "label": label, "at": at, "days": days, "missing": at is None,
+                          "stale": at is None or days > LIST_STALE_DAYS})
+        snooze = float(_load(self.st).get("list_snooze") or 0)
+        return {"kinds": kinds, "stale_days": LIST_STALE_DAYS, "snoozed": snooze > now,
+                "ask": any(k["stale"] for k in kinds) and snooze <= now}
 
     def state(self) -> dict:
         self.express_gateways()
@@ -342,7 +383,7 @@ class Plans:
                                        "org": f.get("org"), "source_url": f.get("source_url"), "gateway": f.get("gateway")}
                                       for f in (fs if gk in EXPRESS_KEYS else sorted(fs, key=lambda f: -f["freq_mhz"]))]})
         return {"key": bool(self.key()), "location": netfind.location(self.st), "km": d.get("km", DEFAULT_KM),
-                "busy": self.busy, "saving": self.saving, "at": last.get("at"),
+                "busy": self.busy, "saving": self.saving, "at": last.get("at"), "winlink_list": self.list_note(),
                 "stale": bool(last.get("at")) and time.time() - last["at"] > STALE_S,
                 "clubs": last.get("clubs") or [], "documents": last.get("documents") or [], "frequencies": found,
                 "left_out": last.get("left_out") or [], "error": last.get("error"), "cost_usd": last.get("cost_usd"),
@@ -395,6 +436,8 @@ class Plans:
     def settings(self, body: dict) -> dict:
         with self.lock:
             d = _load(self.st)
+            if body.get("list_snooze"):                  # "Remind me in a week" on the update-the-list note
+                d["list_snooze"] = time.time() + LIST_SNOOZE_S
             if "hf_km" in body:
                 hk = netfind._num(body.get("hf_km"))
                 if not hk or not 50 <= hk <= 3000:
@@ -744,6 +787,7 @@ class Plans:
         t["searched_at"] = (d.get("last") or {}).get("at")
         t["key"] = bool(self.key())
         t["open"] = {k: consolidate.open_ranges(t, k) for k in ("voice", "data")}
+        t["winlink_list"] = self.list_note()
         return t
 
     def doc_file(self, sid: str) -> tuple[Path, str, str] | None:

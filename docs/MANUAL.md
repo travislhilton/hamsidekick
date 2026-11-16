@@ -358,6 +358,14 @@ you chose is remembered. Each column shows:
   documents, nearest first, with distance, direction, grid, hours and an EMCOMM mark: **VARA FM gateways within**
   the search distance (in the band plan at first) and **VARA HF gateways within 370 mi** (offered: tick to add). A new
   list from Express, a new distance or a new station place rebuilds them; costs nothing (no search, no xAI).
+  When Express is on this PC but a list has **never been downloaded** (a new Express) or is **more than 30 days old**,
+  the Plans tab and the band plan ask you to update it (which list, how old, and where in Express); **Remind me in a
+  week** hides the note for 7 days. Update the list in Express **whenever you like**: the station checks it every
+  minute and an open band plan or Plans tab refreshes by itself.
+- **"Niner" for 9** (owner 2026-11-16): whenever the station says a digit on its own (a call phonetically, "Whiskey
+  Niner…"; a frequency's digits, "point niner four"; a clock time, "zero niner zero five"; a signal report, "five
+  niner") the 9 is **Niner**; Sidekick is told the same. Counts stay words ("nineteen", "ninety"). A call heard with
+  "Nine" is still recognised, and still counts as an ID.
 - **Find nets around the world** (owner 2026-11-14): in Nets → Find nets, **What you can hear around the world today**
   lists, for your antenna, height, power and today's solar flux, each part of the world (Japan, China, Russia,
   Europe, South America, Antarctica, the Pacific…) with the bands and the hours (your time) you hear it at least 60%

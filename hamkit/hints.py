@@ -15,7 +15,7 @@ from .glossary import ITU
 
 CONFIG = Path(__file__).parent.parent / "config" / "procedures.yaml"
 LETTER_WORD = {v: k.title() for k, v in ITU.items() if k not in ("ALPHA", "JULIETT", "WHISKY", "X-RAY")}
-DIGIT = dict(zip("0123456789", "Zero One Two Three Four Five Six Seven Eight Nine".split()))
+DIGIT = dict(zip("0123456789", "Zero One Two Three Four Five Six Seven Eight Niner".split()))   # "Niner" for 9 (owner 2026-11-16)
 
 NET_TYPES = [  # (type, label, cue regexes) — first hit order matters only for ties
     ("emergency", "Possible REAL emergency", [r"\bmayday\b", r"\bemergency traffic\b", r"\breal (world|emergency)\b",

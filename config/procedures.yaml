@@ -73,14 +73,14 @@ cards:
       - "After the net closes the frequency returns to normal use; identify if you transmit."
   calling_cq:
     title: "Answering CQ or a DX station"
-    triggers: ["CQ", "QRZ", "calling CQ", "any station", "5 9", "five nine", "five by nine", "you're 59"]
+    triggers: ["CQ", "QRZ", "calling CQ", "any station", "5 9", "five nine", "five niner", "five by nine", "five by niner", "you're 59"]
     steps:
       - "Answer with your call only, once, phonetically; let the other station pick you out."
       - "Give a signal report and your name/location briefly; DX contacts are often short."
       - "If the DX station works 'split', transmit where they say they're listening (QSX), not on their frequency."
     say:
       - "{me_phonetic}."
-      - "<call>, {me}, thanks, you're five nine in Illinois, name <your name>, back to you."
+      - "<call>, {me}, thanks, you're five niner in Illinois, name <your name>, back to you."
 reminders:
   identify:
     rule: "FCC 97.119: identify at the end of each contact and at least every 10 minutes during it."

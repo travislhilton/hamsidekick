@@ -36,7 +36,7 @@ def test_numbers_and_times_in_words():
     assert words(1250) == "one thousand two hundred fifty" and words(None) == "not reported"
     assert clock_words("2026-11-10T18:57:00-07:00") == "eighteen fifty-seven"
     assert clock_words("2026-11-10T19:00:00-07:00") == "nineteen hundred"
-    assert clock_words("2026-11-10T09:05:00-07:00") == "zero nine zero five"
+    assert clock_words("2026-11-10T09:05:00-07:00") == "zero niner zero five"
 
 
 @pytest.mark.parametrize("name", ["typical", "exercise-nulls", "area"])
@@ -127,3 +127,15 @@ def test_fetch_from_the_eoc(tmp_path):
         def read(self, n=-1): return body
     v = st.readout.fetch("http://127.0.0.1:8080/api/readout", opener=lambda req, timeout: R())
     assert v["doc"]["source"]["eoc"]["name"] == "Larkspur Stake EOC" and len(v["script"]) == 6
+
+
+def test_a_digit_spoken_on_its_own_is_niner_and_counts_stay_nine():
+    """Owner 2026-11-16: "use Niner instead of Nine for the number 9 throughout"."""
+    from hamkit.hints import phonetic as hint_phonetic
+    from station.agent import _has_call, phonetic
+    from station.readout import clock_words, words
+    assert words(146.94) == "one hundred forty-six point niner four"
+    assert clock_words("2026-11-10T09:09:00-07:00") == "zero niner zero niner"
+    assert (words(19), words(9), words(90)) == ("nineteen", "nine", "ninety")
+    assert phonetic("K9ABC") == "Kilo Niner Alfa Bravo Charlie" and hint_phonetic("K9ABC").startswith("Kilo Niner")
+    assert _has_call("this is Kilo Nine Alfa Bravo Charlie", "K9ABC")      # an ID said with "Nine" still counts

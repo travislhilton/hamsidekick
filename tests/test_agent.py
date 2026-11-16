@@ -59,7 +59,7 @@ def test_privileges():
 
 
 def test_phonetic():
-    assert phonetic("W9XYZ") == "Whiskey Nine X-ray Yankee Zulu"
+    assert phonetic("W9XYZ") == "Whiskey Niner X-ray Yankee Zulu"   # owner 2026-11-16
 
 
 def test_a_draft_runs_the_model_checks_it_and_never_transmits(tmp_path):

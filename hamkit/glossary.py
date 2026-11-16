@@ -15,7 +15,7 @@ ITU = {"ALFA": "A", "ALPHA": "A", "BRAVO": "B", "CHARLIE": "C", "DELTA": "D", "E
        "TANGO": "T", "UNIFORM": "U", "VICTOR": "V", "WHISKEY": "W", "WHISKY": "W", "XRAY": "X", "X-RAY": "X",
        "YANKEE": "Y", "ZULU": "Z"}
 SPOKEN_NUMBERS = {"SEVENTY THREE": "73", "SEVEN THREE": "73", "EIGHTY EIGHT": "88", "EIGHT EIGHT": "88",
-                  "FIVE NINE": "FIVE BY NINE", "5 BY 9": "FIVE BY NINE", "5 X 9": "FIVE BY NINE"}
+                  "FIVE NINE": "FIVE BY NINE", "FIVE NINER": "FIVE BY NINE", "FIVE BY NINER": "FIVE BY NINE", "5 BY 9": "FIVE BY NINE", "5 X 9": "FIVE BY NINE"}
 
 
 @lru_cache(maxsize=4)

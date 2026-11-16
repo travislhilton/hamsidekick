@@ -268,6 +268,10 @@ class Station:
         threading.Thread(target=self.accurate.run, args=(self.stop,), daemon=True, name="accurate").start()
         threading.Thread(target=self.summarizer.run, args=(self.stop,), daemon=True, name="summary").start()
         threading.Thread(target=self.costs.run, args=(self.stop,), daemon=True, name="aicost").start()
+        if __import__("os").name == "nt":                 # Winlink Express's channel list -> the band plan, live
+            from .server import _plans
+            threading.Thread(target=_plans(self).watch_express, args=(self.stop,), daemon=True,
+                             name="winlink-list").start()
         if self.vara.any_enabled():                        # VARA modems: chat / files (station/varalink.py)
             threading.Thread(target=self.vara.restart, daemon=True, name="vara-start").start()
 
