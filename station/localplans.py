@@ -808,6 +808,7 @@ class Plans:
         """Each reservation with "open": still on the ad hoc list for its kind (a plan read later, a new gateway or
         another operator's set imported here may have closed it), "fits" (a wide one on a channel with room for
         wide) and "why" when not."""
+        from . import adhoc
         pts = {}
         for k in ("voice", "data"):
             for x in t["open"][k]:
@@ -821,6 +822,8 @@ class Plans:
             if not x:
                 why = ("no longer open for ad hoc " + ("VARA FM" if r["kind"] == "data" else "FM voice")
                        + " here: a plan or channel in the band plan now uses it, or it is outside your privileges")
+            elif r["kind"] == "data" and r.get("width") == "wide" and adhoc.too_close(rows, r):
+                why = adhoc.crowd_note(r, adhoc.too_close(rows, r))      # one of my own reservations, named
             elif r["kind"] == "data" and r.get("width") == "wide" and not x.get("wide"):
                 why = "too close to another channel for VARA FM wide: use it narrow"
             out.append(dict(r, open=bool(x), ok=not why, why=why, band=bandplan.band(r["freq_mhz"])))
@@ -838,9 +841,11 @@ class Plans:
         from . import adhoc
         with self.lock:
             d = _load(self.st)
-            d["adhoc"] = adhoc.apply(d.get("adhoc") or [], body or {})
+            rows = adhoc.apply(d.get("adhoc") or [], body or {})
+            notes = [r.pop("narrowed") for r in rows if "narrowed" in r]
+            d["adhoc"] = rows
             _save(self.st, d)
-        return {"adhoc": d["adhoc"]}
+        return {"adhoc": d["adhoc"], "note": ("Reserved as narrow: " + notes[0]) if notes else None}
 
     def adhoc_import(self, obj, replace: bool = False) -> dict:
         from . import adhoc

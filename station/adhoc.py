@@ -19,7 +19,7 @@ import re
 import time
 
 from . import bandplan
-from .consolidate import EPS, fm_at
+from .consolidate import EPS, WIDE_GUARD, fm_at
 
 FORMAT = "hamsidekick-adhoc-channels"
 # A channel's name fits the shortest radio display that shows names (owner 2026-11-16: "restricted to short so that
@@ -64,6 +64,20 @@ def clean(raw: dict) -> dict:
             "at": float(raw.get("at") or time.time())}
 
 
+def too_close(rows: list[dict], r: dict) -> dict | None:
+    """The nearest other reservation a VARA FM WIDE signal on `r` would overlap (~25 kHz wide: it needs 25 kHz to
+    the next channel on 2 m and 1.25 m, 35 kHz on 70 cm, as WIDE_GUARD), or None. Voice reservations count: they are
+    signals too. Owner 2026-11-16: two wide reservations 25 kHz apart on 70 cm both looked fine."""
+    near = [x for x in rows if not same(x, r) and abs(x["freq_mhz"] - r["freq_mhz"]) > EPS
+            and abs(x["freq_mhz"] - r["freq_mhz"]) < WIDE_GUARD(r["freq_mhz"]) - EPS]
+    return min(near, key=lambda x: abs(x["freq_mhz"] - r["freq_mhz"])) if near else None
+
+
+def crowd_note(r: dict, n: dict) -> str:
+    return (f"too close to your {n.get('name') or 'reservation'} at {n['freq_mhz']:.3f} for VARA FM wide (it needs "
+            f"{round(WIDE_GUARD(r['freq_mhz']) * 1000)} kHz): use narrow, or pick a channel further away")
+
+
 def same(a: dict, b: dict) -> bool:
     return a["kind"] == b["kind"] and abs(a["freq_mhz"] - b["freq_mhz"]) <= EPS
 
@@ -86,6 +100,9 @@ def apply(rows: list[dict], body: dict) -> list[dict]:
             raise ValueError(f"at most {MAX} reserved channels")
         if not r["name"]:
             r["name"] = suggest(rows, r["kind"])
+        if r["kind"] == "data" and r["width"] == "wide" and too_close(rows, r):
+            r["width"] = "narrow"                     # next to one of my own reservations: wide would overlap it
+            r["narrowed"] = crowd_note(r, too_close(rows, r))
         rows.append(r)
     for k in ("remove", "rename", "width"):
         if k in body:

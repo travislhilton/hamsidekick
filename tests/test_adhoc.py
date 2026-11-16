@@ -106,3 +106,29 @@ def test_names_fit_a_baofeng_display():
     got, _ = adhoc.import_([], {"format": adhoc.FORMAT, "channels": [{"freq_mhz": 147.5, "kind": "voice",
                                                                        "name": "Old long name"}]})
     assert got[0]["name"] == "OLD LO"
+
+
+def test_wide_reservations_keep_clear_of_each_other(tmp_path):
+    """Owner 2026-11-16 ("do the fix"): two wide VARA FM reservations 25 kHz apart on 70 cm both looked fine. A wide
+    signal needs 35 kHz to the next channel on 70 cm (25 on 2 m and 1.25 m), my own reservations included."""
+    rows = adhoc.apply([], {"add": {"freq_mhz": 445.5, "kind": "data", "width": "wide"}})
+    rows = adhoc.apply(rows, {"add": {"freq_mhz": 445.525, "kind": "data", "width": "wide"}})
+    assert [r["width"] for r in rows] == ["wide", "narrow"] and "VARA1 at 445.500" in rows[1]["narrowed"]
+    rows = adhoc.apply(rows, {"add": {"freq_mhz": 445.55, "kind": "data", "width": "wide"}})   # 50 kHz from 445.5,
+    assert rows[-1]["width"] == "narrow"                                   # 25 from the narrow one: still too close
+    two = adhoc.apply([], {"add": {"freq_mhz": 145.53, "kind": "data", "width": "wide"}})
+    two = adhoc.apply(two, {"add": {"freq_mhz": 145.57, "kind": "data", "width": "wide"}})    # 40 kHz on 2 m: fine
+    assert [r["width"] for r in two] == ["wide", "wide"]
+
+    from tests.test_localplans import _plans
+    st, p, _, _ = _plans(tmp_path)
+    p._class = lambda: "technician"
+    p.adhoc_set({"add": {"freq_mhz": 445.5, "kind": "voice"}})
+    r = p.adhoc_set({"add": {"freq_mhz": 445.525, "kind": "data", "width": "wide"}})
+    assert r["note"].startswith("Reserved as narrow: too close to your TAC1 at 445.500")
+    assert "narrowed" not in r["adhoc"][0] and "narrowed" not in r["adhoc"][1]
+    p.adhoc_set({"width": {"freq_mhz": 445.525, "kind": "data", "width": "wide"}})   # the operator insists: ⚠ shown
+    a = next(x for x in p.consolidated()["adhoc"] if x["kind"] == "data")
+    assert not a["ok"] and "TAC1 at 445.500" in a["why"] and "35 kHz" in a["why"]
+    p.adhoc_set({"width": {"freq_mhz": 445.525, "kind": "data", "width": "narrow"}})
+    assert all(x["ok"] for x in p.consolidated()["adhoc"] if x["kind"] == "data")

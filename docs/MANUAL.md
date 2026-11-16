@@ -349,7 +349,7 @@ in Ad hoc voice), again to release it. **★ My ad hoc … channels** at the top
 (suggested VARA1, VARA2 … / TAC1, TAC2 …): **up to 6 characters, A–Z 0–9 space . / -**, upper case, so it fits a
 channel name on the radios with the shortest displays when programmed with CHIRP (CHIRP's drivers: Baofeng WP970I /
 UV-82III 6, UV-5R / BF-F8HP / UV-82 / UV-5X3 7 upper case, UV-5RM / UV-17 Pro 12, Yaesu FT-60 6; BF-888S and UV-3R
-show no names); rename it there, change a VARA channel's width, **Use** it on a VARA radio. In the band plan, the full spectrum and the
+show no names); rename it there, change a VARA channel's width (a **wide** reservation keeps 25 kHz from your other reserved channels on 2 m and 1.25 m, 35 kHz on 70 cm: reserving wide next to one reserves it narrow and says so, and a wide one set too close is marked ⚠ naming the neighbour), **Use** it on a VARA radio. In the band plan, the full spectrum and the
 printout a reserved channel is a **★ my ad hoc** row (purple). It stays on the ad hoc list (marked ★) instead of being
 cut out, a voice reservation is not offered to VARA, and one the plans no longer leave open (a plan read later, a new
 gateway, or another operator's set on a station with different privileges) is marked ⚠ with why.

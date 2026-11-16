@@ -2246,13 +2246,13 @@ function renderBP(){
   const sd=box.querySelector("[data-bpsrc]");if(sd)sd.ontoggle=()=>BP.srcOpen=sd.open;
 }
 $("openBandplan").onclick=bpOpen;
-async function adPost(path,body,msg){try{const r=await post(path,body);BP.d=await api("/api/bandplan/area");BP.msg=msg?{text:msg(r)}:null}catch(err){BP.msg={bad:true,text:err.message}}renderBP()}
+async function adPost(path,body,msg){try{const r=await post(path,body);BP.d=await api("/api/bandplan/area");const m=msg?msg(r):r&&r.note;BP.msg=m?{text:m}:null}catch(err){BP.msg={bad:true,text:err.message}}renderBP()}
 document.addEventListener("click",async e=>{const t=e.target.closest&&e.target.closest("#bpDlg [data-adsend]");if(!t)return;
   try{await post("/api/vara/adhoc",{radio:t.dataset.adsend});BP.msg={text:"Sending your ad hoc channels over VARA: the other station gets ★ Install in its VARA window."}}catch(err){BP.msg={bad:true,text:err.message}}renderBP()});
 document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("#bpDlg [data-adtog]");if(!t)return;
   const f=+t.dataset.adtog,k=t.dataset.adk;if(adRes(k,f))return adPost("/api/adhoc",{remove:{freq_mhz:f,kind:k}});
   adName(k).then(sug=>{const n=prompt(`Name for ${adF(f)} MHz (${k==="data"?"VARA FM":"FM voice"}): up to 6 letters or numbers, so it fits a Baofeng's channel display when you program it with CHIRP`,sug);
-    if(n===null)return;adPost("/api/adhoc",{add:{freq_mhz:f,kind:k,width:t.dataset.adw||"narrow",name:adShort(n)||sug}})})});
+    if(n===null)return;adPost("/api/adhoc",{add:{freq_mhz:f,kind:k,width:t.dataset.adw||"narrow",name:adShort(n)||sug}},r=>r.note||"")})});
 // 6 characters, A-Z 0-9 space . / - : the shortest radio display that shows names (CHIRP: Baofeng WP970I / UV-82III 6, UV-5R 7)
 function adShort(v){return String(v||"").toUpperCase().replace(/[^A-Z0-9 .\/-]/g,"").replace(/\s+/g," ").slice(0,6).trim()}
 async function adName(k){try{return (await api("/api/adhoc")).suggest[k]}catch(e){return k==="data"?"VARA1":"TAC1"}}
