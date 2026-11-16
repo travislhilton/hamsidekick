@@ -271,6 +271,8 @@ def _fm_points(band: str, p: dict, chans: list[float], kind: str) -> list[dict]:
             break
         if any(abs(f - c) < (0.015 if c < 400 else 0.025) - EPS for c in chans):
             continue
+        if (abs(f - p["from"]) <= EPS and not p.get("open_lo")) or (abs(f - p["to"]) <= EPS and not p.get("open_hi")):
+            continue                                      # on the segment's edge: half the signal in the next one
         # VARA FM wide (the 9600-baud data port) spreads to about 25 kHz: it needs more room than narrow (owner
         # 2026-11-16 "consider bandwidth for WIDE and NARROW"). Voice and narrow: the guard above.
         wide = not any(abs(f - c) < WIDE_GUARD(c) - EPS for c in chans)
@@ -288,8 +290,12 @@ def _fm_points(band: str, p: dict, chans: list[float], kind: str) -> list[dict]:
         out.append({"band": band, "from": r[0], "to": r[-1], "channel": True, "step": step, "count": len(r),
                     "unplanned": p["unplanned"], "uses": p["uses"], "mode": "FM" if kind == "voice" else "VARA FM",
                     "wide": kind == "data" and rw[0][1],
-                    "auto": auto, "note": ("shared with automatic data stations (Winlink gateways, packet): listen "
-                                           "first, and move off a gateway's frequency" if auto else "")})
+                    "auto": auto, "shared": bool(p.get("share")),
+                    "note": ("shared with automatic data stations (Winlink gateways, packet): listen first, and move "
+                             "off a gateway's frequency" if auto else
+                             "shared FM simplex (local option): VARA FM shares it with voice and links; listen first, "
+                             "stay off 446.000, and use your coordinator's digital simplex channels where it names them"
+                             if p.get("share") else "")})
     return out
 
 
@@ -318,9 +324,14 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
             c = set().union(*(cats(s["use"]) for s in plan)) if plan else set()
             if c & _NEVER:
                 continue
+            share = False
             if kind == "data" and ((plan and "data" not in c) or (hf and "weak" in c)):
-                continue                                  # VARA: where a plan sets data aside, or no plan names a use
-                                                          # (owner 2026-11-16: "unplanned" for VARA too); never HF CW
+                # 70 cm: the ARRL plan sets no data segment at all, and data is legal on all of 420-450 (97.305(c)).
+                # Its FM simplex (445-447, local option) is where ad hoc VARA FM goes, shared with voice (owner
+                # 2026-11-16: "70cm is actually the most probable band for local VARA FM ad-hoc traffic")
+                if not (420 <= r["from"] < 450 and "simplex" in c and "atv" not in c and not c & _NEVER):
+                    continue                              # VARA: where a plan sets data aside, or no plan names a use
+                share = True                              # (owner 2026-11-16: "unplanned" for VARA too); never HF CW
             cw_only = any(re.search(r"\bcw\b", (s["use"] or "").lower())
                           and not re.search(r"ssb|phone|voice|sideband", (s["use"] or "").lower()) for s in plan)
             if kind == "voice" and (c & _AVOID["voice"] or (not hf and "weak" in c) or cw_only):
@@ -330,17 +341,21 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
                 if s["use"] and s["use"] not in uses:
                     uses.append(s["use"])
             near = bool(pieces) and abs(pieces[-1]["to"] - r["from"]) <= EPS
-            if near and pieces[-1]["uses"] == uses:
+            if near and pieces[-1]["uses"] == uses and pieces[-1].get("share") == share:
                 pieces[-1]["to"] = r["to"]
                 continue
             if near:
                 pieces[-1]["open_hi"] = True
-            pieces.append({"from": r["from"], "to": r["to"], "uses": uses, "unplanned": not plan, "open_lo": near})
+            pieces.append({"from": r["from"], "to": r["to"], "uses": uses, "unplanned": not plan, "open_lo": near,
+                           "share": share})
         chans = sorted(r["from"] for r in b["rows"] if r["type"] == "channel")
-        for p in pieces:
+        for i, p in enumerate(pieces):
             if fm_at(p["from"]):
                 if not p["unplanned"]:                    # FM: only where a plan names the use (simplex, local option,
-                    out += _fm_points(b["band"], p, chans, kind)   # digital); the gaps between segments border repeaters  # FM is used channel by channel (owner 2026-11-16: 2 m
+                    q = dict(p,                           # digital); the gaps between segments border repeaters, so an
+                             open_lo=p["open_lo"] and i > 0 and not pieces[i - 1]["unplanned"],    # unplanned neighbour
+                             open_hi=p.get("open_hi") and i + 1 < len(pieces) and not pieces[i + 1]["unplanned"])
+                    out += _fm_points(b["band"], q, chans, kind)   # is a closed edge  # FM is used channel by channel (owner 2026-11-16: 2 m
                 continue                                      # showed nothing: its plans name a channel every 20-40 kHz)
             ssb = hf or p["from"] < 51                     # 6 m below 51 MHz is SSB / CW / data, like HF
             w = WIDTH[kind] if ssb else 0

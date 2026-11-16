@@ -276,3 +276,19 @@ def test_the_search_finds_winlink_gateways_and_they_go_into_the_band_plan(tmp_pa
     assert not [x for x in _rows(p.consolidated(), "2 m") if x["type"] == "channel" and x["from"] == 145.07]
     p.choose(g["key"], True)
     assert p.state()["gateways"][0]["band"]["in"]
+
+
+def test_seventy_cm_simplex_is_open_to_vara_fm(tmp_path):
+    """Owner 2026-11-16: "The Ad hoc VARA FM band plan is showing no 70cm available ... 70cm is actually the most
+    probable band for local VARA FM ad-hoc traffic". Data is legal on all of 420-450 (97.305(c)) but the ARRL plan
+    sets no data segment there: its local-option FM simplex (445-447) is offered to VARA FM, shared with voice."""
+    t = C.build("technician", [])
+    d = [x for x in C.open_ranges(t, "data") if x["band"] == "70 cm"]
+    pts = [round(x["from"] + i * x["step"], 3) for x in d for i in range(x["count"])]
+    assert 445.025 in pts and 446.975 in pts and len(pts) > 70
+    assert all(445 < f < 447 for f in pts)                             # never ATV, links, satellites, repeaters
+    assert 446.0 not in pts and 445.0 not in pts and 447.0 not in pts  # the calling channel; the segment's edges
+    assert all(x["shared"] and x["mode"] == "VARA FM" and "listen first" in x["note"] for x in d)
+    assert any(x["wide"] for x in d) and not next(x for x in d if x["from"] == 445.975)["wide"]   # beside 446.000
+    two = [x for x in C.open_ranges(t, "data") if x["band"] == "2 m"]
+    assert not any(146.4 <= x["from"] <= 146.58 for x in two)          # 2 m voice simplex stays voice
