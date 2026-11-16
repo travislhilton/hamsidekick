@@ -103,7 +103,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
   <p class="card-role">HAM Sidekick Station · VARA</p>
   <span class="card-side">Front · side 1 of 2</span>
   <h2 class="card-title">Set Up Your VARA Modems</h2>
-  <p class="lead">Keyboard chat and file transfer over <b>VARA HF</b> or <b>VARA FM</b>. Each <b>data radio</b> has <b>one VARA modem</b> (a copy of VARA with its own sound card and ports), and each modem is used for one job. Several can be on the air at once. Everything is <b>sent in the clear</b>; nothing transmits unless you click.</p>
+  <p class="lead">Keyboard chat and file transfer over <b>VARA HF</b> or <b>VARA FM</b>. Each <b>data radio</b> has <b>one VARA modem</b> (a copy of VARA with its own sound card and ports), and each modem is used for one job. Several can be on the air at once. Everything is <b>sent in the clear</b>; nothing transmits unless you are at this PC (sending, joining the channel, or its keep-alives).</p>
 
   <p class="card-part">What each modem is for <span>(Modem setup → Used for)</span></p>
   <table class="tier-table">
@@ -135,16 +135,24 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
   <div class="card-head"><div>
   <p class="card-role">HAM Sidekick Station · VARA</p>
   <span class="card-side back">Back · side 2 of 2</span>
-  <h2 class="card-title">Contacts, Chat, Files and Taking Turns</h2>
+  <h2 class="card-title">The Channel: Who Is On, Chat and Files</h2>
   </div><div class="card-qr share"><!--CARD_QR:HAM_Sidekick_VARA_Quick_Reference_Card--><span>Share this card</span></div></div>
 
-  <p class="card-part">Make a contact <span>(the radio's card → VARA chat; several radios: a tab each)</span></p>
+  <p class="card-part">Join the channel <span>(the radio's card → VARA chat)</span></p>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><div class="step-text"><b>Pick a frequency:</b> <span class="k">Band plan</span> → <b>Ad hoc VARA</b> → <span class="k">Use</span> sets the radio there (also on your <b>★</b> reserved channels)<small>Green <b>unplanned</b> = no plan uses it; <b>shared</b> = voice and links too. Listen first; <b>channel busy</b> shows when VARA hears it in use.</small></div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text"><b>Call:</b> callsign → <span class="k">Connect</span> (FM: a digipeater under <b>via</b>) · or <span class="k">Call CQ</span> · or tick <b>Answer calls</b><small>Answering turns itself off the moment you leave the PC or a check fails.</small></div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Chat:</b> type → <span class="k">Enter</span> · <b>Send a file:</b> <b>File</b> → choose it (up to 5 MB; checked with SHA-256 on arrival)</div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text"><b>Files received</b>: listed under the chat as downloads, one folder per radio, never opened by the station<small>Another operator's ad hoc channels (<span class="mono">.hsadhoc</span>): <span class="k">★ Install N ad hoc channels</span> adds them to yours in one click. Yours to them: <span class="k">★ Send my ad hoc channels</span> while connected (Ad hoc channels card).</small></div></div>
-    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Finish:</b> <span class="k">Disconnect</span> · <b>at once:</b> <span class="k">Abort</span> (drops the link, lets go of the transmitter)</div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text"><b>Pick a frequency:</b> <span class="k">Band plan</span> → <b>Ad hoc VARA</b> → <span class="k">Use</span> (or a <b>★</b> reserved channel). Listen first</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><span class="k">Join the channel</span>: announces your call (a VARA CQ frame), answers calls, and says you are still here every <b>10 min</b> (VARA HF 15; 5–60)<small>Only while you are at this PC with the Transmit switch on: all of it pauses when you leave.</small></div></div>
+  </div>
+  <table class="tier-table">
+    <tr><td>● here</td><td>Announced or linked within the keep-alive time (and 3 min grace)</td></tr>
+    <tr><td>○ quiet (grey)</td><td>No keep-alive heard: may have left. Under <b>Earlier</b> after 3 intervals</td></tr>
+    <tr><td>🔗 linked · ⏳ · ⚠</td><td>The station linked now · messages waiting to go · not sent (Retry)</td></tr>
+  </table>
+  <p class="card-part">Chat and files <span>(VARA links one station at a time)</span></p>
+  <div class="steps">
+    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Click a station</b> → type → <span class="k">Enter</span> · <span class="k">📎</span> a file (5 MB) · <b>quick messages</b> fill the box (<span class="k">Edit</span>; {them} {sn} {me})<small>Tick several, or <b>Select everyone here</b>: each gets the message over its own link, one after another.</small></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">It goes by itself: <b>⏳ waiting</b> → a short link when the frequency is clear → <b>✓ sent</b> → <b>✓✓ delivered</b>; the link closes after 20 s of quiet<small><span class="k">Keep the link open</span> for a back-and-forth. 3 calls unanswered: ⚠ <span class="k">Retry</span>. <span class="k">Leave</span> · <span class="k">Abort</span> (drops any link at once).</small></div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Files received</b> are downloads, never opened; a <span class="mono">.hsadhoc</span> file: <span class="k">★ Install</span> · <b>Direct link</b>: Connect / CQ / Answer calls by hand</div></div>
   </div>
 
   <p class="card-part">Taking turns with Winlink Express <span>(a Shared modem)</span></p>
@@ -154,11 +162,9 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 
   <p class="card-part">The window's status line</p>
   <table class="tier-table">
-    <tr><td>Ready · Listening · Connected</td><td>This station has the modem</td></tr>
     <tr><td>Winlink Express's turn</td><td>A Shared modem while Express is open</td></tr>
     <tr><td>"VARA is not answering"</td><td>Is that copy of VARA open, on the ports shown? Another program (Express?) may hold it: a Chat-only modem must not be Express's</td></tr>
     <tr><td>Connect greyed</td><td>Read the amber line: Transmit switch, you at the PC, license class, or the frequency</td></tr>
-    <tr><td>"no data privileges"</td><td>Outside your class's data segment: Band plan → Ad hoc VARA</td></tr>
   </table>
 
   <p class="card-part">Who you can talk to</p>
@@ -167,7 +173,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
     <tr><td>Any other VARA keyboard program</td><td>Plain chat ("plain terminal"); files need this program at both ends</td></tr>
   </table>
 
-  <p class="card-disclaimer">Part of HAM Sidekick Station (MIT License). You are the control operator for every transmission. Part 97: never encrypted; no beacon, relay or automatic reply. The chat and file format is this program's own (docs/VARA.md); VARA is a separate product.</p>
+  <p class="card-disclaimer">Part of HAM Sidekick Station (MIT License). You are the control operator for every transmission: keep-alives and waiting messages go only while you are at the station. Part 97: never encrypted; no relay or automatic reply. The chat and file format is this program's own (docs/VARA.md); VARA is a separate product.</p>
 </div>
 
 </div>

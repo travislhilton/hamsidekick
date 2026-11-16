@@ -299,6 +299,19 @@ you chose is remembered. Each column shows:
     the same by hand.
   - **Winlink Express only**: the station never connects to it; listed so the station's plan is complete.
 
+  **The channel** (owner 2026-11-16; Help → VARA chat and files, side 2): **Join the channel** announces your call (a
+  VARA CQ frame), answers calls, and repeats the announcement every **10 min** (VARA HF 15; choose 5–60) while you are
+  at the PC. The left of the window lists the stations heard: **● here**, **○ quiet** (grey: no keep-alive heard for
+  the interval plus 3 min, so it may have left), **Earlier** after three intervals, **🔗** the one linked now, **⏳**
+  waiting, **⚠** not sent. Click a station to chat with it (Enter sends, Shift+Enter a new line; 📎 a file; **quick
+  messages** fill the box, with {me} {them} {sn} {name} {grid} filled in; **Edit** them). Tick several, or **Select
+  everyone here**, to send one message to each. **VARA links one station at a time**, so nothing is "connected" to
+  several stations at once: each message waits its turn (⏳), goes out over a short link when the frequency is clear
+  (✓ sent, ✓✓ delivered when VARA confirms it), and the link is let go after 20 s of quiet (**Keep the link open** for a
+  back-and-forth). Replies come back the same way. A station that does not answer is called 3 times, then ⚠ **Retry**.
+  Keep-alives, listening and waiting messages pause when you leave the PC. The old controls (Connect, Call CQ, Answer
+  calls, the log) are under **Direct link**. Details: `docs/VARA.md`.
+
   Several modems run at once, each with its own log and received files (`data/vara/radios/<radio>/`); the window has a
   tab per data radio. **One radio, taking turns:** one VARA at 8300/8301 (Winlink Express's default) → Shared.
   **Separate radios:** radio A's VARA FM at 8300/8301 → Winlink Express only; a **second copy of VARA in its own

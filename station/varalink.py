@@ -62,6 +62,8 @@ class Modem:
     def __init__(self, link: "Link", rid: str):
         self.link, self.rid = link, rid
         self.vara = None
+        from .varachan import Channel
+        self.chan = Channel(self, clock=link.clock)
         self.last_event = None
         self.lock = threading.Lock()
 
@@ -168,6 +170,10 @@ class Modem:
         return why
 
     def _event(self, name: str, data: dict):
+        try:
+            self.chan.on_event(name, data)                   # the channel's roster and threads (varachan.py)
+        except Exception:  # noqa: BLE001 - the channel never breaks the link
+            pass
         if name in ("chat", "chat_sent", "file_received", "file_sent", "file_failed", "file_rejected", "connected",
                     "disconnected", "abort", "watchdog", "cq_heard", "handshake"):
             self.last_event = {"name": name, **{k: v for k, v in (data or {}).items()
@@ -189,6 +195,10 @@ class Modem:
         out = {"radio": self.rid, "name": r.get("name") or self.rid, "freq_mhz": r.get("freq_mhz"), "cfg": c,
                "tx_ok": ok, "tx_why": why, "state": s, "last": self.last_event, "status": self._status(c, s)}
         if transcript:
+            try:
+                out["channel"] = self.chan.view() if self.runs() else None
+            except Exception:  # noqa: BLE001
+                out["channel"] = None
             out["transcript"] = self.transcript()
             out["inbox"] = self.inbox()
         return out
@@ -275,6 +285,32 @@ class Modem:
                 except ValueError:
                     raise ValueError("the file did not arrive whole: try again") from None
                 self._v().send_file(name=str(body.get("name") or "file"), data=data)
+            elif what in ("join", "leave", "announce", "csend", "retry", "cancel", "closelink", "channel"):
+                c = self.chan                         # the channel (varachan.py)
+                if what == "join":
+                    c.join()
+                elif what == "leave":
+                    c.leave()
+                elif what == "announce":
+                    c.announce()
+                elif what == "csend":
+                    data = None
+                    if body.get("data") is not None:
+                        import base64
+                        try:
+                            data = base64.b64decode(str(body["data"]), validate=True)
+                        except ValueError:
+                            raise ValueError("the file did not arrive whole: try again") from None
+                    c.send(body.get("to"), text=body.get("text"), name=body.get("name"), data=data)
+                elif what == "retry":
+                    c.retry(str(body.get("id") or ""))
+                elif what == "cancel":
+                    c.cancel(str(body.get("id") or ""))
+                elif what == "closelink":
+                    c.close_link()
+                else:
+                    c.settings(body)
+                self.link._publish("channel", self.rid)
             elif what == "adhoc":                    # my reserved ad hoc channels to the station I am connected to
                 from .server import _plans
                 rows = _plans(self.link.st).adhoc()
@@ -475,7 +511,16 @@ class Link:
             self.check()
 
     def check(self) -> dict:
-        return {rid: m.check() for rid, m in list(self.modems.items())}
+        out = {rid: m.check() for rid, m in list(self.modems.items())}
+        for rid, m in list(self.modems.items()):         # the channel's keep-alives and queue (varachan.py)
+            try:
+                m.chan.dirty = False
+                m.chan.tick()
+                if m.chan.dirty:
+                    self._publish("channel", rid)
+            except Exception:  # noqa: BLE001
+                pass
+        return out
 
     def _express(self) -> bool:
         now = time.monotonic()                       # asked by every modem every few seconds: once is enough

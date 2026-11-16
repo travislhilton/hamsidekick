@@ -51,9 +51,30 @@ letters, digits, `.`, `_` and `-`; never hidden; a program or script kind (`.exe
 Every transmission the station can cause over VARA needs the station's permission at that moment (the operator
 present, the radio's transmit switch on): calling, a CQ, listening (VARA answers calls by itself while listening),
 every message or file, and the protocol's own HSK1, ACK and NAK. If permission goes away mid-session, the station
-aborts the link rather than send. There is no automatic reply, beacon, relay or forwarding. When the station (not
+aborts the link rather than send. There is no automatic reply, relay or forwarding; the channel's keep-alives (below)
+are sent only while the operator is at the station. When the station (not
 VARA) keys the radio, it follows VARA's `PTT ON` / `PTT OFF` and aborts the link if the transmitter stays on, or a
 file waits for its receipt, longer than 10 minutes.
 
 VARA serves one program at a time: while Winlink Express is open, the station does not connect to VARA, and it lets
 go of VARA when Winlink Express opens while no session is up.
+
+## The channel (who is on the frequency)
+
+VARA links one station at a time, and the only frame it sends without a link is the **CQ frame** (`CQFRAME`, which
+carries the callsign and nothing else). The station's channel view (`station/varachan.py`) is built on those two
+facts; it adds nothing to the framing above.
+
+* **Joining** sends one CQ frame (the announcement) and turns listening on; while joined, another CQ frame goes every
+  *n* minutes (default 10 on VARA FM, 15 on VARA HF; 5 to 60): the keep-alive. Only while the operator is at the
+  station with the radio's transmit switch on; it waits for the frequency to be clear and for no link to be up.
+* **Presence**: every CQ frame heard, and every link with a station, marks it *here*. Not heard for one interval plus
+  3 minutes: *quiet* (grey). After three intervals: *gone*. A station leaving sends nothing (no frame says so), so it
+  greys out.
+* **Messages** to a station are queued. When no link is up and the frequency is clear (VARA's `BUSY OFF`), the station
+  links to the oldest waiting station, sends what waits for it as `MSG` / `FILE` frames, and disconnects after 20 s
+  (VARA HF 40 s) with nothing moving, or 5 s when other stations are waiting, never before VARA's buffer is empty. A
+  message is *sent* when written and *delivered* when VARA reports `BUFFER 0` (its ARQ has every byte on the other
+  modem); a file is delivered on its `ACK`. A link the other station opened is left for it to close, and what waits
+  for that station goes out on it. A call not answered is tried 3 times, 30 s or more apart.
+* **Several stations "at once"** = one link after another: the same message is queued for each.

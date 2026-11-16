@@ -27,7 +27,8 @@ to data/vara/YYYY-MM.jsonl.
 Transmitting (Part 97): every transmission this class can cause goes through `tx_allowed()` first, injected by the
 station (operator present, the radio's transmit switch on): CONNECT, CQFRAME, LISTEN/CHAT ON (VARA answers calls by
 itself while listening), every byte written to the data port (chat, files, and the protocol's own HSK1/ACK/NAK; a
-refusal mid-session aborts the link), and a station-keyed PTT. There is no auto-reply, beacon, relay or forwarding:
+refusal mid-session aborts the link), and a station-keyed PTT. There is no auto-reply, relay or forwarding (the channel's
+keep-alive CQ frames, varachan.py, go only while the operator is at the station, at least 5 minutes apart):
 only the protocol's handshake and file receipts are sent without a key press, inside a session the operator opened or
 accepted by listening. No ENCRYPT command is ever sent (97.113: no messages obscured in meaning); `_cmd` refuses one.
 
