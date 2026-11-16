@@ -15,7 +15,8 @@ from . import speaker
 
 STATIC = Path(__file__).parent / "static"
 HELP_CARDS = {"/help": "card.html", "/card": "card.html", "/help/sidekick": "sidekick_card.html",   # Help: the three
-              "/help/conversation": "conversation_card.html"}                                    # reference cards
+              "/help/conversation": "conversation_card.html", "/help/vara": "vara_card.html",
+              "/help/bandplan": "bandplan_card.html"}                                    # reference cards
 
 
 def _plans(station):
@@ -188,6 +189,8 @@ def make_handler(station):
                 return
             if u.path == "/api/localplans":                      # Nets -> Plans (localplans.py)
                 return self._json(_plans(station).state())
+            if u.path == "/api/bandplan/area":                   # the consolidated band plan (consolidate.py)
+                return self._json(_plans(station).consolidated())
             if u.path == "/api/bandplan":                        # the built-in band plan (bandplan.py)
                 from . import bandplan
                 return self._json({"bands": bandplan.table(_plans(station)._class()),
@@ -292,7 +295,7 @@ def make_handler(station):
                       "/api/nets/assign", "/api/netfind/settings", "/api/netfind/search", "/api/netfind/add",
                       "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
-                      "/api/localplans/copies"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
+                      "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "handoff", "takeback")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
             alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss)", u.path)        # pre-net alert
@@ -392,6 +395,11 @@ def make_handler(station):
                         return self._json(lp.drop(body.get("ids")))
                     if what == "net":
                         return self._json(lp.add_net(str(body.get("id") or ""), body.get("radio")))
+                    if what == "ingest":                     # read the saved plans again
+                        return self._json(lp.ingest(force=bool(body.get("force")), keys=body.get("keys")))
+                    if what == "source":                     # {key, excluded, authority}
+                        return self._json(lp.set_source(str(body.get("key") or ""), body.get("excluded"),
+                                                        body.get("authority")))
                     if what == "copies":
                         lp.save_copies(background=True, urls=[str(u_) for u_ in body.get("urls") or []] or None)
                         return self._json(lp.state())

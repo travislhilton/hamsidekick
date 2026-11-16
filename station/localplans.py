@@ -77,10 +77,32 @@ def _prompt(loc: dict, km: int) -> str:
 
 
 def _extract_prompt(name: str, text: str) -> tuple[str, str]:
-    sys = ("You read an amateur radio communications plan or band plan and list every frequency it assigns. Only "
-           "what the document says; never add or guess. " + _SHAPE.split("\n", 1)[1].replace("source_url\": str (the "
-           "page or document that lists it)", "source_url\": \"\""))
+    sys = ("You read an amateur radio band plan or communications plan. List (1) its band plan SEGMENTS: each range "
+           "of frequencies and what the plan sets it aside for (e.g. '146.61-147.39 FM repeater outputs', "
+           "'144.90-145.10 packet', '147.42-147.57 FM simplex'), a single-frequency entry as from = to; and (2) every "
+           "FREQUENCY (channel) it assigns to a use, repeater, net or group. Only what the document says; never add or "
+           "guess. Answer ONLY with a JSON object, no prose:\n"
+           "{\"segments\": [{\"from_mhz\": number, \"to_mhz\": number, \"use\": str}],\n"
+           + ' "frequencies"' + _SHAPE.split('\n "frequencies"', 1)[1].replace("source_url\": str (the page or document that lists it)",
+                                               "source_url\": \"\""))
     return sys, f"The document ({name}):\n\n{text[:60000]}"
+
+
+def _clean_segments(raw) -> list[dict]:
+    out = []
+    for g in raw or []:
+        if not isinstance(g, dict):
+            continue
+        a, b = netfind._num(g.get("from_mhz")), netfind._num(g.get("to_mhz"))
+        b = b if b is not None else a
+        use = " ".join(str(g.get("use") or "").split())[:120]
+        if a is None or not use:
+            continue
+        a, b = min(a, b), max(a, b)
+        if not bandplan.band(a) or not bandplan.band(b) or b - a > 60:
+            continue
+        out.append({"from_mhz": round(a, 4), "to_mhz": round(b, 4), "use": use})
+    return out[:600]
 
 
 def _post(key: str, body: dict, timeout: float) -> dict:
@@ -304,6 +326,11 @@ class Plans:
         from . import knowledge
         with self.copy_lock:                         # one at a time: a second run finds the first one's copies
             self._copies(urls, knowledge)
+            if self.key():
+                try:
+                    self.ingest()                    # read each saved plan into the consolidated band plan
+                except Exception as e:  # noqa: BLE001
+                    print(f"localplans: ingest failed: {e}", flush=True)
 
     def _copies(self, urls, knowledge):
         try:
@@ -338,6 +365,104 @@ class Plans:
         finally:
             self.saving = False
 
+    # ----- ingesting: each saved plan read into segments and channels (consolidate.py) -----
+    def _text_of(self, path: Path) -> str:
+        from . import knowledge
+        if path.suffix == ".txt":
+            return path.read_text(encoding="utf-8", errors="replace")
+        return knowledge.extract(path.name, path.read_bytes())
+
+    def _read_plan(self, key: str, name: str, path: Path) -> tuple[list[dict], list[dict], list[str]]:
+        sys_, user = _extract_prompt(name, self._text_of(path))
+        obj = self._call_extract(key, sys_, user)
+        freqs, out = [], []
+        for raw in obj.get("frequencies") or []:
+            f, why = _clean_freq(dict(raw if isinstance(raw, dict) else {}, source_url=""), set(),
+                                 require_source=False)
+            if f:
+                freqs.append(f)
+            elif why:
+                out.append(why)
+        return _clean_segments(obj.get("segments")), freqs, out
+
+    def ingest(self, force: bool = False, keys: list[str] | None = None) -> dict:
+        """Read every saved public plan (not yet read, or `force`) with xAI: its band segments and channels go into
+        the consolidated band plan; its channels are also offered under Frequencies found (with the document as the
+        source). One call per document."""
+        key = self.key()
+        if not key:
+            raise ValueError("set the xAI key first (Settings -> Station agent): it reads the plans")
+        d = _load(self.st)
+        docs = d.get("docs") or {}
+        meta = {x["url"]: x for x in (d.get("last") or {}).get("documents") or []}
+        done = d.get("ingested") or {}
+        todo = [(u, rec) for u, rec in docs.items() if rec.get("path") and (force or u not in done
+                                                                            or done[u].get("error"))
+                and (keys is None or u in keys)]
+        for url, rec in todo[:20]:
+            m = meta.get(url) or {}
+            ent = {"at": time.time(), "title": rec.get("title") or m.get("title") or url, "kind": rec.get("kind"),
+                   "org": m.get("org"), "date": m.get("date"), "url": url,
+                   "authority": (done.get(url) or {}).get("authority")
+                   or ("coordinator" if rec.get("kind") == "band_plan" else "local"),
+                   "excluded": (done.get(url) or {}).get("excluded", False)}
+            try:
+                segs, freqs, _ = self._read_plan(key, ent["title"], self.docdir() / rec["path"])
+                for f in freqs:
+                    f["source_url"], f["source_opened"], f["source_doc"] = url, True, ent["title"]
+                    f["org"] = f.get("org") or ent["org"]
+                ent.update(segments=segs, frequencies=freqs)
+            except Exception as e:  # noqa: BLE001 - one document never stops the rest
+                ent["error"] = f"{type(e).__name__}: {e}"[:160]
+            with self.lock:
+                d = _load(self.st)
+                d.setdefault("ingested", {})[url] = ent
+                last = d.setdefault("last", {"at": None, "clubs": [], "documents": [], "frequencies": []})
+                have = {f["id"] for f in last.get("frequencies") or []}
+                last["frequencies"] = (last.get("frequencies") or []) + [f for f in ent.get("frequencies") or []
+                                                                          if f["id"] not in have]
+                _save(self.st, d)
+            print(f"localplans: read {ent['title'][:60]}: {len(ent.get('segments') or [])} segments, "
+                  f"{len(ent.get('frequencies') or [])} channels{' (' + ent['error'] + ')' if ent.get('error') else ''}",
+                  flush=True)
+        return self.state()
+
+    def set_source(self, key: str, excluded=None, authority=None) -> dict:
+        """The operator's say on one ingested plan: leave it out of the band plan, or name it the coordinator's."""
+        with self.lock:
+            d = _load(self.st)
+            ent = (d.get("ingested") or {}).get(key)
+            if not ent:
+                raise ValueError("no such plan")
+            if excluded is not None:
+                ent["excluded"] = bool(excluded)
+            if authority is not None:
+                if authority not in ("coordinator", "local"):
+                    raise ValueError("a plan is the state coordinator's or a local plan")
+                ent["authority"] = authority
+            _save(self.st, d)
+        return self.state()
+
+    def consolidated(self) -> dict:
+        """The consolidated, reconciled band plan for this area (consolidate.py)."""
+        from . import consolidate
+        d = _load(self.st)
+        sources = [{"id": k, "name": e.get("title") + (f" ({e['org']})" if e.get("org") else ""),
+                    "authority": e.get("authority") or "local", "url": e.get("url"),
+                    "segments": e.get("segments") or [], "frequencies": e.get("frequencies") or []}
+                   for k, e in (d.get("ingested") or {}).items() if not e.get("excluded") and not e.get("error")]
+        t = consolidate.build(self._class(), sources, d.get("kept") or [])
+        t["read"] = [{"key": k, "title": e.get("title"), "org": e.get("org"), "kind": e.get("kind"),
+                      "authority": e.get("authority"), "excluded": bool(e.get("excluded")), "error": e.get("error"),
+                      "segments": len(e.get("segments") or []), "channels": len(e.get("frequencies") or []),
+                      "at": e.get("at"), "url": e.get("url")} for k, e in (d.get("ingested") or {}).items()]
+        t["unread"] = len([u for u, r in (d.get("docs") or {}).items() if r.get("path")
+                           and u not in (d.get("ingested") or {})])
+        t["location"] = (netfind.location(self.st) or {}).get("label")
+        t["searched_at"] = (d.get("last") or {}).get("at")
+        t["key"] = bool(self.key())
+        return t
+
     def doc_file(self, sid: str) -> tuple[Path, str, str] | None:
         """(path, content type, download name) of a saved copy or file, by its id."""
         if not re.fullmatch(r"[0-9a-f]{12}", sid or ""):
@@ -370,9 +495,11 @@ class Plans:
         (self.docdir() / stored).write_bytes(data)
         sys_, user = _extract_prompt(name, text)
         obj = self._call_extract(key, sys_, user)
+        segs = _clean_segments(obj.get("segments"))
         freqs, out = [], []
         for raw in obj.get("frequencies") or []:
-            f, why = _clean_freq(dict(raw, source_url=""), set(), require_source=False)
+            f, why = _clean_freq(dict(raw if isinstance(raw, dict) else {}, source_url=""), set(),
+                                 require_source=False)
             if f:
                 f["source_file"] = name
                 f["file_id"] = sid
@@ -387,6 +514,11 @@ class Plans:
             files.append({"id": sid, "title": Path(name).stem, "name": name, "path": stored, "type": ctype,
                           "at": time.time(), "found": len(freqs)})
             d["files"] = files
+            prev = (d.get("ingested") or {}).get(f"file:{sid}") or {}
+            d.setdefault("ingested", {})[f"file:{sid}"] = {
+                "at": time.time(), "title": Path(name).stem, "kind": "your file", "org": None, "url": None,
+                "authority": prev.get("authority") or "local", "excluded": prev.get("excluded", False),
+                "segments": segs, "frequencies": freqs}
             last = d.setdefault("last", {"at": None, "clubs": [], "documents": [], "frequencies": []})
             have = {f["id"] for f in last.get("frequencies") or []}
             last["frequencies"] = (last.get("frequencies") or []) + [f for f in freqs if f["id"] not in have]
@@ -468,5 +600,15 @@ class Plans:
                 ch = {"use": k["use"], "org": k.get("org"), "priority": k.get("priority"), "kind": k["kind"]}
                 break
         seg = bandplan.segment(f)
-        return {"channel": ch, "plan": seg["what"] if seg else None, "band": seg["band"] if seg else None,
+        plan, by = (seg["what"] if seg else None), "ARRL band plan"
+        try:
+            from . import consolidate
+            hit = consolidate.lookup(self.consolidated(), f)
+            rng, chn = (hit or {}).get("range"), (hit or {}).get("channel")
+            row = chn if chn and not chn.get("kept") else rng if rng and rng.get("authority") != "fcc" else None
+            if row and row.get("use"):
+                plan, by = row["use"], row.get("by")
+        except Exception:  # noqa: BLE001
+            pass
+        return {"channel": ch, "plan": plan, "by": by, "band": seg["band"] if seg else None,
                 "warn": bool(seg and seg["warn"])}

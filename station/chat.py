@@ -113,7 +113,7 @@ class Chat:
         ch = lab.get("channel")
         return [("Local plan: " + ch["use"] + (f" ({ch['org']})" if ch.get("org") else "")
                  + (f", {ch['priority']}" if ch.get("priority") else "") + ". " if ch else "")
-                + (f"Band plan: {lab['plan']}." if lab.get("plan") else "")]
+                + (f"Band plan ({lab.get('by') or 'ARRL'}): {lab['plan']}." if lab.get("plan") else "")]
 
     # ----- what the model is told -----
     def context(self, rid: str, question: str, tools: bool = False) -> list[str]:

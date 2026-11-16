@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VARA Card</title>
+<!-- VARA keyboard chat and file transfer (station/varalink.py): two-sided reference card. Served at /help/vara; PDF by tools/build_ref_card.py. Keep every side within one page: python -m tools.build_ref_card checks it. -->
+<style>
+:root{--red:#C8102E;--navy:#1A2744;--blue:#4A7FC1;--green:#5BAD8A;--amber:#D4850A;--muted:#4A5568;--border:#CBD5E0;color-scheme:light}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#F0F4F8;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#2D3748;padding:32px 16px 64px}
+.page-header{max-width:1120px;margin:0 auto}
+h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.page-intro{font-size:17px;color:var(--muted);margin-bottom:12px}
+.print-btn{background:var(--red);color:#fff;border:none;border-radius:8px;padding:10px 24px;font:600 18px system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;cursor:pointer;letter-spacing:.05em;margin-bottom:24px}
+.print-btn:hover{background:#9a0020}
+.card-row{display:flex;gap:20px;flex-wrap:wrap;max-width:1120px;margin:0 auto}
+.card{background:#fff;border-radius:12px;padding:24px 28px;box-shadow:0 2px 8px rgba(0,0,0,.10);display:flex;flex-direction:column;gap:12px;min-width:340px;flex:1;max-width:550px}
+.card-front{border-top:5px solid var(--red)}
+.card-back{border-top:5px solid var(--navy)}
+.card-role{font-size:13.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.card-title{font-size:24px;font-weight:700;color:var(--navy);line-height:1.1}
+.card-side{display:inline-block;align-self:flex-start;font-size:13.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--red);color:#fff;padding:2px 10px;border-radius:4px;margin:2px 0}
+.card-side.back{background:var(--navy)}
+.card-head{display:flex;gap:12px;align-items:flex-start}
+.card-head>div:first-child{flex:1;min-width:0}
+.card-qr{flex:none;width:108px;text-align:center;font-size:12.5px;line-height:1.15;color:var(--muted)}
+.card-qr svg{display:block;width:100px;height:100px;margin:0 auto 2px}
+.card-qr.share{width:auto;display:flex;flex-direction:row-reverse;align-items:center;gap:6px;font-size:11.5px;text-align:right}.card-qr.share svg{width:64px;height:64px;margin:0}.card-qr.share span{width:4.2em}
+.card-qr .url{display:block;font-size:10px;word-break:break-all;margin-top:2px}
+.lead{font-size:15.5px;line-height:1.45}
+.card-part{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--red);border-bottom:1px solid #D5DCE5;padding-bottom:2px}
+.card-back .card-part{color:var(--navy)}
+.card-part span{font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:13.5px}
+.steps{display:flex;flex-direction:column;gap:7px}
+.step{display:flex;gap:12px;align-items:flex-start}
+.step-num{background:var(--red);color:#fff;border-radius:50%;width:26px;height:26px;min-width:26px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700}
+.card-back .step-num{background:var(--navy)}
+.step-text{font-size:15.5px;line-height:1.42;padding-top:2px}
+.step-text b{color:var(--navy)}
+.step-text small{color:var(--muted);font-size:13.5px;display:block}
+.note-box{background:#F0F4F8;border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:9px 14px;font-size:14.5px;line-height:1.42}
+.note-box.warning{border-color:var(--amber);background:#FFF8E1}
+.note-box.tip{border-color:var(--green);background:#E8F8F0}
+.phrase-box{background:var(--navy);color:#BFD8D5;border-radius:8px;padding:11px 16px;font-size:14.5px;line-height:1.45}
+.phrase-box b{color:#fff}
+.tier-table{width:100%;border-collapse:collapse;font-size:14px;line-height:1.35}
+@media screen and (max-width:600px){.tier-table{display:block;overflow-x:auto}}
+.tier-table th{background:var(--navy);color:#fff;padding:6px 10px;text-align:left;font-size:13px;font-weight:600;letter-spacing:.06em}
+.tier-table td{padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.tier-table tr:nth-child(even) td{background:#F7F9FC}
+.tier-table td:first-child{font-weight:600;color:var(--navy);white-space:nowrap}
+.k{display:inline-block;font-weight:600;font-size:.92em;border:1px solid #8a96a3;border-radius:4px;padding:0 5px;line-height:1.35;background:#fff;white-space:nowrap;color:var(--navy)}
+.mono{font-family:Consolas,'Courier New',monospace;font-size:.92em}
+.grey{color:#6b7785}.edge{border-left:3px solid var(--blue);padding-left:4px}
+.call{text-decoration:underline;font-family:Consolas,'Courier New',monospace}
+.fill{display:inline-block;min-width:2.1in;border-bottom:1px solid #2D3748;height:1em;vertical-align:baseline}
+.turn-over{margin-top:auto;text-align:right;font-size:14px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.card-disclaimer{margin-top:auto;padding-top:6px;border-top:1px solid #e2e8f0;font-size:12.5px;line-height:1.35;color:var(--muted)}
+@media (max-width:600px){.card-row{flex-direction:column}.card{min-width:0;max-width:none;padding:18px 16px;overflow-wrap:anywhere}.card-head{flex-direction:column}}
+/* Printing: every card side is one US Letter page, front then back, so a sheet printed double-sided
+   ("flip on long edge") is the card. Nothing flows from one side onto the next. */
+@page{size:letter;margin:.5in}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html,body{background:#fff;padding:0;margin:0}
+  .page-header{display:none}
+  .card-row{display:block;margin:0;max-width:none}
+  .card{max-width:none;width:100%;min-width:0;flex:none;box-shadow:none;border:1px solid #b8c2cc;border-top-width:6px;border-radius:10px;
+        min-height:9.8in;padding:16px 22px;gap:9px;break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid}
+  .card:last-child{break-after:auto;page-break-after:auto}
+  /* a touch smaller than on screen so every side fits one Letter page (measured with Chrome on macOS, whose
+     system font runs wider than Windows' Segoe UI) */
+  .card{gap:7px;padding:14px 20px}
+  .card-title{font-size:22px}
+  .lead,.step-text{font-size:14px;line-height:1.36}
+  .step-text small{font-size:12.5px}
+  .steps{gap:5px}
+  .step-num{width:24px;height:24px;min-width:24px;font-size:14px}
+  .note-box,.phrase-box{font-size:13px;line-height:1.36;padding:7px 12px}
+  .tier-table{font-size:13px;line-height:1.3}
+  .tier-table td{padding:4px 8px}
+  .card-part{font-size:13px}
+  .card-disclaimer{font-size:11.5px}
+}
+.card-nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.card-nav a{display:inline-block;padding:6px 14px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--navy);font-size:15px;font-weight:600;text-decoration:none}
+.card-nav a:hover{border-color:var(--navy)}
+.card-nav a[aria-current]{background:var(--navy);border-color:var(--navy);color:#fff}
+</style>
+</head>
+<body>
+<div class="page-header">
+  <nav class="card-nav" aria-label="Reference cards"><a href="/help">The station</a><a href="/help/sidekick">Sidekick, the AI assistant</a><a href="/help/conversation">Record a conversation</a><a href="/help/vara" aria-current="page">VARA chat and files</a><a href="/help/bandplan">Band plan for your area</a></nav>
+  <h1>VARA Chat and Files: Quick Reference Card</h1>
+  <p class="page-intro">Keyboard chat and file transfer over VARA HF and VARA FM: setting up, connecting, sending files and handing VARA to Winlink Express. Two sides, US Letter. Print double-sided ("flip on long edge") and keep it with the station's card.</p>
+  <button class="print-btn" onclick="window.print()">PRINT</button>
+</div>
+<div class="card-row">
+
+<!-- ===================== FRONT ===================== -->
+<div class="card card-front">
+  <p class="card-role">HAM Sidekick Station · VARA</p>
+  <span class="card-side">Front · side 1 of 2</span>
+  <h2 class="card-title">VARA Chat and Files: Set Up and Connect</h2>
+  <p class="lead">Keyboard chat and file transfer with another station over <b>VARA HF</b> or <b>VARA FM</b>, through the same VARA modem Winlink Express uses. Everything is <b>sent in the clear</b> and <b>logged on this PC</b>. Nothing transmits unless you click.</p>
+
+  <p class="card-part">A · Once: set it up</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-text"><b>A radio for VARA.</b> On its card: <b>Used for</b> → <span class="k">Winlink only</span><small>Its nets are not recorded on it, and the station never records from the VARA sound card.</small></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><b>Its Transmit switch on:</b> <span class="k">Radios…</span> → the radio → <b>Transmit</b><small>Off = VARA never transmits from this station.</small></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Your license class:</b> Settings → <b>Station agent</b><small>Every transmission is checked against your data privileges on the radio's frequency.</small></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text"><b>The radio's frequency</b> on its card (CAT reads it; or <span class="k">Change</span>)</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Open the VARA modem</b> (VARA HF or VARA FM) as for Winlink, with its sound card and PTT set up there</div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-text">The radio's card → <span class="k">VARA chat</span> → choose <b>VARA HF</b> or <b>VARA FM</b> → <span class="k">Switch VARA on</span><small>Ports 8300 / 8301 are VARA's defaults: change them only if you changed them in VARA. HF: <b>Bandwidth</b> 500, 2300 or 2750 Hz, or VARA's own setting.</small></div></div>
+  </div>
+
+  <p class="card-part">B · Make a contact</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">7</div><div class="step-text"><b>Call a station:</b> type its callsign → <span class="k">Connect</span><small>VARA FM can go through a digipeater: type it under <b>via</b>. A call you heard under <b>CQs heard</b> fills in with one tap.</small></div></div>
+    <div class="step"><div class="step-num">8</div><div class="step-text"><b>Or call CQ:</b> <span class="k">Call CQ</span> → confirm<small>Listen first: the window shows <b>channel busy</b> when VARA hears the frequency in use.</small></div></div>
+    <div class="step"><div class="step-num">9</div><div class="step-text"><b>Or wait for a call:</b> tick <b>Answer calls while I am here</b><small>It turns itself off the moment you leave the PC or any check below fails.</small></div></div>
+  </div>
+
+  <div class="note-box warning"><b>When it will transmit</b>, all four, every time: the radio is <b>Winlink only</b> · its <b>Transmit switch</b> is on · <b>you are at the dashboard</b> (keyboard or mouse in the last few minutes) · your <b>license class has data privileges</b> on that frequency. The window's green or amber line says which one is missing.</div>
+  <p class="turn-over">Turn over → side 2: Chat, Files, Winlink Express</p>
+</div>
+
+<!-- ===================== BACK ===================== -->
+<div class="card card-back">
+  <div class="card-head"><div>
+  <p class="card-role">HAM Sidekick Station · VARA</p>
+  <span class="card-side back">Back · side 2 of 2</span>
+  <h2 class="card-title">Chat, Files and Winlink Express</h2>
+  </div><div class="card-qr share"><!--CARD_QR:HAM_Sidekick_VARA_Quick_Reference_Card--><span>Share this card</span></div></div>
+
+  <p class="card-part">Connected</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-text"><b>Chat:</b> type → <span class="k">Enter</span><small>Up to 4000 characters a message. Theirs and yours show in the window with the time.</small></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><b>Send a file:</b> <b>File</b> → choose it<small>Up to 5 MB. A bar shows progress; the other station checks the file arrived whole (SHA-256) and says so. Small files: VARA is slow (HF, minutes for a page; FM is faster).</small></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Files received</b> are listed under the chat as downloads<small>Saved in <span class="mono">data\vara\inbox</span>, never opened by the station. Open one only if you expected it.</small></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text"><b>Finish:</b> <span class="k">Disconnect</span> · <b>at once:</b> <span class="k">Abort</span><small>Abort drops the link immediately and lets go of the transmitter.</small></div></div>
+  </div>
+
+  <p class="card-part">Who you can talk to</p>
+  <table class="tier-table">
+    <tr><td>Another HAM Sidekick Station</td><td>Chat <b>and</b> files</td></tr>
+    <tr><td>Any other VARA keyboard program</td><td>Plain chat, line by line ("plain terminal" in the window). Files need this program at both ends</td></tr>
+  </table>
+
+  <p class="card-part">Winlink Express <span>(VARA serves one program at a time)</span></p>
+  <div class="steps">
+    <div class="step"><div class="step-num">5</div><div class="step-text"><span class="k">Hand VARA to Winlink Express</span> → then open Express and connect as usual</div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-text">Close Express → <span class="k">Take VARA back</span><small>While Express is open the station leaves VARA alone.</small></div></div>
+  </div>
+
+  <p class="card-part">When something looks wrong</p>
+  <table class="tier-table">
+    <tr><td>"VARA is not answering"</td><td>Open the VARA modem; check the ports match VARA's settings; close other programs using VARA</td></tr>
+    <tr><td>Connect is greyed</td><td>Read the amber line: Transmit switch, you at the PC, license class, or the radio's frequency</td></tr>
+    <tr><td>"no data privileges"</td><td>The frequency is outside your class's data segment: dashboard <span class="k">Band plan</span> shows where you may transmit data</td></tr>
+    <tr><td>Stopped listening</td><td>You left the PC, or a check failed: tick <b>Answer calls</b> again</td></tr>
+  </table>
+
+  <p class="card-disclaimer">Part of HAM Sidekick Station (MIT License). You are the control operator for every transmission. Part 97: messages are never encrypted, and the station sends no beacon, relay or automatic reply. The chat and file format is this program's own, published in the project's docs/VARA.md; VARA is a separate product.</p>
+</div>
+
+</div>
+</body>
+</html>

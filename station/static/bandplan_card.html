@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Band Plan Card</title>
+<!-- Finding the area's plans and reading the consolidated band plan (station/localplans.py, station/consolidate.py): two-sided reference card. Served at /help/bandplan; PDF by tools/build_ref_card.py. Keep every side within one page: python -m tools.build_ref_card checks it. -->
+<style>
+:root{--red:#C8102E;--navy:#1A2744;--blue:#4A7FC1;--green:#5BAD8A;--amber:#D4850A;--muted:#4A5568;--border:#CBD5E0;color-scheme:light}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#F0F4F8;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#2D3748;padding:32px 16px 64px}
+.page-header{max-width:1120px;margin:0 auto}
+h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.page-intro{font-size:17px;color:var(--muted);margin-bottom:12px}
+.print-btn{background:var(--red);color:#fff;border:none;border-radius:8px;padding:10px 24px;font:600 18px system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;cursor:pointer;letter-spacing:.05em;margin-bottom:24px}
+.print-btn:hover{background:#9a0020}
+.card-row{display:flex;gap:20px;flex-wrap:wrap;max-width:1120px;margin:0 auto}
+.card{background:#fff;border-radius:12px;padding:24px 28px;box-shadow:0 2px 8px rgba(0,0,0,.10);display:flex;flex-direction:column;gap:12px;min-width:340px;flex:1;max-width:550px}
+.card-front{border-top:5px solid var(--red)}
+.card-back{border-top:5px solid var(--navy)}
+.card-role{font-size:13.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.card-title{font-size:24px;font-weight:700;color:var(--navy);line-height:1.1}
+.card-side{display:inline-block;align-self:flex-start;font-size:13.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--red);color:#fff;padding:2px 10px;border-radius:4px;margin:2px 0}
+.card-side.back{background:var(--navy)}
+.card-head{display:flex;gap:12px;align-items:flex-start}
+.card-head>div:first-child{flex:1;min-width:0}
+.card-qr{flex:none;width:108px;text-align:center;font-size:12.5px;line-height:1.15;color:var(--muted)}
+.card-qr svg{display:block;width:100px;height:100px;margin:0 auto 2px}
+.card-qr.share{width:auto;display:flex;flex-direction:row-reverse;align-items:center;gap:6px;font-size:11.5px;text-align:right}.card-qr.share svg{width:64px;height:64px;margin:0}.card-qr.share span{width:4.2em}
+.card-qr .url{display:block;font-size:10px;word-break:break-all;margin-top:2px}
+.lead{font-size:15.5px;line-height:1.45}
+.card-part{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--red);border-bottom:1px solid #D5DCE5;padding-bottom:2px}
+.card-back .card-part{color:var(--navy)}
+.card-part span{font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:13.5px}
+.steps{display:flex;flex-direction:column;gap:7px}
+.step{display:flex;gap:12px;align-items:flex-start}
+.step-num{background:var(--red);color:#fff;border-radius:50%;width:26px;height:26px;min-width:26px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700}
+.card-back .step-num{background:var(--navy)}
+.step-text{font-size:15.5px;line-height:1.42;padding-top:2px}
+.step-text b{color:var(--navy)}
+.step-text small{color:var(--muted);font-size:13.5px;display:block}
+.note-box{background:#F0F4F8;border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:9px 14px;font-size:14.5px;line-height:1.42}
+.note-box.warning{border-color:var(--amber);background:#FFF8E1}
+.note-box.tip{border-color:var(--green);background:#E8F8F0}
+.phrase-box{background:var(--navy);color:#BFD8D5;border-radius:8px;padding:11px 16px;font-size:14.5px;line-height:1.45}
+.phrase-box b{color:#fff}
+.tier-table{width:100%;border-collapse:collapse;font-size:14px;line-height:1.35}
+@media screen and (max-width:600px){.tier-table{display:block;overflow-x:auto}}
+.tier-table th{background:var(--navy);color:#fff;padding:6px 10px;text-align:left;font-size:13px;font-weight:600;letter-spacing:.06em}
+.tier-table td{padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.tier-table tr:nth-child(even) td{background:#F7F9FC}
+.tier-table td:first-child{font-weight:600;color:var(--navy);white-space:nowrap}
+.k{display:inline-block;font-weight:600;font-size:.92em;border:1px solid #8a96a3;border-radius:4px;padding:0 5px;line-height:1.35;background:#fff;white-space:nowrap;color:var(--navy)}
+.mono{font-family:Consolas,'Courier New',monospace;font-size:.92em}
+.grey{color:#6b7785}.edge{border-left:3px solid var(--blue);padding-left:4px}
+.call{text-decoration:underline;font-family:Consolas,'Courier New',monospace}
+.fill{display:inline-block;min-width:2.1in;border-bottom:1px solid #2D3748;height:1em;vertical-align:baseline}
+.turn-over{margin-top:auto;text-align:right;font-size:14px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.card-disclaimer{margin-top:auto;padding-top:6px;border-top:1px solid #e2e8f0;font-size:12.5px;line-height:1.35;color:var(--muted)}
+@media (max-width:600px){.card-row{flex-direction:column}.card{min-width:0;max-width:none;padding:18px 16px;overflow-wrap:anywhere}.card-head{flex-direction:column}}
+/* Printing: every card side is one US Letter page, front then back, so a sheet printed double-sided
+   ("flip on long edge") is the card. Nothing flows from one side onto the next. */
+@page{size:letter;margin:.5in}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html,body{background:#fff;padding:0;margin:0}
+  .page-header{display:none}
+  .card-row{display:block;margin:0;max-width:none}
+  .card{max-width:none;width:100%;min-width:0;flex:none;box-shadow:none;border:1px solid #b8c2cc;border-top-width:6px;border-radius:10px;
+        min-height:9.8in;padding:16px 22px;gap:9px;break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid}
+  .card:last-child{break-after:auto;page-break-after:auto}
+  /* a touch smaller than on screen so every side fits one Letter page (measured with Chrome on macOS, whose
+     system font runs wider than Windows' Segoe UI) */
+  .card{gap:7px;padding:14px 20px}
+  .card-title{font-size:22px}
+  .lead,.step-text{font-size:14px;line-height:1.36}
+  .step-text small{font-size:12.5px}
+  .steps{gap:5px}
+  .step-num{width:24px;height:24px;min-width:24px;font-size:14px}
+  .note-box,.phrase-box{font-size:13px;line-height:1.36;padding:7px 12px}
+  .tier-table{font-size:13px;line-height:1.3}
+  .tier-table td{padding:4px 8px}
+  .card-part{font-size:13px}
+  .card-disclaimer{font-size:11.5px}
+}
+.card-nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.card-nav a{display:inline-block;padding:6px 14px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--navy);font-size:15px;font-weight:600;text-decoration:none}
+.card-nav a:hover{border-color:var(--navy)}
+.card-nav a[aria-current]{background:var(--navy);border-color:var(--navy);color:#fff}
+</style>
+</head>
+<body>
+<div class="page-header">
+  <nav class="card-nav" aria-label="Reference cards"><a href="/help">The station</a><a href="/help/sidekick">Sidekick, the AI assistant</a><a href="/help/conversation">Record a conversation</a><a href="/help/vara">VARA chat and files</a><a href="/help/bandplan" aria-current="page">Band plan for your area</a></nav>
+  <h1>Band Plan for Your Area: Quick Reference Card</h1>
+  <p class="page-intro">Finding your area's band plans and EMCOMM plans, keeping your channels, and reading the one consolidated table. Two sides, US Letter. Print double-sided ("flip on long edge") and keep it with the station's card.</p>
+  <button class="print-btn" onclick="window.print()">PRINT</button>
+</div>
+<div class="card-row">
+
+<!-- ===================== FRONT ===================== -->
+<div class="card card-front">
+  <p class="card-role">HAM Sidekick Station · Band plan</p>
+  <span class="card-side">Front · side 1 of 2</span>
+  <h2 class="card-title">Build Your Area's Band Plan</h2>
+  <p class="lead">One table of <b>where you may transmit and what each frequency is for</b> near your station: the <b>FCC rules</b> for your license class, the <b>ARRL band plan</b>, your <b>state frequency coordinator's</b> band plan, and the local <b>ARES, RACES and club</b> plans. The FCC rules and the ARRL plan are built in and work with no internet; the rest you find once, then keep on this PC.</p>
+
+  <p class="card-part">A · Once: what it needs</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-text"><b>Your license class:</b> Settings → <b>Station agent</b><small>Without it the table shows the plans but not your privileges.</small></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><b>Where the station is:</b> a grid square in Settings, or <span class="k">Nets</span> → <b>Find nets</b> → location<small>Only a rounded position (about 10 km) is ever sent.</small></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><b>The xAI key</b> (Settings → Station agent): it searches and reads the plans</div></div>
+  </div>
+
+  <p class="card-part">B · Find the local plans</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">4</div><div class="step-text"><span class="k">Nets</span> → <b>Plans</b> → set <b>Within … km</b> → <span class="k">Find local plans</span><small>Up to two minutes; about $0.20–0.50. It looks for clubs and EMCOMM groups, your state coordinator's band plan, and public ARES, RACES and ICS-205 plans.</small></div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Public plans are saved and read</b> by themselves<small>Each plan document is saved on this PC (<b>offline copy</b>), then read into ranges and channels: one xAI call per plan, a few cents each.</small></div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-text"><b>Members-only plan?</b> <b>Add a plan you have</b> → choose the file (PDF, Word, text)<small>The station never signs in anywhere. Your file stays on this PC and is read the same way.</small></div></div>
+  </div>
+
+  <p class="card-part">C · Keep your channels</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">7</div><div class="step-text"><b>Frequencies found</b>: open each <b>source</b>, tick the right ones → <span class="k">Keep</span><small>Nothing found is trusted until you keep it. "not opened" = the search did not read that page itself: check it.</small></div></div>
+    <div class="step"><div class="step-num">8</div><div class="step-text"><b>A plan's regular net?</b> <span class="k">Add its net</span> puts it on the schedule</div></div>
+  </div>
+
+  <div class="note-box tip"><b>Kept channels name your radio's frequency</b> on its card ("County ARES primary"), and Sidekick is told it. Plans change: when the last search is over a month old the Plans tab says so. <b>Search again</b> marks what is new and which kept channels a plan no longer lists. It never searches by itself.</div>
+  <p class="turn-over">Turn over → side 2: Read the Band Plan</p>
+</div>
+
+<!-- ===================== BACK ===================== -->
+<div class="card card-back">
+  <div class="card-head"><div>
+  <p class="card-role">HAM Sidekick Station · Band plan</p>
+  <span class="card-side back">Back · side 2 of 2</span>
+  <h2 class="card-title">Read the Band Plan</h2>
+  </div><div class="card-qr share"><!--CARD_QR:HAM_Sidekick_Band_Plan_Quick_Reference_Card--><span>Share this card</span></div></div>
+
+  <p class="card-part">Open it <span>(dashboard header)</span></p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-text"><span class="k">Band plan</span> → one table per band<small><b>Show</b>: all, HF, VHF / UHF or one band · <b>Only where I may transmit</b> · <b>Only what to check</b> · <b>Channels</b> on or off · <span class="k">Print</span>.</small></div></div>
+  </div>
+
+  <p class="card-part">The columns</p>
+  <table class="tier-table">
+    <tr><td>MHz</td><td>A range (146.61–147.39), or a channel (shaded) with its mode, repeater offset and tone</td></tr>
+    <tr><td>Use</td><td>What it is for, from the plan that speaks first (below), and whose words they are</td></tr>
+    <tr><td>You</td><td>Range: <b>Phone · Data · CW</b>, the ones struck through you may not use. Channel: <b>yes / no</b></td></tr>
+    <tr><td>Sources · notes</td><td>Every other plan's words for it, and <b>⚠</b> anything to check</td></tr>
+  </table>
+
+  <p class="card-part">Who speaks first <span>(how plans are reconciled)</span></p>
+  <table class="tier-table">
+    <tr><td>FCC rules</td><td>The <b>law</b>: decides the <b>You</b> column, never outranked</td></tr>
+    <tr><td>1 · State coordinator</td><td>The area's band plan (repeater pairs, simplex, packet)</td></tr>
+    <tr><td>2 · Local plans</td><td>ARES, RACES, ICS-205, club plans and your own files</td></tr>
+    <tr><td>3 · Your channels</td><td>What you kept on the Plans tab</td></tr>
+    <tr><td>4 · ARRL band plan</td><td>The national voluntary plan, built in</td></tr>
+  </table>
+
+  <p class="card-part">⚠ What to check</p>
+  <table class="tier-table">
+    <tr><td>Plans differ</td><td>Two plans set the same stretch aside for different uses (e.g. weak signal vs packet). Both are shown: follow the higher one, or ask the coordinator</td></tr>
+    <tr><td>Channel in another use</td><td>A channel sits in a range set aside for something else (a simplex channel in repeater outputs)</td></tr>
+    <tr><td>Outside your privileges</td><td>A kept channel, or its repeater input, is outside your class</td></tr>
+  </table>
+
+  <p class="card-part">Your say on each plan</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">2</div><div class="step-text"><b>Plans read</b> (top of the table): mark a plan <b>State coordinator's plan</b> or <b>Local plan</b>, or untick <b>in the table</b> to leave it out<small><span class="k">Read the plans again</span> re-reads them all after a plan is updated.</small></div></div>
+  </div>
+
+  <p class="card-disclaimer">Part of HAM Sidekick Station (MIT License). US rules: 47 CFR 97.301 / 97.305. Band plans are voluntary agreements; plans read by AI can be wrong: check a channel against its source before you rely on it on the air.</p>
+</div>
+
+</div>
+</body>
+</html>

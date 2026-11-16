@@ -300,6 +300,15 @@ you chose is remembered. Each column shows:
   back** after closing it. Files received are in the list below the chat as downloads (data/vara/inbox); open them
   only if you expected them. Chat with another HAM Sidekick Station gets files too; with any other VARA keyboard
   program you get plain chat.
+- **Band plan for your area** (header → **Band plan**, owner 2026-11-15; its own card: Help → Band plan for your
+  area): one table per band of where you may transmit and what each frequency is for. Built in: the FCC rules for
+  your license class and the ARRL band plan. Once Nets → Plans has found your area's plans, each saved plan document
+  (your state coordinator's band plan, ARES / RACES / ICS-205 / club plans, and files you added) is read into its
+  ranges and channels and merged in. The state coordinator's words come first, then local plans, then your kept
+  channels, then the ARRL's; the FCC rules decide the **You** column and are never outranked. **⚠** marks what to
+  check: two plans that disagree, a channel in a range set aside for another use, a kept channel outside your
+  privileges. **Plans read** lets you mark a plan as the state coordinator's or a local plan, leave it out, or read
+  them all again. **Print** prints the table.
 - **Plans** (Nets → Plans, owner 2026-11-15): the **band plan** is built in (your privileges for phone, data and CW
   by license class, set in Settings → Station agent, and what the ARRL band plan sets each segment aside for) and
   works with no internet. **Find local plans** searches for the clubs and EMCOMM groups within the distance you set,

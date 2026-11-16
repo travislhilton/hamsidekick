@@ -548,18 +548,25 @@ def test_sidekick_card_is_served_and_linked():
     assert HELP_CARDS["/help/sidekick"] == "sidekick_card.html"
 
 
-def test_help_has_three_cards_each_linking_the_others():
+def test_help_has_five_cards_each_linking_the_others():
     from station.server import HELP_CARDS, STATIC
-    pages = {"/help": "card.html", "/help/sidekick": "sidekick_card.html", "/help/conversation": "conversation_card.html"}
+    pages = {"/help": "card.html", "/help/sidekick": "sidekick_card.html", "/help/conversation": "conversation_card.html",
+             "/help/vara": "vara_card.html", "/help/bandplan": "bandplan_card.html"}
     for path, src in pages.items():
         assert HELP_CARDS[path] == src
         html = (STATIC / src).read_text(encoding="utf-8")
         nav = html[html.index('<nav class="card-nav"'):html.index("</nav>")]
-        assert all(f'href="{p}"' in nav for p in pages)             # Help: every card reaches the other two
+        assert all(f'href="{p}"' in nav for p in pages)             # Help: every card reaches the others
         assert f'href="{path}" aria-current="page"' in nav
         assert "side 1 of 2" in html and "side 2 of 2" in html
     conv = (STATIC / "conversation_card.html").read_text(encoding="utf-8")
     assert "Record a Conversation" in conv and "Include conversations" in conv and "conversations only" in conv
+    vara = (STATIC / "vara_card.html").read_text(encoding="utf-8")
+    assert "Winlink only" in vara and "Hand VARA to Winlink Express" in vara and "Abort" in vara and "encrypted" in vara
+    bp = (STATIC / "bandplan_card.html").read_text(encoding="utf-8")
+    assert "Find local plans" in bp and "Who speaks first" in bp and "97.305" in bp
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'href="/help/vara"' in idx and idx.count('href="/help/bandplan"') == 2
 
 
 def test_end_button_names_a_conversation_outside_a_net():

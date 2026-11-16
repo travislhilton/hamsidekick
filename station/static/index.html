@@ -485,6 +485,11 @@ a.btn{display:inline-block;padding:4px 10px;border:1px solid var(--line,#888);bo
 .vlog{max-height:45vh;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:8px 0}
 .vmsg{margin:3px 0;overflow-wrap:anywhere}.vmsg.out b{color:var(--accent)}
 #varaDlg{width:min(720px,calc(100vw - 32px))}
+#bpDlg{width:min(1100px,calc(100vw - 32px))}
+.bpt td,.bpt th{vertical-align:top}.bpt tr.ch td:first-child{padding-left:1.4em}.bpt tr.ch td{background:var(--okbg)}
+.bpt tr.flag td{box-shadow:inset 3px 0 0 var(--warn)}.bpt td{font-family:inherit}.bpt .bps{display:block;margin-bottom:2px}.bppv span{font-weight:600;margin-right:6px;white-space:nowrap}.bppv .no{opacity:.4;text-decoration:line-through;font-weight:400}
+.bpband{margin:14px 0 4px}.bpband h4{display:inline;margin-right:.5em}
+@media print{body>*:not(#bpDlg){display:none!important}#bpDlg{position:static;width:auto;border:0;box-shadow:none}#bpDlg .noprint{display:none!important}.nlistwrap{overflow:visible!important}}
 .st{white-space:nowrap;color:var(--muted)}button.st.perf{background:none;border:0;padding:0;margin:0;font:inherit;cursor:pointer;opacity:.75}button.st.perf.on{opacity:1;font-weight:600}.st.ok{color:var(--ok)}.st.warn{color:var(--warn)}.st.bad{color:var(--bad)}
 #settings .savebar{position:sticky;bottom:-16px;background:var(--panel);border-top:1px solid var(--line);margin:12px -16px -16px;padding:10px 16px;z-index:2}
 button:disabled{cursor:not-allowed}
@@ -533,13 +538,14 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <form id="searchForm" class="hsearch" role="search"><input id="q" type="search" placeholder="Search everything" aria-label="Search every transmission, callsign, net and the minutes" autocomplete="off"> <button>Search</button></form>
   <label class="small" title="Explain Q-codes, prowords and abbreviations (Roger, QSO, QSY…) under each transmission"><input type="checkbox" id="explain" checked style="width:auto"> <span class="xl">Explain radio terms</span><span class="xs">Explain terms</span></label>
   <button id="openNets" title="Schedule, history, who takes part, minutes and what is still open">Nets</button>
+  <button id="openBandplan" title="The band plan for your area: FCC privileges, the ARRL plan, your state coordinator's plan and the local ARES / RACES plans, in one table">Band plan</button>
   <button id="openRadios" title="Add, replace or remove a radio and choose its sound input">Radios…</button>
   <button id="openSettings" title="Your callsign and Winlink Express">Settings</button>
   <button id="openPhone" title="Show a QR code: point a phone's camera at it to open this dashboard on the phone">Open on phone</button>
   <button id="fullScr" type="button" aria-pressed="false" title="Fill the whole screen with the dashboard (Esc or this button again to leave)" hidden>Full screen</button>
   <button id="openReadout" title="The EOC's situation report: approve it, then read it on the net from a large-type card" onclick="window.open('/readout','_blank')">Read-out</button>
   <button id="nightBtn" aria-pressed="false" title="Night colours: all red on black, to keep your night vision (again for normal colours)" onclick="setDisplay('theme',DISP.theme==='night'?(DISP.prevTheme||'auto'):(DISP.prevTheme=DISP.theme,'night'))">☾ Night</button>
-  <a class="helpbtn" href="/help" target="_blank" rel="noopener" title="How to use the station: the reference cards (the station, Sidekick, recording a conversation; printable)">Help</a>
+  <a class="helpbtn" href="/help" target="_blank" rel="noopener" title="How to use the station: the reference cards (the station, Sidekick, recording a conversation, VARA chat and files, the band plan; printable)">Help</a>
   </div>
 </header>
 <nav id="today" class="today" aria-label="Nets today"></nav>
@@ -585,6 +591,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <div class="row savebar"><button value="save" id="setSave" class="primary">Save</button> <button value="cancel" formnovalidate>Cancel</button> <span class="err" id="setErr"></span></div>
 </form></dialog>
 <dialog id="wl"><div id="wlBody"></div></dialog>
+<dialog id="bpDlg" aria-label="Band plan for your area"><div id="bpBody"></div></dialog>
 <dialog id="varaDlg" aria-label="VARA keyboard chat and files"><div id="varaBody"></div></dialog>
 <dialog id="testDlg"><div id="testBody"></div></dialog>
 <dialog id="levelDlg"><div id="levelBody"></div></dialog>
@@ -1860,7 +1867,7 @@ function renderVara(){
   const sending=st.sending?`<p class="small">Sending ${esc(st.sending.name)}: <progress max="${st.sending.size}" value="${st.sending.size-(st.sending.left||0)}"></progress></p>`:"";
   const heard=(st.cq_heard||[]).length?`<p class="small">CQs heard: ${st.cq_heard.slice(-8).reverse().map(h=>`<button class="linkish small" data-vcall="${esc(h.call)}">${esc(h.call)}</button>`).join(" · ")}</p>`:"";
   const inbox=(d.inbox||[]).length?`<details class="small"><summary>Files received (${d.inbox.length})</summary><ul>${d.inbox.map(f=>`<li><a href="/api/vara/inbox/${enc(f.name)}">${esc(f.name)}</a> <span class="muted">${Math.round(f.bytes/1024)} KB · a download only, never opened here</span></li>`).join("")}</ul></details>`:"";
-  box.innerHTML=`<h3>VARA chat and files</h3>
+  box.innerHTML=`<h3>VARA chat and files <a class="small" href="/help/vara" target="_blank" rel="noopener" style="font-weight:400">Card (printable)</a></h3>
    <div class="row nfrow small"><label>Modem <select data-vset="kind"><option value="hf"${c.kind==="hf"?" selected":""}>VARA HF</option><option value="fm"${c.kind==="fm"?" selected":""}>VARA FM</option></select></label>
      ${c.kind==="hf"?`<label>Bandwidth <select data-vset="bw"><option value=""${!c.bw?" selected":""}>VARA's setting</option>${[500,2300,2750].map(b=>`<option value="${b}"${c.bw===b?" selected":""}>${b} Hz</option>`).join("")}</select></label>`:""}
      <label>Ports <input data-vset="cmd_port" value="${c.cmd_port}" style="width:5em" inputmode="numeric"> / <input data-vset="data_port" value="${c.data_port}" style="width:5em" inputmode="numeric"></label>
@@ -1894,6 +1901,56 @@ document.addEventListener("click",async e=>{const t=e.target;if(!t.closest)retur
   if(w==="cq"&&!confirm("Call CQ on VARA now? Your station transmits."))return;
   await varaAct(w,{});
 });
+// ----- The consolidated band plan (station/consolidate.py): header -> Band plan -----
+const BP={d:null,band:"all",mine:false,flags:false,chans:true,msg:null};
+async function bpOpen(){BP.msg=null;if(!$("bpDlg").open)$("bpDlg").showModal();$("bpBody").innerHTML='<p class="muted">Loading…</p>';try{BP.d=await api("/api/bandplan/area")}catch(e){BP.msg={bad:true,text:e.message}}renderBP()}
+const AUTHN={coordinator:"State coordinator",local:"Local plan",kept:"Your channel",arrl:"ARRL",fcc:"FCC"};
+function bpMhz(x){return Number(x).toFixed(4).replace(/0+$/,"").replace(/\.$/,"")}
+function renderBP(){
+  const d=BP.d,box=$("bpBody");if(!d){box.innerHTML=`<p class="bad">${esc(BP.msg?BP.msg.text:"Not available")}</p><div class="row"><button onclick="$('bpDlg').close()">Close</button></div>`;return}
+  const cls=d.license_class,read=d.read||[];
+  const hf=b=>b.to<=30,shown=d.bands.filter(b=>BP.band==="all"||(BP.band==="hf"&&hf(b))||(BP.band==="vu"&&!hf(b))||BP.band===b.band);
+  const pv=r=>{if(r.type==="channel")return r.privileges===true?'<span class="ok">yes</span>':r.privileges===false?'<span class="bad">no</span>':"";
+    if(!r.privileges)return"";const k=r.privileges;if(!k.phone&&!k.data&&!k.cw)return'<span class="muted">none</span>';
+    return `<span class="bppv">${[["phone","Phone"],["data","Data"],["cw","CW"]].map(([x,l])=>`<span class="${k[x]?"":"no"}">${l}</span>`).join("")}</span>`};
+  const rowOk=r=>(BP.chans||r.type!=="channel")&&(!BP.flags||r.flags.length)&&(!BP.mine||!cls||(r.type==="channel"?r.privileges===true:r.privileges&&(r.privileges.phone||r.privileges.data||r.privileges.cw)));
+  const tables=shown.map(b=>{const rows=b.rows.filter(rowOk);if(!rows.length)return"";
+    return `<div class="bpband"><h4>${esc(b.band)}</h4><span class="small muted">${bpMhz(b.from)}–${bpMhz(b.to)} MHz${b.flags?` · <span class="warnc">${b.flags} to check</span>`:""}</span></div>
+    <div class="nlistwrap"><table class="nlist bpt"><thead><tr><th>MHz</th><th>Use</th>${cls?"<th>You</th>":""}<th>Sources · notes</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.type==="channel"?"ch":""}${r.flags.length?" flag":""}">
+      <td class="f">${r.type==="channel"?`${bpMhz(r.from)}${r.mode?" "+esc(r.mode):""}${r.offset_mhz?` <span class="muted">${r.offset_mhz>0?"+":""}${r.offset_mhz}${r.tone_hz?" · "+r.tone_hz:""}</span>`:""}`:`${bpMhz(r.from)}–${bpMhz(r.to)}`}</td>
+      <td><b>${esc(r.use||"")}</b>${r.kept?' <span class="np k-ready" style="padding:0 6px">your channel</span>':""}${r.priority?` <span class="np k-tune" style="padding:0 6px">${esc(r.priority)}</span>`:""}<div class="small muted">${esc(AUTHN[r.authority]||"")}${r.by&&r.authority!=="arrl"&&r.authority!=="fcc"?": "+esc(r.by):""}</div></td>
+      ${cls?`<td class="small">${pv(r)}</td>`:""}
+      <td class="small">${r.statements.filter(x=>x.authority!=="fcc"||r.statements.length===1).slice(r.type==="channel"?1:1).map(x=>`<span class="bps muted">${esc(AUTHN[x.authority]||"")}${x.authority==="coordinator"||x.authority==="local"?" ("+esc(x.source)+")":""}: ${esc(x.use||"")}</span>`).join("")}${r.flags.map(f=>`<span class="bps warnc">⚠ ${esc(f)}</span>`).join("")}${r.source_url?`<a class="bps noprint" href="${esc(r.source_url)}" target="_blank" rel="noopener noreferrer">source</a>`:""}</td></tr>`).join("")}</tbody></table></div>`}).join("");
+  const srcs=read.length?`<details class="small noprint"${BP.srcOpen?" open":""} data-bpsrc><summary><b>Plans read (${read.length})</b>${d.unread?` · ${d.unread} saved, not read yet`:""}</summary><ul>${read.map(x=>`<li><b>${esc(x.title||"")}</b>${x.org?" · "+esc(x.org):""} · ${x.error?`<span class="warnc">could not be read: ${esc(x.error)}</span>`:`${x.segments} segments, ${x.channels} channels`}
+      · <label style="display:inline;margin:0"><select style="width:auto;min-height:0" data-bpauth="${esc(x.key)}"><option value="coordinator"${x.authority==="coordinator"?" selected":""}>State coordinator's plan</option><option value="local"${x.authority!=="coordinator"?" selected":""}>Local plan</option></select></label>
+      · <label class="chk" style="display:inline-flex;margin:0"><input type="checkbox" data-bpex="${esc(x.key)}"${x.excluded?"":" checked"}> in the table</label></li>`).join("")}</ul>${d.key?`<button class="small" data-bpread>Read the plans again</button> <span class="muted">(one xAI call per plan, a few cents each)</span>`:""}</details>`
+    :`<p class="small noprint">${d.searched_at?"No plan documents read yet.":"No local plans yet."} Nets → <button class="linkish" data-bpplans>Plans</button> finds your state coordinator's band plan and the ARES / RACES plans; they are read into this table. Until then it shows the FCC rules and the ARRL band plan.</p>`;
+  const bands=`<option value="all">All bands</option><option value="hf"${BP.band==="hf"?" selected":""}>HF</option><option value="vu"${BP.band==="vu"?" selected":""}>VHF / UHF</option>${d.bands.map(b=>`<option${BP.band===b.band?" selected":""}>${esc(b.band)}</option>`).join("")}`;
+  const nflags=d.bands.reduce((n,b)=>n+b.flags,0);
+  box.innerHTML=`<h3><a class="small noprint" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;float:right">Card (printable)</a>Band plan${d.location?` <span class="muted small">near ${esc(d.location)}</span>`:""}</h3>
+   <p class="small muted">One table from every plan: the FCC rules (what is legal${cls?` for a ${esc(cls)}`:""}), the ARRL band plan, your state coordinator's plan and the local ARES / RACES / club plans. Where plans say different things the row is marked ⚠, with each plan's words. The state coordinator's words come first, then local plans, then the ARRL's.${cls?"":' <span class="warnc">Set your license class (Settings → Station agent) to see your privileges.</span>'}</p>
+   <div class="row nfrow small noprint"><label>Show <select data-bpband>${bands}</select></label>
+     ${cls?`<label class="chk"><input type="checkbox" data-bpmine${BP.mine?" checked":""}> Only where I may transmit</label>`:""}
+     <label class="chk"><input type="checkbox" data-bpflags${BP.flags?" checked":""}> Only what to check${nflags?` (${nflags})`:""}</label>
+     <label class="chk"><input type="checkbox" data-bpchans${BP.chans?" checked":""}> Channels</label>
+     <button class="small" onclick="window.print()">Print</button></div>
+   ${BP.msg?`<p class="${BP.msg.bad?"bad":"ok"}">${esc(BP.msg.text)}</p>`:""}${srcs}${tables||'<p class="muted">Nothing matches.</p>'}
+   <p class="small muted">US rules: 47 CFR 97.301 / 97.305. Band plans are voluntary agreements; the FCC rules are the law.</p>
+   <div class="row noprint"><button onclick="$('bpDlg').close()">Close</button></div>`;
+  const sd=box.querySelector("[data-bpsrc]");if(sd)sd.ontoggle=()=>BP.srcOpen=sd.open;
+}
+$("openBandplan").onclick=bpOpen;
+document.addEventListener("change",async e=>{const t=e.target;if(!t.closest||!t.closest("#bpDlg"))return;
+  if(t.matches("[data-bpband]")){BP.band=t.value;renderBP();return}
+  if(t.matches("[data-bpmine]")){BP.mine=t.checked;renderBP();return}
+  if(t.matches("[data-bpflags]")){BP.flags=t.checked;renderBP();return}
+  if(t.matches("[data-bpchans]")){BP.chans=t.checked;renderBP();return}
+  const body=t.matches("[data-bpauth]")?{key:t.dataset.bpauth,authority:t.value}:t.matches("[data-bpex]")?{key:t.dataset.bpex,excluded:!t.checked}:null;
+  if(body){try{await post("/api/localplans/source",body);BP.d=await api("/api/bandplan/area")}catch(err){BP.msg={bad:true,text:err.message}}renderBP()}});
+document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.closest("#bpDlg"))return;
+  if(t.closest("[data-bpplans]")){$("bpDlg").close();openNetsArea({tab:"plans",radio:null});return}
+  if(t.closest("[data-bpread]")){BP.msg={bad:false,text:"Reading the plans… (up to a few minutes)"};renderBP();
+    try{await post("/api/localplans/ingest",{force:true});BP.d=await api("/api/bandplan/area");BP.msg={bad:false,text:"Plans read."}}catch(err){BP.msg={bad:true,text:err.message}}renderBP()}});
 // ----- Plans (station/localplans.py, station/bandplan.py): band plans, clubs, ARES / RACES plans -----
 const PL={d:null,bp:null,sel:new Set(),msg:null,busy:false};
 async function plansLoad(){try{const [d,bp]=await Promise.all([api("/api/localplans"),api("/api/bandplan")]);PL.d=d;PL.bp=bp}catch(e){}}
@@ -1911,7 +1968,7 @@ async function renderPlans(full){
   const newIds=new Set((d.changes||{}).new||[]),goneIds=new Set((d.changes||{}).gone||[]);
   const found=(d.frequencies||[]).filter(f=>!f.kept);
   for(const id of [...PL.sel])if(!found.some(f=>f.id===id))PL.sel.delete(id);
-  const head=`<h4>Plans</h4><p class="small muted">The band plan below is built in and works offline. Local plans come from a web search (or a file you add): nothing is used until you keep it, and every frequency links to where it was found.${d.license_class?"":' <span class="warnc">Set your license class (Settings → Station agent) to see your privileges.</span>'}</p>`;
+  const head=`<h4>Plans <a class="small" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;text-transform:none;letter-spacing:0">Card (printable)</a> <button class="linkish small" data-bpfromplans style="text-transform:none;letter-spacing:0">Open the band plan</button></h4><p class="small muted">The band plan below is built in and works offline. Local plans come from a web search (or a file you add): nothing is used until you keep it, and every frequency links to where it was found.${d.license_class?"":' <span class="warnc">Set your license class (Settings → Station agent) to see your privileges.</span>'}</p>`;
   const busy=PL.busy||d.busy;
   const search=!d.key?'<p>Searching needs the xAI key (Settings → Station agent). You can still add a plan file once the key is set, and the band plan works without it.</p>'
     :`<div class="row nfrow"><span>${d.location?`Near <b>${esc(d.location.label)}</b>`:'<span class="bad">Set the station\'s location first (Nets → Find nets).</span>'}</span>
@@ -1942,6 +1999,7 @@ async function renderPlans(full){
 document.addEventListener("click",async e=>{
   const t=e.target;if(!t.closest||!t.closest("#netsBody")||NV.tab!=="plans")return;
   const act=async(fn,ok)=>{try{PL.d=await fn();PL.msg=ok?{bad:false,text:typeof ok==="function"?ok(PL.d):ok}:null}catch(err){PL.msg={bad:true,text:err.message}}renderPlans();renderRadios()};
+  if(t.closest("[data-bpfromplans]")){bpOpen();return}
   if(t.closest("[data-plgo]")){PL.busy=true;PL.msg=null;renderPlans();await act(()=>post("/api/localplans/search",{km:$("plKm")?$("plKm").value:undefined}),d=>`${(d.frequencies||[]).filter(f=>!f.kept).length} frequencies, ${(d.documents||[]).length} plans and documents, ${(d.clubs||[]).length} clubs found.`);PL.busy=false;renderPlans();return}
   const pk=t.closest("[data-plpick]");if(pk){pk.checked?PL.sel.add(pk.dataset.plpick):PL.sel.delete(pk.dataset.plpick);renderPlans();return}
   const al=t.closest("[data-plall]");if(al){(PL.d.frequencies||[]).filter(f=>!f.kept).forEach(f=>al.checked?PL.sel.add(f.id):PL.sel.delete(f.id));renderPlans();return}

@@ -47,7 +47,7 @@ def _plans(tmp_path, answer=ANSWER, fetched=None):
     def fetch(url):
         got.append(url)
         return b"%PDF-1.4 a plan", "application/pdf"
-    return st, LP.Plans(st, post=post, fetch=fetch), sent, got
+    return st, LP.Plans(st, post=post, fetch=fetch, extract=lambda key, sys, user: {}), sent, got
 
 
 def test_a_search_proposes_and_nothing_is_kept_until_confirmed(tmp_path, xai_key):
