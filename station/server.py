@@ -298,7 +298,7 @@ def make_handler(station):
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "handoff", "takeback")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
-            alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss)", u.path)        # pre-net alert
+            alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss|unskip)", u.path)        # pre-net alert
             item = re.fullmatch(r"/api/items(?:/(\d+)(/delete)?)?", u.path)                             # minutes items
             close = re.fullmatch(r"/api/netclose/([\w-]+)/(end|undo|save_ncs)", u.path)                  # end of a net
             sec = re.fullmatch(r"/api/secrets/([A-Z_]+)(/test)?", u.path)                               # Settings: a key

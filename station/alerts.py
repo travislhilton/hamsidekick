@@ -128,17 +128,19 @@ class Alerts:
                 self.st.bus.publish("alerts", {"alerts": cur})
 
     def act(self, key: str, action: str) -> dict:
-        """An answer from a dashboard: ready | snooze | skip | dismiss."""
-        if action not in ("ready", "snooze", "skip", "dismiss"):
+        """An answer from a dashboard: ready | snooze | skip | dismiss | unskip (a radio's Nets list: listen after all)."""
+        if action not in ("ready", "snooze", "skip", "dismiss", "unskip"):
             raise ValueError("unknown answer")
         at = self.st.clock()
         with self.lock:
             a = next((x for x in self.active(at) if x["key"] == key), None)
-            if a is None and action != "skip":
+            if a is None and action not in ("skip", "unskip"):
                 raise NoSuchAlert(key)
             if action == "ready" and a and a.get("freq_mhz") and a["state"] == "due":
                 self.st.set_radio(a["radio"], a["freq_mhz"], a.get("mode"))     # logs it, like Change
-            if action == "snooze":
+            if action == "unskip":
+                self.state["skip"].pop(key, None)
+            elif action == "snooze":
                 self.state["snooze"][key] = (at + timedelta(minutes=SNOOZE_MIN)).isoformat(timespec="seconds")
             else:
                 self.state[action][key] = at.isoformat(timespec="seconds")

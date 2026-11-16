@@ -338,7 +338,9 @@ you chose is remembered. Each column shows:
   happen there (Records / You tune / Clash / Can't hear; a Winlink-only radio takes none), and on the drop you choose
   **Every time** or **Just Tue Nov 10** (that date only; the next time it is back on its own radio). **Undo** on the
   note that follows; when the radio can't hear it, the note offers to switch its antenna. Without a mouse (a phone),
-  click a net in the column: the same menu moves it every time or just that date, or opens it in Nets. Above the
+  click a net in the column: the same menu moves it every time or just that date, or opens it in Nets. The same
+  menu has **Skip today** (or Skip Mon Nov 16): that date only is not listened to, recorded or alerted, and a net on
+  the air stops at once (the radio goes to the next net); **Don't skip today** takes it back. Above the
   columns, a red line counts the nets that can't be recorded (no radio, or the radio can't hear them).
 - **HF scan** (a radio the station tunes by CAT, with its HF antenna on): **Scan Off / On / Auto** on the radio's
   card. **On** scans in the gaps between nets; **Auto** also scans while a scheduled net has been quiet for 3

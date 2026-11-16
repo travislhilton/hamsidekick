@@ -2550,10 +2550,10 @@ function renderRadioNets(r){
   const more=today.filter(x=>!shown.includes(x)).length;
   const when=w=>{const d=new Date(w.start);return d.toDateString()===td?hm12(w.start):d.toLocaleDateString([],{weekday:"short"})+" "+hm12(w.start)};
   const line=x=>{const n=x.n,w=x.w,on=isOn(x),k=w.radio===n.radio?kindOf(n):(((n.status||{}).fits||{})[r.id]||{}).kind||"ready";
-    const off=w.skipped||w.loses,cls=on?"on":all.indexOf(x)===nextI?"next":"";
-    const tip=`${n.name} · ${when(w)}–${hm12(w.end)}${w.moved_radio?" · moved to this radio for this date":""}${w.loses?" · loses a clash: not recorded":""}${w.skipped?" · skipped":""} — drag to another radio, or click to choose`;
+    const off=w.skipped||w.loses,cls=on&&!off?"on":all.indexOf(x)===nextI?"next":"";
+    const tip=`${n.name} · ${when(w)}–${hm12(w.end)}${w.moved_radio?" · moved to this radio for this date":""}${w.loses?" · loses a clash: not recorded":""}${w.skipped?" · skipped":""} — drag to another radio, or click to skip it or choose`;
     return `<button class="rn ${cls}${off?" off":""}" draggable="true" data-rn="${esc(n.id)}" data-date="${esc(w.date)}" data-from="${esc(r.id)}" title="${esc(tip)}">
-      <span class="tt">${esc(when(w))}</span><span class="nm">${esc(n.name)}</span>${w.moved_radio?'<span class="once">this date</span>':""}<span class="fq">${n.freq_mhz?Number(n.freq_mhz).toFixed(3):""}</span>${(n.heard||{}).flag&&!on?`<span class="np k-cant" title="Not heard ${n.heard.run} times in a row: open Nets to remove or keep it">not heard ${n.heard.run}×</span>`:""}${on?'<span class="np k-ready">on the air</span>':off?`<span class="np k-none">${w.loses?"not recorded":"skipped"}</span>`:k!=="ready"?`<span class="np k-${k}">${KLABEL[k]}</span>`:""}</button>`};
+      <span class="tt">${esc(when(w))}</span><span class="nm">${esc(n.name)}</span>${w.moved_radio?'<span class="once">this date</span>':""}<span class="fq">${n.freq_mhz?Number(n.freq_mhz).toFixed(3):""}</span>${(n.heard||{}).flag&&!on?`<span class="np k-cant" title="Not heard ${n.heard.run} times in a row: open Nets to remove or keep it">not heard ${n.heard.run}×</span>`:""}${off?`<span class="np k-none">${w.loses?"not recorded":"skipped"}</span>`:on?'<span class="np k-ready">on the air</span>':k!=="ready"?`<span class="np k-${k}">${KLABEL[k]}</span>`:""}</button>`};
   const tog=open?`<button data-rntog="${esc(r.id)}" aria-expanded="true">▴ Less</button>`:more?`<button data-rntog="${esc(r.id)}" aria-expanded="false">▾ ${more} more today</button>`:all.length>key.length?`<button data-rntog="${esc(r.id)}" aria-expanded="false">▾ Next 2 days</button>`:"";
   box.innerHTML=`<div class="rh"><span>Nets</span>${tog}<span class="sp"></span><button data-nets="${esc(r.id)}">This week…</button></div>
     <div class="rlist">${shown.length?shown.map(line).join(""):`<div class="none">${(S.schedule||[]).some(n=>n.radio===r.id)?"No more nets on this radio today.":"No nets on this radio. Drag one here, or add one in Nets."}</div>`}</div>`}
@@ -2613,6 +2613,12 @@ async function moveNet(n,date,from,rid,always){
   toast(`${esc(n.name)} ${always?"is now on":`on ${esc(fmtOcc(date))} is on`} <b>${esc(to)}</b>.${f.kind==="cant"?" It can't hear it yet.":""}`,acts)}
 // ----- the radio picker on a net, antenna / used-for on a card, clashes -----
 function closePick(){const m=$("rpick");if(m)m.hidden=true}
+// a radio's Nets list: skip one date of a net (not listened to, not recorded, no alert), or take the skip back
+function pickSkip(n,occ){
+  const w=(n.week||[]).find(x=>x.date===occ.date&&x.radio===occ.from)||(n.week||[]).find(x=>x.date===occ.date);if(!w||!w.key)return"";
+  const day=new Date().toDateString()===new Date(w.start).toDateString()?"today":fmtOcc(occ.date),on=new Date(w.start).getTime()<=Date.now();
+  return `<hr>`+(w.skipped?`<button class="opt" data-skipocc="${esc(w.key)}" data-v="unskip"><span>↺</span><span><b>Don't skip ${esc(day)}</b></span><span class="d">Listen to it and record it after all</span></button>`
+    :`<button class="opt" data-skipocc="${esc(w.key)}" data-v="skip"><span>⤼</span><span><b>Skip ${esc(day)}</b></span><span class="d">${on?"Stop listening to it now: ":""}not recorded, no alert; the radio goes to the next net. Other days stay as they are</span></button>`)}
 function openPick(btn,id,occ){
   const n=(S.schedule||[]).find(x=>x.id===id);if(!n)return;
   const m=$("rpick"),host=btn.closest("dialog")||document.body;if(m.parentElement!==host)host.append(m);
@@ -2620,7 +2626,7 @@ function openPick(btn,id,occ){
   m.innerHTML=`<div class="h">${esc(n.name)}${n.freq_mhz?" · "+mhz(n.freq_mhz,n.mode):""}</div>`+S.radios.map(r=>{const f=fits[r.id]||{},k=f.clash?"clash":f.kind||"ready",ok=k==="ready"||k==="tune";
     return `<button class="opt${ok?"":" no"}" role="menuitemradio" aria-checked="${n.radio===r.id}" data-assign="${esc(id)}" data-to="${esc(r.id)}"><span class="np k-${k}" style="padding:0 4px">${n.radio===r.id?"✓":"&nbsp;"}</span><span><b>${esc(r.name)}</b> <span class="np k-${k}">${KLABEL[k]}</span></span><span class="d">${esc(f.clash?`Meets ${f.clash.name} (${f.clash.start}) there`:f.why||"")}</span></button>`}).join("")
     +`<hr><button class="opt" role="menuitemradio" aria-checked="${!n.radio}" data-assign="${esc(id)}" data-to=""><span>${n.radio?"&nbsp;":"✓"}</span><span>No radio</span><span class="d">Kept in the list, not recorded</span></button>`
-    +(occ?`<hr><div class="h">Just ${esc(fmtOcc(occ.date))}: put it on</div>`+S.radios.filter(r=>r.id!==occ.from&&r.role!=="winlink").map(r=>`<button class="opt" data-once="${esc(id)}" data-date="${esc(occ.date)}" data-from="${esc(occ.from)}" data-to="${esc(r.id)}"><span>1</span><span>${esc(r.name)}</span></button>`).join("")
+    +(occ?pickSkip(n,occ)+`<hr><div class="h">Just ${esc(fmtOcc(occ.date))}: put it on</div>`+S.radios.filter(r=>r.id!==occ.from&&r.role!=="winlink").map(r=>`<button class="opt" data-once="${esc(id)}" data-date="${esc(occ.date)}" data-from="${esc(occ.from)}" data-to="${esc(r.id)}"><span>1</span><span>${esc(r.name)}</span></button>`).join("")
       +`<button class="opt" data-goto="schedule" data-net="${esc(id)}"><span>↗</span><span>Open in Nets</span></button>`:"");
   m.hidden=false;const b=btn.getBoundingClientRect(),w=m.offsetWidth,h=m.offsetHeight;
   m.style.left=Math.max(16,Math.min(b.left,innerWidth-w-16))+"px";m.style.top=(b.bottom+h+8<innerHeight?b.bottom+4:Math.max(8,b.top-h-4))+"px";
@@ -2630,8 +2636,9 @@ addEventListener("resize",closePick);
 async function netAct(fn){try{const d=await fn();if(d&&d.schedule){S.schedule=d.schedule;if(d.unheard)S.unheard=d.unheard;renderNetPick();if($("netsDlg").open&&NV.tab==="schedule")renderSchedule(true);renderRadios();renderToday()}return true}catch(err){alert(err.message);return false}}
 document.addEventListener("click",async e=>{
   const p=e.target.closest("[data-rpick]");if(p){e.preventDefault();openPick(p,p.dataset.rpick);return}
-  if(!e.target.closest("#rpick"))closePick();
+  if(!e.target.closest("#rpick")&&!e.target.closest("[data-rn]"))closePick();   // a radio's Nets row just opened it
   const a=e.target.closest("[data-assign]");if(a){closePick();netAct(()=>post(`/api/schedule/${enc(a.dataset.assign)}/radio`,{radio:a.dataset.to||null}));return}
+  const sk=e.target.closest("[data-skipocc]");if(sk){closePick();netAct(async()=>{await post(`/api/alerts/${enc(sk.dataset.skipocc)}/${sk.dataset.v}`,{});return api("/api/schedule")});return}
   const o1=e.target.closest("[data-once]");if(o1){closePick();const n=(S.schedule||[]).find(x=>x.id===o1.dataset.once);if(n)moveNet(n,o1.dataset.date,o1.dataset.from,o1.dataset.to,false);return}
   const mv=e.target.closest("[data-netmove]");if(mv){netAct(()=>post(`/api/schedule/${enc(mv.dataset.netmove)}/radio`,{radio:mv.dataset.to}));return}
   const kp=e.target.closest("[data-netkeep]");if(kp){netAct(()=>post(`/api/schedule/${enc(kp.dataset.netkeep)}/keep`,{}));return}

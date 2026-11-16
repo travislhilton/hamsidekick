@@ -226,3 +226,17 @@ def test_not_heard_move_back_and_forget_over_http(tmp_path):
         assert not _post(base, "/api/schedule/sun/forget", {})["unheard"]
     finally:
         srv.shutdown()
+
+
+def test_a_net_on_the_air_is_skipped_from_its_radio_list_and_taken_back(tmp_path):
+    """Owner 2026-11-15: skip today's net from the radio's Nets list (also while it is on), and undo it."""
+    st, clock = make(tmp_path, SUN.replace(hour=19, minute=10))
+    st.nets.tick()
+    assert st.radios["ftm"]["listen"]["now"] == "Sunday Net"
+    st.nets.alerts.act("sun@2026-11-15", "skip")
+    assert st.radios["ftm"]["listen"]["now"] is None
+    wk = next(w for w in st.nets.decorated()[0]["week"] if w["date"] == "2026-11-15")
+    assert wk["skipped"] and wk["key"] == "sun@2026-11-15"
+    st.nets.alerts.act("sun@2026-11-15", "unskip")
+    assert st.radios["ftm"]["listen"]["now"] == "Sunday Net"
+    assert not next(w for w in st.nets.decorated()[0]["week"] if w["date"] == "2026-11-15")["skipped"]

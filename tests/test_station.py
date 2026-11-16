@@ -584,3 +584,12 @@ def test_the_log_always_keeps_a_height_on_a_wide_screen():
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     block = idx.split("@media (min-width:901px) and (min-height:820px){", 1)[1].split("\n}", 1)[0]
     assert ".rcol>.logbox{flex:1;min-height:min(560px,70dvh)" in block
+
+
+def test_a_radio_nets_row_opens_its_menu_with_skip_for_that_date():
+    """Owner 2026-11-15: skip today's net from the radio's Nets list. The row's menu also closed itself at once (the
+    page's click-away handler saw a click outside the menu): a row click no longer closes it."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'if(!e.target.closest("#rpick")&&!e.target.closest("[data-rn]"))closePick();' in idx
+    assert "data-skipocc" in idx and "/api/alerts/${enc(sk.dataset.skipocc)}/${sk.dataset.v}" in idx
