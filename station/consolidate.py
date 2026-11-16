@@ -20,6 +20,7 @@ Reconciling:
 """
 from __future__ import annotations
 
+import math
 import re
 
 from . import bandplan
@@ -263,9 +264,13 @@ def _fm_points(band: str, p: dict, chans: list[float], kind: str) -> list[dict]:
     """The free FM simplex frequencies in one open stretch: channel steps from its lower edge, each at least a guard
     (15 kHz on 2 m and 1.25 m, 25 kHz on 70 cm, as in _guard) from every channel any plan names."""
     step = _fm_step(p["from"])
+    # On the band's channel grid: 2 m below 146 MHz odd 20 kHz channels (145.010, 145.510: the packet and
+    # miscellaneous-simplex convention), above it and on 1.25 m and 6 m even ones (146.420, 223.420), 70 cm 25 kHz.
+    odd = 0.01 if 144 <= p["from"] < 146 else 0.0
+    base = round(math.ceil(round((p["from"] - odd) / step, 6)) * step + odd, 4)
     pts, k = [], 0
     while True:
-        f = round(p["from"] + k * step, 4)
+        f = round(base + k * step, 4)
         k += 1
         if f > p["to"] + EPS:
             break
@@ -273,9 +278,14 @@ def _fm_points(band: str, p: dict, chans: list[float], kind: str) -> list[dict]:
             continue
         if (abs(f - p["from"]) <= EPS and not p.get("open_lo")) or (abs(f - p["to"]) <= EPS and not p.get("open_hi")):
             continue                                      # on the segment's edge: half the signal in the next one
+        if abs(f - p["to"]) <= EPS and p.get("open_hi"):
+            continue                                      # the next open stretch starts on it and lists it
         # VARA FM wide (the 9600-baud data port) spreads to about 25 kHz: it needs more room than narrow (owner
         # 2026-11-16 "consider bandwidth for WIDE and NARROW"). Voice and narrow: the guard above.
         wide = not any(abs(f - c) < WIDE_GUARD(c) - EPS for c in chans)
+        half = WIDE_GUARD(f) / 2                          # and it stays inside a stretch whose neighbour is closed
+        wide = bool(wide and (f - p["from"] >= half - EPS or p.get("open_lo"))
+                    and (p["to"] - f >= half - EPS or p.get("open_hi")))
         pts.append((f, wide))
     runs: list[list[tuple]] = []
     for f, wide in pts:                                   # neighbouring free channels make one row
@@ -293,10 +303,42 @@ def _fm_points(band: str, p: dict, chans: list[float], kind: str) -> list[dict]:
                     "auto": auto, "shared": bool(p.get("share")),
                     "note": ("shared with automatic data stations (Winlink gateways, packet): listen first, and move "
                              "off a gateway's frequency" if auto else
-                             "shared FM simplex (local option): VARA FM shares it with voice and links; listen first, "
-                             "stay off 446.000, and use your coordinator's digital simplex channels where it names them"
+                             "shared (local option / miscellaneous): no plan sets data aside here, so VARA FM shares it "
+                             "with voice, links and experiments; listen first, stay off calling channels, and use your "
+                             "coordinator's digital channels where it names them"
                              if p.get("share") else "")})
     return out
+
+
+_CLOSED = {"atv", "satellite", "weak", "repeater_in", "repeater_out", "beacon"}
+
+
+def _said(text: str | None) -> set[str]:
+    """cats() of what a plan sets a stretch aside FOR, without what it rules out ("Simplex, miscellaneous (no
+    repeater operation allowed per FCC 97.205)" is not a repeater stretch)."""
+    return cats(re.sub(r"\bno\s[^,;:)]*", " ", (text or "").lower()))
+
+
+def _shared_data(r: dict, plan: list[dict]) -> bool:
+    """A VHF/UHF FM stretch where ad hoc VARA FM may go though no plan names data there, shared with voice and links
+    (owner 2026-11-16: "70cm is actually the most probable band for local VARA FM ad-hoc traffic since 2m is so
+    crowded"; the same analysis for 2 m and 1.25 m). Data is legal on all of 2 m above 144.1, 1.25 m and 70 cm
+    (97.305(c)); the ARRL plan sets data aside only on 2 m 145.01-145.09 and 1.25 m 223.52-223.64. The stretches it
+    leaves to "local option" or to "miscellaneous and experimental" use (2 m 145.5-145.8, 1.25 m 223.71-223.85,
+    70 cm 445-447, the only 70 cm FM simplex) are shared, unless a plan there sets them aside for ATV, satellites,
+    weak signal, beacons or repeaters. FM voice simplex proper (2 m 146.40-146.58, 147.42-147.57, 1.25 m
+    223.40-223.52) stays voice, and links (ARRL "repeater links", a coordinator's links-and-control) stay closed."""
+    if not (144 <= r["from"] < 450) or not fm_at(r["from"]):
+        return False
+    arrl = " ; ".join((s["use"] or "") for s in plan if s["authority"] == "arrl").lower()
+    if not arrl or cats(arrl) & _CLOSED or "link" in cats(arrl) and "local option" not in arrl:
+        return False
+    if not (re.search(r"local option|miscellaneous|experiment", arrl) or (420 <= r["from"] and "simplex" in cats(arrl))):
+        return False
+    other = [s for s in plan if s["authority"] != "arrl"]
+    if any(_said(s["use"]) & _CLOSED or re.search(r"\bexcept\b", (s["use"] or "").lower()) for s in other):
+        return False
+    return not any(_said(s["use"]) == {"link"} for s in other)   # a coordinator's links-only stretch
 
 
 def open_ranges(table: dict, kind: str) -> list[dict]:
@@ -321,17 +363,19 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
             if r["type"] != "range" or not (r.get("privileges") or {}).get(pk):
                 continue
             plan = [s for s in r["statements"] if s["authority"] != "fcc"]
-            c = set().union(*(cats(s["use"]) for s in plan)) if plan else set()
-            if c & _NEVER:
-                continue
-            share = False
-            if kind == "data" and ((plan and "data" not in c) or (hf and "weak" in c)):
-                # 70 cm: the ARRL plan sets no data segment at all, and data is legal on all of 420-450 (97.305(c)).
-                # Its FM simplex (445-447, local option) is where ad hoc VARA FM goes, shared with voice (owner
-                # 2026-11-16: "70cm is actually the most probable band for local VARA FM ad-hoc traffic")
-                if not (420 <= r["from"] < 450 and "simplex" in c and "atv" not in c and not c & _NEVER):
-                    continue                              # VARA: where a plan sets data aside, or no plan names a use
-                share = True                              # (owner 2026-11-16: "unplanned" for VARA too); never HF CW
+            # The area's frequency coordinator speaks for its own area (the ARRL plan defers to local plans): where
+            # its band plan covers a stretch, the ARRL's words there are shown but no longer decide (a coordinator
+            # "digital / packet" stretch inside ARRL "ATV simplex" is data; its "links" inside ARRL simplex is links).
+            rule = [s for s in plan if s["authority"] != "arrl"] if any(
+                s["authority"] == "coordinator" for s in plan) else plan
+            c = set().union(*(cats(s["use"]) for s in rule)) if rule else set()
+            regional = any(re.search(r"\bexcept\b", (s["use"] or "").lower()) for s in rule)
+            share = kind == "data" and _shared_data(r, plan)
+            if not share and (c & _NEVER or regional):
+                continue                                  # "... except <area>": the station cannot tell; not offered
+            if kind == "data" and not share and ((rule and "data" not in c) or (hf and "weak" in c)):
+                continue                                  # VARA: where a plan sets data aside, or no plan names a use
+                                                          # (owner 2026-11-16: "unplanned" for VARA too); never HF CW
             cw_only = any(re.search(r"\bcw\b", (s["use"] or "").lower())
                           and not re.search(r"ssb|phone|voice|sideband", (s["use"] or "").lower()) for s in plan)
             if kind == "voice" and (c & _AVOID["voice"] or (not hf and "weak" in c) or cw_only):
@@ -384,4 +428,20 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
                             "uses": p["uses"], "mode": mode, "auto": auto,
                             "note": ("shared with automatic data stations (Winlink gateways, packet): listen first, and "
                                      "move off a gateway's frequency" if auto else "")})
+    return _join(out)
+
+
+def _join(rows: list[dict]) -> list[dict]:
+    """Neighbouring channel rows that differ only in which plans' words cover them (two plans' segment edges fall
+    on different channels) make one row."""
+    out: list[dict] = []
+    same = ("band", "channel", "step", "mode", "wide", "auto", "shared", "unplanned")
+    for r in rows:
+        q = out[-1] if out else None
+        if (q and r.get("channel") and all(q.get(k) == r.get(k) for k in same)
+                and abs(q["to"] + q["step"] - r["from"]) <= EPS):
+            q["to"], q["count"] = r["to"], q["count"] + r["count"]
+            q["uses"] = q["uses"] + [u for u in r["uses"] if u not in q["uses"]]
+            continue
+        out.append(dict(r))
     return out

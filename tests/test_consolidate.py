@@ -292,3 +292,69 @@ def test_seventy_cm_simplex_is_open_to_vara_fm(tmp_path):
     assert any(x["wide"] for x in d) and not next(x for x in d if x["from"] == 445.975)["wide"]   # beside 446.000
     two = [x for x in C.open_ranges(t, "data") if x["band"] == "2 m"]
     assert not any(146.4 <= x["from"] <= 146.58 for x in two)          # 2 m voice simplex stays voice
+
+
+def _pts(rows, band):
+    return [round(x["from"] + i * x["step"], 3) for x in rows if x["band"] == band and x.get("channel")
+            for i in range(x["count"])]
+
+
+def test_two_m_and_one_25_vara_fm(tmp_path):
+    """Owner 2026-11-16: "do the same analysis for 2m and 1.25m VARA FM". ARRL: data set aside on 2 m 145.01-145.09
+    and 1.25 m 223.52-223.64; "miscellaneous and experimental" (2 m 145.5-145.8) and "local option" (1.25 m
+    223.71-223.85) are shared; FM voice simplex stays voice; links, satellites, weak signal, repeaters never."""
+    t = C.build("technician", [])
+    d = C.open_ranges(t, "data")
+    two, one = _pts(d, "2 m"), _pts(d, "1.25 m")
+    assert {145.03, 145.05, 145.07} <= set(two) and 145.51 in two and 145.79 in two
+    assert all(round(f * 100) % 2 == 1 for f in two)                   # odd 20 kHz channels below 146
+    assert not any(146 <= f for f in two) and not any(145.8 <= f < 146 or 145.1 <= f < 145.5 for f in two)
+    assert {223.54, 223.62, 223.72, 223.84} <= set(one) and not any(223.4 <= f < 223.52 or 223.64 <= f < 223.71
+                                                                     or f < 223.4 for f in one)
+    shared = {x["from"]: x["shared"] for x in d if x.get("channel")}
+    assert shared[145.03] is False and shared[223.54] is False and shared[145.53] and shared[223.74]
+    w = {round(x["from"] + i * x["step"], 3): x["wide"] for x in d if x.get("channel") for i in range(x["count"])}
+    assert w[145.51] is False and w[145.53] and w[223.84] is False   # 10 kHz from a closed edge: narrow only
+    assert len(two) == len(set(two))
+
+
+COORD_FM = {"id": "co", "name": "Coordinator VHF/UHF plan", "authority": "coordinator", "frequencies": [], "segments": [
+    {"from_mhz": 144.9, "to_mhz": 145.2, "use": "Simplex/duplex packet operation"},
+    {"from_mhz": 145.1, "to_mhz": 145.5, "use": "FM repeater outputs"},
+    {"from_mhz": 145.5, "to_mhz": 145.8, "use": "Simplex, miscellaneous/experimental (no repeater operation allowed)"},
+    {"from_mhz": 146.42, "to_mhz": 146.6, "use": "FM simplex"},
+    {"from_mhz": 431.0, "to_mhz": 432.0, "use": "Digital/packet operation (9600+ baud)"},
+    {"from_mhz": 438.0, "to_mhz": 441.0, "use": "Links, control and local simplex usage"},
+    {"from_mhz": 440.05, "to_mhz": 441.05, "use": "Misc. digital/packet (except the northern area)"},
+    {"from_mhz": 445.0, "to_mhz": 447.0, "use": "Simplex, links and control"}]}
+
+
+def test_a_coordinator_plan_decides_its_area(tmp_path):
+    """Where the area's frequency coordinator's band plan covers a stretch, its words decide (the ARRL plan defers
+    to local plans): its digital stretch inside ARRL ATV simplex is VARA FM; its links are not; "no repeater" is not
+    a repeater stretch; "except <area>" is not offered (the station cannot tell); channels never repeat."""
+    t = C.build("technician", [COORD_FM])
+    d = C.open_ranges(t, "data")
+    two, cm = _pts(d, "2 m"), _pts(d, "70 cm")
+    assert 144.91 in two and 145.09 in two and 145.53 in two and not any(145.1 < f < 145.5 for f in two)
+    assert 431.025 in cm and 431.975 in cm and not any(438 <= f <= 441.05 for f in cm)   # links; "except"
+    assert 445.5 in cm                                                 # "Simplex, links and control" shared
+    assert len(cm) == len(set(cm)) and len(two) == len(set(two))
+    v = _pts(C.open_ranges(t, "voice"), "2 m")
+    assert 146.58 in v and len(v) == len(set(v)) and all(round(f * 100) % 2 == 0 for f in v)
+
+
+def test_the_plan_reader_asks_for_segments(tmp_path, monkeypatch):
+    """A structured answer holds only what the schema names: without "segments" a state band plan read as 0
+    segments (2026-11-16)."""
+    from station import agent, localplans
+    seen = {}
+
+    def fake(key, model, system, user, timeout=0, schema=None, max_tokens=0, name=""):
+        seen.update(schema)
+        return {"segments": [], "frequencies": []}, {}
+    monkeypatch.setattr(agent, "call_xai", fake)
+    p = localplans.Plans.__new__(localplans.Plans)
+    p.extract = None
+    p._call_extract("k", "s", "u")
+    assert "segments" in seen["properties"] and "segments" in seen["required"]

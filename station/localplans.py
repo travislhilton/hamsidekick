@@ -871,10 +871,14 @@ class Plans:
         if self.extract:
             return self.extract(key, system, user)
         from . import agent
-        schema = {"type": "object", "properties": {"frequencies": {"type": "array", "items": {"type": "object"}}},
-                  "required": ["frequencies"], "additionalProperties": True}
+        seg = {"type": "object", "properties": {"from_mhz": {"type": "number"}, "to_mhz": {"type": "number"},
+                                                "use": {"type": "string"}}, "required": ["from_mhz", "to_mhz", "use"]}
+        schema = {"type": "object",           # the segments must be in the schema, or a structured answer leaves them
+                  "properties": {"segments": {"type": "array", "items": seg},     # out (a state band plan read as 0
+                                 "frequencies": {"type": "array", "items": {"type": "object"}}},   # segments, 11-16)
+                  "required": ["segments", "frequencies"], "additionalProperties": True}
         try:
-            out, _ = agent.call_xai(key, MODEL, system, user, timeout=180, schema=schema, max_tokens=8000,
+            out, _ = agent.call_xai(key, MODEL, system, user, timeout=180, schema=schema, max_tokens=16000,
                                     name="local_plans")
         except Exception as e:  # noqa: BLE001
             raise ValueError(f"reading the file failed ({getattr(e, 'code', None) or type(e).__name__})") from e
