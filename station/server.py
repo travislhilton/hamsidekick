@@ -228,7 +228,7 @@ def make_handler(station):
                 data, ctype, name = _plans(station).adhoc_export("csv" if u.path.endswith(".csv") else "json")
                 return self._send(200, data, ctype, {"Content-Disposition": f'attachment; filename="{name}"'})
             if u.path == "/api/adhoc":
-                return self._json({"adhoc": _plans(station).adhoc()})
+                return self._json({"adhoc": _plans(station).adhoc(), "suggest": _plans(station).adhoc_suggest()})
             if u.path == "/api/bandplan/area":                   # the consolidated band plan (consolidate.py)
                 return self._json(_plans(station).consolidated())
             if u.path == "/api/bandplan":                        # the built-in band plan (bandplan.py)

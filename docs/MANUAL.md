@@ -345,8 +345,11 @@ ARES or club plan that names digital simplex channels in Plans and they are offe
 
 **Your reserved ad hoc channels** (owner 2026-11-16). In **Ad hoc VARA** and **Ad hoc voice** every VHF/UHF FM range
 is split into its channels: click **☆ 445.525** to reserve it (VARA FM narrow or wide as the channel allows; FM voice
-in Ad hoc voice), again to release it. **★ My ad hoc … channels** at the top lists them: give each a name (e.g. "VARA
-1", "Tac 1"), change a VARA channel's width, **Use** it on a VARA radio. In the band plan, the full spectrum and the
+in Ad hoc voice), again to release it. **★ My ad hoc … channels** at the top lists them: each gets a name when you reserve it
+(suggested VARA1, VARA2 … / TAC1, TAC2 …): **up to 6 characters, A–Z 0–9 space . / -**, upper case, so it fits a
+channel name on the radios with the shortest displays when programmed with CHIRP (CHIRP's drivers: Baofeng WP970I /
+UV-82III 6, UV-5R / BF-F8HP / UV-82 / UV-5X3 7 upper case, UV-5RM / UV-17 Pro 12, Yaesu FT-60 6; BF-888S and UV-3R
+show no names); rename it there, change a VARA channel's width, **Use** it on a VARA radio. In the band plan, the full spectrum and the
 printout a reserved channel is a **★ my ad hoc** row (purple). It stays on the ad hoc list (marked ★) instead of being
 cut out, a voice reservation is not offered to VARA, and one the plans no longer leave open (a plan read later, a new
 gateway, or another operator's set on a station with different privileges) is marked ⚠ with why.

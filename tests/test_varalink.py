@@ -260,7 +260,7 @@ def test_ad_hoc_channels_go_over_vara_and_install_with_one_click(tmp_path):
         with pytest.raises(urllib.error.HTTPError):                     # nothing reserved yet
             _post(base, "/api/vara/adhoc", {})
         _post(base, "/api/adhoc", {"add": {"freq_mhz": 445.525, "kind": "data", "width": "wide", "name": "VARA 1"}})
-        _post(base, "/api/adhoc", {"add": {"freq_mhz": 446.525, "kind": "voice", "name": "Tac 1"}})
+        _post(base, "/api/adhoc", {"add": {"freq_mhz": 446.525, "kind": "voice", "name": "tac 1"}})
         _post(base, "/api/vara/adhoc", {})
         what, name, data = FakeVara.made[-1].calls[-1]
         assert what == "file" and name.endswith(varalink.ADHOC_SUFFIX)
@@ -280,7 +280,7 @@ def test_ad_hoc_channels_go_over_vara_and_install_with_one_click(tmp_path):
         assert r["report"]["added"] == 2
         with urllib.request.urlopen(base + "/api/adhoc") as h:
             assert {(a["freq_mhz"], a["name"]) for a in json.loads(h.read())["adhoc"]} == {(445.525, "VARA 1"),
-                                                                                       (446.525, "Tac 1")}
+                                                                                       (446.525, "TAC 1")}
         with pytest.raises(urllib.error.HTTPError):
             _post(base, "/api/adhoc/install", {"name": "20261116-1201-K7ABC-bad.hsadhoc"})
         with pytest.raises(urllib.error.HTTPError):

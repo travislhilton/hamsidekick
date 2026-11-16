@@ -15,14 +15,34 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 import time
 
 from . import bandplan
 from .consolidate import EPS, fm_at
 
 FORMAT = "hamsidekick-adhoc-channels"
+# A channel's name fits the shortest radio display that shows names (owner 2026-11-16: "restricted to short so that
+# when exported as a CHIRP file the name will fit"). CHIRP's drivers: Baofeng UV-5R / BF-F8HP / UV-82 / UV-5X3 7
+# characters, upper case (uv5r.py UV5R_CHARSET); Baofeng WP970I / UV-82III / UV-9R Pro 6 (baofeng_wp970i.py); UV-5RM /
+# UV-17 Pro 12; Yaesu FT-60 6; BF-888S / UV-3R none. So 6, from what every one of them accepts.
+NAME_MAX = 6
+NAME_CHARS = "A-Z0-9 ./-"
 KINDS = ("data", "voice")
 MAX = 200
+
+
+def short_name(text) -> str:
+    """A name a 6-character radio display shows as typed: upper case, letters, digits, space . / - only."""
+    t = re.sub(f"[^{NAME_CHARS}]", "", str(text or "").upper())
+    return " ".join(t.split())[:NAME_MAX].strip()
+
+
+def suggest(rows: list[dict], kind: str) -> str:
+    """The next free default name: VARA1, VARA2 ... for VARA FM, TAC1, TAC2 ... for voice."""
+    base = "VARA" if kind == "data" else "TAC"
+    used = {r.get("name") for r in rows}
+    return next(f"{base}{i}" for i in range(1, 1000) if f"{base}{i}" not in used)
 
 
 def clean(raw: dict) -> dict:
@@ -39,7 +59,7 @@ def clean(raw: dict) -> dict:
     if not bandplan.band(f) or not fm_at(f) or f < 144.1:          # 144.0-144.1 is CW only (97.305)
         raise ValueError(f"{f:g} MHz: ad hoc channels are VHF / UHF FM channels (2 m, 1.25 m, 70 cm)")
     width = raw.get("width") if raw.get("width") in ("narrow", "wide") else "narrow"
-    name = " ".join(str(raw.get("name") or "").split())[:40]
+    name = short_name(raw.get("name"))
     return {"freq_mhz": f, "kind": kind, "width": width if kind == "data" else None, "name": name,
             "at": float(raw.get("at") or time.time())}
 
@@ -64,6 +84,8 @@ def apply(rows: list[dict], body: dict) -> list[dict]:
             raise ValueError(f"{r['freq_mhz']:g} is reserved already")
         if len(rows) >= MAX:
             raise ValueError(f"at most {MAX} reserved channels")
+        if not r["name"]:
+            r["name"] = suggest(rows, r["kind"])
         rows.append(r)
     for k in ("remove", "rename", "width"):
         if k in body:
@@ -74,7 +96,7 @@ def apply(rows: list[dict], body: dict) -> list[dict]:
             if k == "remove":
                 rows = [x for x in rows if not same(x, want)]
             elif k == "rename":
-                hit[0]["name"] = " ".join(str(body[k].get("name") or "").split())[:40]
+                hit[0]["name"] = short_name(body[k].get("name"))
             elif want["kind"] == "data":
                 hit[0]["width"] = want["width"]
     if body.get("clear") in KINDS:
@@ -124,7 +146,7 @@ def chirp_csv(rows: list[dict]) -> str:
     w = csv.writer(buf, lineterminator="\r\n")
     w.writerow(cols)
     for i, r in enumerate(sorted(rows, key=lambda x: (x["kind"] != "voice", x["freq_mhz"]))):
-        short = (r.get("name") or (("V" if r["kind"] == "data" else "F") + f"{r['freq_mhz']:.3f}"))[:8]   # V145.530
+        short = r.get("name") or f"{r['freq_mhz']:.2f}"[:NAME_MAX]
         w.writerow([i, short, f"{r['freq_mhz']:.6f}", "", "0.000000", "", "88.5", "88.5", "023", "NN", "FM",
                     "5.00" if r["freq_mhz"] < 400 else "25.00", "", label(r), "", "", "", ""])
     return buf.getvalue()

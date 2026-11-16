@@ -826,6 +826,11 @@ class Plans:
             out.append(dict(r, open=bool(x), ok=not why, why=why, band=bandplan.band(r["freq_mhz"])))
         return out
 
+    def adhoc_suggest(self) -> dict:
+        from . import adhoc
+        rows = self.adhoc()
+        return {k: adhoc.suggest(rows, k) for k in adhoc.KINDS} | {"max": adhoc.NAME_MAX}
+
     def adhoc(self) -> list[dict]:
         return list(_load(self.st).get("adhoc") or [])
 
