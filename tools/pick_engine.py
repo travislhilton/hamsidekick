@@ -7,6 +7,10 @@ Choice: FINAL = fastest engine running large-v3-turbo at <= 0.6x real time (accu
 home server in testing); else small.en. PARTIAL (words while someone is still talking) = base.en if
 it runs at <= 0.15x real time, else none. Writes config/engine.yaml.
 
+No OpenVINO or NVIDIA engine runs (owner 2026-11-16: Windows 11 on ARM in a VM on Apple silicon,
+where the x64 OpenVINO crashes with an access violation): faster-whisper on the CPU (int8) is measured instead,
+small.en for the final text (0.43x real time there) and base.en for partials. On Windows on ARM OpenVINO is not tried.
+
     python tools/pick_engine.py [--models DIR] [--quick]
 """
 import argparse, json, os, shutil, subprocess, sys, time
@@ -42,6 +46,24 @@ def cuda_runner(model: str):
     return lambda a: " ".join(s.text for s in m.transcribe(a, language="en", beam_size=1, initial_prompt=PROMPT)[0])
 
 
+def cpu_runner(model: str):
+    from faster_whisper import WhisperModel
+    m = WhisperModel(model, device="cpu", compute_type="int8")
+    return lambda a: " ".join(s.text for s in m.transcribe(a, language="en", beam_size=1, initial_prompt=PROMPT)[0])
+
+
+def windows_arm() -> bool:
+    """Windows on ARM (x64 Python runs emulated there): the x64 OpenVINO crashes, so it is not tried."""
+    import platform
+    return any(str(x).upper() == "ARM64" for x in (platform.machine(), os.environ.get("PROCESSOR_ARCHITECTURE"),
+                                                   os.environ.get("PROCESSOR_ARCHITEW6432")))
+
+
+def cpu_fallback() -> list[dict]:
+    return [{"engine": "faster-whisper", "device": "cpu", "model": m, "role": role,
+             "make": (lambda n=m: cpu_runner(n))} for m, role in (("small.en", "final"), ("base.en", "partial"))]
+
+
 def has_nvidia() -> bool:
     exe = shutil.which("nvidia-smi")
     return bool(exe) and subprocess.run([exe, "-L"], capture_output=True).returncode == 0
@@ -58,7 +80,7 @@ def openvino_devices() -> list[str]:
 
 def candidates(models: Path):
     out = []
-    devs = openvino_devices()
+    devs = [] if windows_arm() else openvino_devices()
     for name, role in (("whisper-large-v3-turbo-int8-ov", "final"), ("whisper-small.en-int8-ov", "final"),
                        ("whisper-base.en-int8-ov", "partial")):
         if (models / name).exists():
@@ -110,6 +132,14 @@ def _measure_all(a, audio):
             r = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
         row = {k: c[k] for k in ("engine", "device", "model", "role")} | r
         results.append(row); print(json.dumps(row), flush=True)
+    if not any("rtf" in r and r["role"] == "final" for r in results):
+        for c in cpu_fallback():                 # nothing else runs here: faster-whisper on the CPU
+            try:
+                r = measure(c, audio)
+            except Exception as e:  # noqa: BLE001
+                r = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
+            row = {k: c[k] for k in ("engine", "device", "model", "role")} | r
+            results.append(row); print(json.dumps(row), flush=True)
     ok = [r for r in results if "rtf" in r]
     turbo = [r for r in ok if "turbo" in r["model"] and r["rtf"] <= 0.6]
     small = [r for r in ok if "small" in r["model"]]

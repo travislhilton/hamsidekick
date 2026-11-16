@@ -322,7 +322,7 @@ The station can read an EOC's situation report on a voice net — from the compa
 
 | Requirement | Notes |
 |---|---|
-| **Windows 10 or 11, 64-bit** | The station PC. About 8 GB free; a laptop works (keep it plugged in) |
+| **Windows 10 or 11, 64-bit** | The station PC. About 8 GB free; a laptop works (keep it plugged in). Windows 11 on ARM (e.g. a VM on an Apple silicon Mac) works too: OpenVINO does not run there, so the installer picks faster-whisper on the CPU (small.en, about 0.4x real time in a VM; no words while someone is still talking) |
 | **A sound input per radio** | A USB sound card or interface (Digirig, SignaLink, a data-jack cable) — never the one VARA or Winlink uses. An IC-705 on Wi-Fi uses Icom Remote Utility's virtual sound input |
 | **Internet, the first time** | About 4 GB for the install. Afterwards the station works with none |
 | **Winlink Express** | Only to send the net's messages by Winlink · [winlink.org](https://winlink.org) |
