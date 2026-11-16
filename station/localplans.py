@@ -347,9 +347,13 @@ class Plans:
             days = int((now - at) // 86400) if at else None
             kinds.append({"kind": kind, "label": label, "at": at, "days": days, "missing": at is None,
                           "stale": at is None or days > LIST_STALE_DAYS})
-        snooze = float(_load(self.st).get("list_snooze") or 0)
+        d = _load(self.st)
+        remind = {"vhf": True, "hf": True} | (d.get("list_remind") or {})   # owner 11-16: optional per list ("an
+        for k in kinds:                                                       # operator may not be using Winlink or
+            k["remind"] = bool(remind.get(k["kind"]))                         # VARA FM at all")
+        snooze = float(d.get("list_snooze") or 0)
         return {"kinds": kinds, "stale_days": LIST_STALE_DAYS, "snoozed": snooze > now,
-                "ask": any(k["stale"] for k in kinds) and snooze <= now}
+                "ask": any(k["stale"] and k["remind"] for k in kinds) and snooze <= now}
 
     def state(self) -> dict:
         self.express_gateways()
@@ -436,6 +440,13 @@ class Plans:
     def settings(self, body: dict) -> dict:
         with self.lock:
             d = _load(self.st)
+            if isinstance(body.get("list_remind"), dict):  # {"vhf": bool, "hf": bool}: remind about that list or not
+                lr = {"vhf": True, "hf": True} | (d.get("list_remind") or {})
+                for k, v in body["list_remind"].items():
+                    if k not in ("vhf", "hf"):
+                        raise ValueError("the lists are vhf (VARA FM) and hf (VARA HF)")
+                    lr[k] = bool(v)
+                d["list_remind"] = lr
             if body.get("list_snooze"):                  # "Remind me in a week" on the update-the-list note
                 d["list_snooze"] = time.time() + LIST_SNOOZE_S
             if "hf_km" in body:

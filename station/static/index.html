@@ -649,6 +649,8 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
     <div class="srow"><label class="sl" for="setWlAcc">Send as</label><div class="sc">
       <select id="setWlAcc" name="winlink_account"></select>
       <div class="sh">The callsign account in that folder whose Outbox gets the messages.</div></div></div>
+    <h4 class="sec">Winlink gateway lists <span class="stag">saved at once</span></h4>
+    <div id="wlListSet" class="small"></div>
   </section>
 
   <section class="spanel" data-spanel="ai" role="tabpanel" aria-label="Sidekick and AI" hidden>
@@ -1657,7 +1659,7 @@ async function openSettings(tab){
   $("wlNone").textContent=(op.installs||[]).length?"":"No Winlink Express found on this PC (looked in C:\\RMS Express and the installed-programs list).";
   fillAccounts(f);setClearErrs();SETWAS={};Object.keys(SETF).forEach(k=>SETWAS[k]=setVal(f,k));setDirty();
   let t=tab;if(!t)try{t=localStorage.getItem("hamsidekick.setTab")}catch(e){}setTab(t||"station");
-  loadPC();renderAlertSettings();renderLearned();renderKeys();loadCost();loadAgent().then(renderAgentSet);loadLocalNames();renderShare();loadVoice();loadGrok();
+  loadPC();renderAlertSettings();renderLearned();renderKeys();loadCost();loadAgent().then(renderAgentSet);loadLocalNames();renderShare();loadVoice();loadGrok();renderWlListSet();
   if(!$("settings").open)$("settings").showModal();
 }
 $("openSettings").onclick=()=>openSettings();
@@ -2148,10 +2150,16 @@ function bpTuned(){return (S.radios||[]).filter(r=>r.freq_mhz).map(r=>{const m=v
 function bpChanHit(r,t){const tol=r.from<30?0.001:0.0025;return Math.abs(t.f-r.from)<=tol}
 function bpRangeHit(x,t){return t.f>=x.from-1e-6&&t.f<=x.to+1e-6}
 // Ask for a fresh Winlink Express channel list (owner 2026-11-16): none yet, or older than 10 days
-function wlListNote(n){if(!n||!n.ask)return"";const bad=n.kinds.filter(k=>k.stale);
+async function renderWlListSet(){const box=$("wlListSet");if(!box)return;let n=null;try{n=(await api("/api/localplans")).winlink_list}catch(e){}
+  if(!n){box.innerHTML='<p class="shint">Winlink Express is not on this PC: nothing to remind you about.</p>';return}
+  box.innerHTML=`<p class="shint">The band plan takes the Winlink gateways near you from Winlink Express's channel lists. Tick the lists you use: the station reminds you when one is over ${n.stale_days} days old or was never downloaded. Not using VARA FM, VARA HF or Winlink at all? Untick it: nothing is asked.</p>`
+   +n.kinds.map(k=>`<label class="chk"><input type="checkbox" data-wlremind="${k.kind}"${k.remind?" checked":""}> Remind me to update the <b>${esc(k.label)}</b> list <span class="muted">(${k.missing?"never downloaded":k.days+" days old"})</span></label>`).join("<br>")}
+document.addEventListener("change",async e=>{const t=e.target;if(!t.dataset||!t.dataset.wlremind)return;
+  try{await post("/api/localplans/settings",{list_remind:{[t.dataset.wlremind]:t.checked}});if($("bpDlg").open){BP.d=await api("/api/bandplan/area");renderBP()}await plansLoad();if(NV.tab==="plans"&&$("netsDlg").open)renderPlans()}catch(err){}});
+function wlListNote(n){if(!n||!n.ask)return"";const bad=n.kinds.filter(k=>k.stale&&k.remind);if(!bad.length)return"";
   return `<div class="note warnbox noprint" role="status"><b>Please update Winlink Express's RMS channel list</b> so the band plan knows the Winlink gateways near you: ${bad.map(k=>`<b>${esc(k.label)}</b> ${k.missing?"has never been downloaded":`is ${k.days} days old`}`).join(" and ")}.
    <div class="small">In Winlink Express: <b>Open Session</b> → ${bad.map(k=>`<b>${k.kind==="vhf"?"VARA FM Winlink":"VARA HF Winlink"}</b>`).join(" (then again for ")}${bad.length>1?")":""} → <b>Channel Selection</b> → <b>Update Table Via Internet</b> (service codes <b>PUBLIC EMCOMM</b>). The station reads the new list by itself.</div>
-   <button class="small quiet" data-wlsnooze>Remind me in a week</button></div>`}
+   <button class="small quiet" data-wlsnooze>Remind me in a week</button> ${bad.map(k=>`<button class="small quiet" data-wloff="${k.kind}" title="Stop asking about this list (Settings → Winlink turns it back on)">I don't use ${k.kind==="vhf"?"VARA FM":"VARA HF"} Winlink</button>`).join(" ")}</div>`}
 function bpOpenF(x){return x.channel?(x.count>1?`${bpMhz(x.from)}–${bpMhz(x.to)}`:bpMhz(x.from)):`${bpMhz(x.from)}–${bpMhz(x.to)}`}
 function bpOpenW(x){return (x.mode==="VARA FM"?(x.wide?"narrow &amp; wide · ":"narrow only · "):"")+(x.channel?(x.count>1?`every ${Math.round(x.step*1000)} kHz · ${x.count} channels`:"simplex channel"):`${Math.round((x.to-x.from)*1000)} kHz`)}
 function bpTag(t,here){return `<span class="np k-tune bptag" title="${esc(t.name)} is tuned to ${bpMhz(t.f)} MHz ${esc(t.mode)} now${t.vara?" · "+esc(t.vara):""}">📻 ${esc(t.name)}${here?"":" · "+bpMhz(t.f)}${t.vara?" · "+esc(t.vara):""}</span>`}
@@ -2224,8 +2232,8 @@ document.addEventListener("change",async e=>{const t=e.target;if(!t.closest||!t.
   if(t.matches("[data-bpchans]")){BP.chans=t.checked;renderBP();return}
   const body=t.matches("[data-bpauth]")?{key:t.dataset.bpauth,authority:t.value}:t.matches("[data-bpex]")?{key:t.dataset.bpex,excluded:!t.checked}:null;
   if(body){try{await post("/api/localplans/source",body);BP.d=await api("/api/bandplan/area")}catch(err){BP.msg={bad:true,text:err.message}}renderBP()}});
-document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.closest("[data-wlsnooze]"))return;
-  try{await post("/api/localplans/settings",{list_snooze:true});if($("bpDlg").open){BP.d=await api("/api/bandplan/area");renderBP()}await plansLoad();if(NV.tab==="plans"&&$("netsDlg").open)renderPlans()}catch(err){}});
+document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.closest("[data-wlsnooze],[data-wloff]"))return;const off=t.closest("[data-wloff]");
+  try{await post("/api/localplans/settings",off?{list_remind:{[off.dataset.wloff]:false}}:{list_snooze:true});if($("bpDlg").open){BP.d=await api("/api/bandplan/area");renderBP()}await plansLoad();if(NV.tab==="plans"&&$("netsDlg").open)renderPlans()}catch(err){}});
 document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.closest("#bpDlg"))return;
   const bv=t.closest("[data-bpview]");if(bv){BP.view=bv.dataset.bpview;renderBP();return}
   const go=t.closest("[data-bpgo]");if(go){const id=go.dataset.bpgo;let row=[...$("bpBody").querySelectorAll("[data-bptuned]")].find(x=>x.dataset.bptuned.split(" ").includes(id));

@@ -360,7 +360,8 @@ you chose is remembered. Each column shows:
   list from Express, a new distance or a new station place rebuilds them; costs nothing (no search, no xAI).
   When Express is on this PC but a list has **never been downloaded** (a new Express) or is **more than 10 days old**,
   the Plans tab and the band plan ask you to update it (which list, how old, and where in Express); **Remind me in a
-  week** hides the note for 7 days. Update the list in Express **whenever you like**: the station checks it every
+  week** hides the note for 7 days. Each list's reminder is **optional** (not using VARA FM, VARA HF or Winlink at
+  all): **I don't use VARA HF Winlink** on the note, or **Settings → Winlink → Winlink gateway lists**, turns it off or on. Update the list in Express **whenever you like**: the station checks it every
   minute and an open band plan or Plans tab refreshes by itself.
 - **"Niner" for 9** (owner 2026-11-16): whenever the station says a digit on its own (a call phonetically, "Whiskey
   Niner…"; a frequency's digits, "point niner four"; a clock time, "zero niner zero five"; a signal report, "five

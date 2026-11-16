@@ -125,3 +125,31 @@ def test_a_new_list_from_express_is_picked_up_by_itself(tmp_path, monkeypatch):
     assert told and told[0] == ("localplans", {"gateways": True})
     calls = {g["gateway"]["call"] for g in {x["key"]: x for x in p.state()["gateways"]}["express:vhf"]["list"]}
     assert "N0CALL-10" in calls
+
+
+def test_each_list_reminder_is_optional(tmp_path, monkeypatch):
+    """Owner 2026-11-16: "make the VARA HF and VARA FM Winlink channel selection updates optional. An operator may not
+    be using Winlink or VARA FM at all"."""
+    import os
+    import time
+    import pytest
+    inst = _express(tmp_path)
+    st, p, _, _ = _plans(tmp_path)
+    st.where = lambda: HERE
+    monkeypatch.setattr(p, "_installs", lambda: [str(inst)])
+    old = time.time() - 40 * 86400
+    for f in inst.glob("*/Data/*.dat"):
+        os.utime(f, (old, old))
+    assert p.state()["winlink_list"]["ask"]                                # both old, both reminded by default
+    p.settings({"list_remind": {"hf": False}})
+    n = p.state()["winlink_list"]
+    assert n["ask"] and {k["kind"]: k["remind"] for k in n["kinds"]} == {"vhf": True, "hf": False}
+    p.settings({"list_remind": {"vhf": False}})                             # not using Winlink at all
+    assert p.state()["winlink_list"]["ask"] is False
+    p.settings({"list_remind": {"hf": True}})                               # Settings → Winlink turns it back on
+    assert p.consolidated()["winlink_list"]["ask"]
+    with pytest.raises(ValueError):
+        p.settings({"list_remind": {"uhf": True}})
+    from station.server import STATIC
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'id="wlListSet"' in html and "data-wlremind" in html and "data-wloff" in html
