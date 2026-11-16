@@ -575,3 +575,12 @@ def test_end_button_names_a_conversation_outside_a_net():
     assert 'const w=isNet?"net":"conversation"' in idx and "End ${w}</button>" in idx and "End the ${w} now?" in idx
     assert idx.count("endAsk(rid,key,!!sn)") == 1 and idx.count("endAsk(r.id,key,!!sn)") == 1     # both End buttons
     assert '${c.scheduled?"Net ended":"Ended"} by you' in idx
+
+
+def test_the_log_always_keeps_a_height_on_a_wide_screen():
+    """A busy evening on an iPad in landscape: the radio card and its alerts took the whole column and the log got
+    0 px (2026-11-15). In the full-height layout the log keeps a minimum and the column scrolls instead."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    block = idx.split("@media (min-width:901px) and (min-height:820px){", 1)[1].split("\n}", 1)[0]
+    assert ".rcol>.logbox{flex:1;min-height:min(560px,70dvh)" in block

@@ -48,7 +48,10 @@ header #nightBtn[aria-pressed=true]{background:#fff;color:var(--hdr)}
   body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
   main{flex:1;min-height:0;grid-template-rows:minmax(0,1fr)}
   #radios{min-height:0;overflow-y:auto;align-items:stretch;grid-auto-rows:minmax(100%,auto)}
-  .rcol{min-height:0}.rcol>.logbox{flex:1;min-height:0;display:flex;flex-direction:column}
+  /* the log keeps at least this much: on a busy evening (urgent box, pre-net alert, nets list) the radio card took the
+     whole column and the log got 0 px, on an iPad in landscape and even on a 1080p screen (2026-11-15). Now the
+     column grows and the radios scroll down to it instead. */
+  .rcol{min-height:0}.rcol>.logbox{flex:1;min-height:min(560px,70dvh);display:flex;flex-direction:column}
   .feed{flex:1;min-height:0;max-height:none}
 }
 #rtabs{display:none}
