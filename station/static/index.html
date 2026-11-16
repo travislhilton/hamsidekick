@@ -494,7 +494,32 @@ a.btn{display:inline-block;padding:4px 10px;border:1px solid var(--line,#888);bo
 .bpband{margin:14px 0 4px}.bpband h4{display:inline;margin-right:.5em}
 @media print{body>*:not(#bpDlg){display:none!important}#bpDlg{position:static;width:auto;border:0;box-shadow:none}#bpDlg .noprint{display:none!important}.nlistwrap{overflow:visible!important}}
 .st{white-space:nowrap;color:var(--muted)}button.st.perf{background:none;border:0;padding:0;margin:0;font:inherit;cursor:pointer;opacity:.75}button.st.perf.on{opacity:1;font-weight:600}.st.ok{color:var(--ok)}.st.warn{color:var(--warn)}.st.bad{color:var(--bad)}
-#settings .savebar{position:sticky;bottom:-16px;background:var(--panel);border-top:1px solid var(--line);margin:12px -16px -16px;padding:10px 16px;z-index:2}
+/* Settings (owner 2026-11-15: "redesign the settings view to be well designed, understandable for a human and easy to
+   use"): tabs, one row per setting (name | control, one plain line under it, the long story behind "Why?"), each
+   section says how it saves, and one Save bar for the fields that need it. */
+#setForm{display:flex;flex-direction:column;flex:1;min-height:0;margin:0}
+#settings section.spanel{max-width:780px;border:0;border-radius:0;background:none;padding:0;margin:0}
+#settings details.why{border:0;border-radius:0;padding:0;margin:3px 0 0}
+#agentSet label>input[type=checkbox]{display:inline-block;vertical-align:-3px;margin:0 6px 0 0}
+#settings h4.sec{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:18px 0 4px;font-size:15px;color:var(--ink);text-transform:none}
+#settings .spanel>h4.sec:first-child,#settings .spanel>div:first-child>h4.sec:first-child{margin-top:6px}
+#settings .stag{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:9px;padding:1px 8px;white-space:nowrap}
+#settings .shint{margin:0 0 6px;color:var(--muted);font-size:13px}
+#settings .srow{display:grid;grid-template-columns:minmax(140px,210px) minmax(0,1fr);gap:4px 18px;padding:10px 0;border-top:1px solid var(--line);align-items:start}
+#settings h4.sec+.srow,#settings .shint+.srow{border-top:0}
+#settings .srow>.sl{margin:0;padding-top:7px;font-weight:600;font-size:14px}
+#settings .sc>input:not([type=checkbox]),#settings .sc>select,#settings .sc .inl input{display:inline-block;margin:0;max-width:100%}
+#settings .sc>select{width:100%;max-width:440px}#settings .sc label.chk{margin:6px 0 0}
+#settings .sh{color:var(--muted);font-size:12.5px;margin-top:4px;line-height:1.4}#settings .sh:empty{display:none}
+#settings .ferr{display:block;color:var(--bad);font-size:13px;font-weight:600}#settings .ferr:empty{display:none}
+#settings .sc input.bad{border-color:var(--bad)}
+#settings details.why{margin-top:3px;font-size:12.5px}#settings details.why>summary{cursor:pointer;color:var(--accent);width:max-content}
+#settings details.why>div,#settings details.why>p{color:var(--muted);margin:4px 0 2px;line-height:1.45}
+#settings .ntabs .sdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-left:5px;vertical-align:middle}
+#settings .savebar{position:static;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0;padding:10px 16px;border-top:1px solid var(--line);background:var(--panel);flex:none}
+#settings .savebar .sp{flex:1}#setSave:disabled{opacity:.45;cursor:default;filter:grayscale(1)}#settings .sdirty.on{color:var(--ink);font-weight:600}
+@media (max-width:600px){#settings .srow{grid-template-columns:minmax(0,1fr);gap:4px}#settings .srow>.sl{padding-top:0}
+  #settings .savebar{padding:8px 12px}#settings .savebar .sp{display:none}#settings .savebar button{flex:1}}
 button:disabled{cursor:not-allowed}
 .wlsend{font-size:15px;padding:8px 16px;font-weight:700}
 .wlsend:disabled{background:var(--line);border-color:var(--line);color:var(--muted);opacity:1}
@@ -543,7 +568,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <button id="openNets" title="Schedule, history, who takes part, minutes and what is still open">Nets</button>
   <button id="openBandplan" title="The band plan for your area: FCC privileges, the ARRL plan, your state coordinator's plan and the local ARES / RACES plans, in one table">Band plan</button>
   <button id="openRadios" title="Add, replace or remove a radio and choose its sound input">Radios…</button>
-  <button id="openSettings" title="Your callsign and Winlink Express">Settings</button>
+  <button id="openSettings" title="Your station, nets, Winlink, Sidekick and AI, AI costs, this PC">Settings</button>
   <button id="openPhone" title="Show a QR code: point a phone's camera at it to open this dashboard on the phone">Open on phone</button>
   <button id="fullScr" type="button" aria-pressed="false" title="Fill the whole screen with the dashboard (Esc or this button again to leave)" hidden>Full screen</button>
   <button id="openReadout" title="The EOC's situation report: approve it, then read it on the net from a large-type card" onclick="window.open('/readout','_blank')">Read-out</button>
@@ -559,39 +584,107 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <div id="radios"></div>
 </main>
 <dialog id="callDlg"><div id="lookup"></div><div class="row"><button onclick="$('callDlg').close()">Close</button></div></dialog>
-<dialog id="settings"><form method="dialog" id="setForm">
-  <h3>Settings</h3>
-  <label>Your callsign <input name="callsign" maxlength="11" required></label>
-  <label>Your name <input name="name" maxlength="80" style="text-transform:none"></label>
-  <label>Grid square <input name="grid" maxlength="6" placeholder="EM59et" style="text-transform:none"></label>
-  <label>Winlink Express folder <select name="winlink_dir"></select></label>
-  <div class="small muted" id="wlNone"></div>
-  <label>Send as (callsign account in that folder) <select name="winlink_account"></select></label>
-  <label class="inl">VHF/UHF reach <input name="reach_km" type="number" min="50" max="5000" step="10" style="width:7em"> km</label>
-  <div class="small muted">On a repeater or simplex net, a callsign licensed farther away than this, heard only once, that the two transcription passes did not read alike and that has no name or earlier check-in with it is shown struck through and not counted. Raise it for a linked repeater system.</div>
-  <label>Full speed and screen on <select name="keep_awake">
-    <option value="traffic">During nets and traffic (then back to my own power settings)</option>
-    <option value="listening">The whole time a radio listens</option>
-    <option value="always">Always, while the station runs</option>
-    <option value="off">Never (my power settings only)</option></select></label>
-  <div class="small muted">Laptops run several times slower once the screen goes dark. “During nets and traffic” switches to full speed for a scheduled net, for every transmission (from its first moment) and for 10 minutes after the last one; the rest of the time your own power plan, screen and sleep settings apply, and the radio still listens. With every radio paused, your own settings apply on every choice once the accurate pass has finished.</div>
-  <label class="chk"><input type="checkbox" name="ai_summary"> AI summary at the top of each net's minutes</label>
-  <div class="small muted">With the xAI key (Station agent, below): a short paragraph written about 10 minutes after each net ends, from its minutes and transcript (well under a cent a net), shown above the summary lines and put in the ICS-213. Off: the summary lines only (written by the station, no internet).</div>
-  <label class="inl">Keep recordings and net history for <input name="keep_weeks" type="number" min="1" max="104" step="1" style="width:5em"> weeks</label>
-  <div class="small muted" id="keepNote">Older recordings, day logs, net history, minutes and voiceprints are deleted (checked every 6 hours). Settings, radios, the net schedule and local names are always kept.</div>
-  <h4>Display <span class="muted small" style="text-transform:none">(this browser only, applied at once)</span></h4>
-  <div class="row"><label>Colours <select id="dispTheme" onchange="setDisplay('theme',this.value)"><option value="auto">Automatic (follow this device)</option><option value="light">Light (daylight, bright rooms)</option><option value="dark">Dark</option><option value="night">Night: red on black (keeps night vision)</option></select></label>
-  <label>Clock <select id="dispClock" onchange="setDisplay('clock',this.value)"><option value="24">24-hour (19:30)</option><option value="12">12-hour (7:30 PM)</option></select></label></div>
-  <h4>This PC</h4><div id="pcSet" class="small"></div>
-  <h4>Net alerts</h4><div id="alertSet" class="small"></div>
-  <h4>Learned fixes</h4><div id="learnSet" class="small"></div>
-  <details class="setsec" id="lnDet" open><summary><h4>Local names</h4></summary><div id="lnSet" class="small"></div></details>
-  <h4>Share settings with another station</h4><div id="shareSet" class="small"></div>
-  <h4>AI costs <span class="muted small" style="text-transform:none">(xAI: what this station spends, and the account)</span></h4><div id="costSet" class="small"></div><div id="mgmtKeySet" class="small"></div>
-  <h4>Station agent (optional) <a class="small" href="/help/sidekick" target="_blank" rel="noopener" style="font-weight:400">Sidekick card (set up and use, printable)</a></h4><div id="agentSet" class="small"></div><div id="keySet" class="small"></div>
-  <h4>Sidekick's voice</h4><div id="voiceSet" class="small"></div>
-  <h4>Grok speech-to-text (compared)</h4><div id="grokSet" class="small"></div>
-  <div class="row savebar"><button value="save" id="setSave" class="primary">Save</button> <button value="cancel" formnovalidate>Cancel</button> <span class="err" id="setErr"></span></div>
+<dialog id="settings" class="big" aria-labelledby="setTitle"><form method="dialog" id="setForm" novalidate>
+  <div class="dhead"><h3 id="setTitle">Settings</h3><button type="button" class="x" id="setX" aria-label="Close settings">✕</button></div>
+  <nav class="ntabs" id="setTabs" role="tablist" aria-label="Settings sections">
+    <button type="button" role="tab" data-stab="station">Station</button>
+    <button type="button" role="tab" data-stab="nets">Nets</button>
+    <button type="button" role="tab" data-stab="winlink">Winlink</button>
+    <button type="button" role="tab" data-stab="ai">Sidekick &amp; AI</button>
+    <button type="button" role="tab" data-stab="costs">AI costs</button>
+    <button type="button" role="tab" data-stab="pc">This PC</button>
+    <button type="button" role="tab" data-stab="share">Share</button>
+  </nav>
+  <div class="dbody" id="setBody">
+
+  <section class="spanel" data-spanel="station" role="tabpanel" aria-label="Station">
+    <h4 class="sec">You and your station <span class="stag">Save below</span></h4>
+    <div class="srow"><label class="sl" for="setCall">Your callsign</label><div class="sc">
+      <input id="setCall" name="callsign" maxlength="11" autocomplete="off"><span class="ferr" data-ferr="callsign"></span>
+      <div class="sh">The station's name at the top of the page, and the call Sidekick identifies with.</div></div></div>
+    <div class="srow"><label class="sl" for="setName">Your name</label><div class="sc">
+      <input id="setName" name="name" maxlength="80" style="text-transform:none"><span class="ferr" data-ferr="name"></span>
+      <div class="sh">The operator's name on the Winlink forms.</div></div></div>
+    <div class="srow"><label class="sl" for="setGrid">Grid square</label><div class="sc">
+      <input id="setGrid" name="grid" maxlength="6" placeholder="EM59et" style="text-transform:none;width:8em"><span class="ferr" data-ferr="grid"></span>
+      <div class="sh">Where the station is: 4 or 6 characters. Used by Find nets and on Winlink messages.</div></div></div>
+    <h4 class="sec">Display <span class="stag">this browser · changes at once</span></h4>
+    <div class="srow"><label class="sl" for="dispTheme">Colours</label><div class="sc">
+      <select id="dispTheme" onchange="setDisplay('theme',this.value)"><option value="auto">Automatic (follow this device)</option><option value="light">Light (daylight, bright rooms)</option><option value="dark">Dark</option><option value="night">Night: red on black (keeps night vision)</option></select></div></div>
+    <div class="srow"><label class="sl" for="dispClock">Clock</label><div class="sc">
+      <select id="dispClock" onchange="setDisplay('clock',this.value)"><option value="24">24-hour (19:30)</option><option value="12">12-hour (7:30 PM)</option></select></div></div>
+  </section>
+
+  <section class="spanel" data-spanel="nets" role="tabpanel" aria-label="Nets" hidden>
+    <h4 class="sec">Net alerts <span class="stag">this browser · changes at once</span></h4>
+    <div id="alertSet" class="small"></div>
+    <h4 class="sec">Logging nets <span class="stag">Save below</span></h4>
+    <div class="srow"><label class="sl" for="setReach">VHF/UHF reach</label><div class="sc">
+      <span class="inl"><input id="setReach" name="reach_km" type="number" min="50" max="5000" step="10" style="width:7em"> km</span><span class="ferr" data-ferr="reach_km"></span>
+      <div class="sh">A far-away callsign heard only once is not counted. Raise it for a linked repeater system.</div>
+      <details class="why"><summary>Why?</summary><div>On a repeater or simplex net, a callsign licensed farther away than this, heard only once, that the two transcription passes did not read alike and that has no name or earlier check-in with it is shown struck through and not counted.</div></details></div></div>
+    <div class="srow"><span class="sl">AI net summary</span><div class="sc">
+      <label class="chk"><input type="checkbox" name="ai_summary"> A short AI paragraph at the top of each net's minutes</label>
+      <div class="sh">Needs the xAI key (Sidekick &amp; AI). Well under a cent a net.</div>
+      <details class="why"><summary>Why?</summary><div>Written about 10 minutes after each net ends, from its minutes and transcript, shown above the summary lines and put in the ICS-213. Off: the summary lines only (written by the station, no internet).</div></details></div></div>
+    <h4 class="sec">Learned fixes <span class="stag">changes at once</span></h4>
+    <div id="learnSet" class="small"></div>
+    <div id="lnDet"><h4 class="sec">Local names <span class="stag">own Save button</span></h4><div id="lnSet" class="small"></div></div>
+  </section>
+
+  <section class="spanel" data-spanel="winlink" role="tabpanel" aria-label="Winlink" hidden>
+    <h4 class="sec">Winlink Express on this PC <span class="stag">Save below</span></h4>
+    <p class="shint">The Winlink window puts the net's ICS-309 and ICS-213 in this account's Outbox.</p>
+    <div class="srow"><label class="sl" for="setWlDir">Winlink Express folder</label><div class="sc">
+      <select id="setWlDir" name="winlink_dir"></select><span class="ferr" data-ferr="winlink_dir"></span>
+      <div class="sh bad" id="wlNone"></div></div></div>
+    <div class="srow"><label class="sl" for="setWlAcc">Send as</label><div class="sc">
+      <select id="setWlAcc" name="winlink_account"></select>
+      <div class="sh">The callsign account in that folder whose Outbox gets the messages.</div></div></div>
+  </section>
+
+  <section class="spanel" data-spanel="ai" role="tabpanel" aria-label="Sidekick and AI" hidden>
+    <h4 class="sec">xAI key <span class="stag">own Save button</span></h4>
+    <div id="keySet" class="small"></div>
+    <h4 class="sec">Station agent (Sidekick) <span class="stag">own Save button</span> <a class="small" href="/help/sidekick" target="_blank" rel="noopener" style="font-weight:400">Sidekick card</a></h4>
+    <div id="agentSet" class="small"></div>
+    <h4 class="sec">Sidekick's voice <span class="stag">own Save button</span></h4>
+    <div id="voiceSet" class="small"></div>
+    <h4 class="sec">Grok speech-to-text (compared) <span class="stag">own Save button</span></h4>
+    <div id="grokSet" class="small"></div>
+  </section>
+
+  <section class="spanel" data-spanel="costs" role="tabpanel" aria-label="AI costs" hidden>
+    <h4 class="sec">AI costs <span class="stag">own Save button</span></h4>
+    <p class="shint">What this station spends on xAI, a monthly budget, and (optional) the account's credit.</p>
+    <div id="costSet" class="small"></div><div id="mgmtKeySet" class="small"></div>
+  </section>
+
+  <section class="spanel" data-spanel="pc" role="tabpanel" aria-label="This PC" hidden>
+    <h4 class="sec">Power and speed <span class="stag">Save below</span></h4>
+    <div class="srow"><label class="sl" for="setAwake">Full speed and screen on</label><div class="sc">
+      <select id="setAwake" name="keep_awake">
+        <option value="traffic">During nets and traffic (then back to my own power settings)</option>
+        <option value="listening">The whole time a radio listens</option>
+        <option value="always">Always, while the station runs</option>
+        <option value="off">Never (my power settings only)</option></select>
+      <div class="sh">Laptops run several times slower once the screen goes dark.</div>
+      <details class="why"><summary>Why?</summary><div>“During nets and traffic” switches to full speed for a scheduled net, for every transmission (from its first moment) and for 10 minutes after the last one; the rest of the time your own power plan, screen and sleep settings apply, and the radio still listens. With every radio paused, your own settings apply on every choice once the accurate pass has finished.</div></details></div></div>
+    <h4 class="sec">Storage <span class="stag">Save below</span></h4>
+    <div class="srow"><label class="sl" for="setWeeks">Keep recordings and net history</label><div class="sc">
+      <span class="inl"><input id="setWeeks" name="keep_weeks" type="number" min="1" max="104" step="1" style="width:5em"> weeks</span><span class="ferr" data-ferr="keep_weeks"></span>
+      <div class="sh" id="keepNote">Older recordings, day logs, net history, minutes and voiceprints are deleted (checked every 6 hours). Settings, radios, the net schedule and local names are always kept.</div></div></div>
+    <h4 class="sec">This PC <span class="stag">status</span></h4>
+    <div id="pcSet" class="small"></div>
+  </section>
+
+  <section class="spanel" data-spanel="share" role="tabpanel" aria-label="Share" hidden>
+    <h4 class="sec">Share settings with another station</h4>
+    <div id="shareSet" class="small"></div>
+  </section>
+  </div>
+  <div class="savebar" id="setBar"><span class="sdirty small" id="setDirty" role="status">No changes to save.</span><span class="err small" id="setErr" role="alert"></span><span class="sp"></span>
+    <button type="button" id="setCancel">Close</button> <button value="save" id="setSave" class="primary" disabled>Save</button></div>
 </form></dialog>
 <dialog id="wl"><div id="wlBody"></div></dialog>
 <dialog id="bpDlg" aria-label="Band plan for your area"><div id="bpBody"></div></dialog>
@@ -1526,40 +1619,81 @@ function fillAccounts(f){
   const inst=(OP.installs||[]).find(i=>i.path===f.winlink_dir.value);
   f.winlink_account.innerHTML=(inst?inst.accounts:[]).map(a=>`<option${a===OP.winlink_account?" selected":""}>${esc(a)}</option>`).join("");
 }
-$("openSettings").onclick=async()=>{
+// ---------- Settings: tabs; the fields above the Save bar save together, every other part on its own button ----------
+const SETF={callsign:["station","Callsign"],name:["station","Name"],grid:["station","Grid square"],winlink_dir:["winlink","Winlink folder"],
+  winlink_account:["winlink","Send as"],reach_km:["nets","VHF/UHF reach"],ai_summary:["nets","AI net summary"],keep_awake:["pc","Full speed"],keep_weeks:["pc","Keep weeks"]};
+let SETWAS={};
+const setVal=(f,k)=>f[k].type==="checkbox"?f[k].checked:String(f[k].value);
+function setTab(t){
+  const tabs=[...document.querySelectorAll("#setTabs [data-stab]")];if(!tabs.some(b=>b.dataset.stab===t))t="station";
+  tabs.forEach(b=>{const on=b.dataset.stab===t;b.classList.toggle("on",on);b.setAttribute("aria-selected",on)});
+  document.querySelectorAll("#settings [data-spanel]").forEach(x=>x.hidden=x.dataset.spanel!==t);
+  $("setBody").scrollTop=0;try{localStorage.setItem("hamsidekick.setTab",t)}catch(e){}}
+function setDirty(){
+  const f=$("setForm"),ch=Object.keys(SETF).filter(k=>setVal(f,k)!==SETWAS[k]);
+  document.querySelectorAll("#setTabs [data-stab]").forEach(b=>{const d=ch.some(k=>SETF[k][0]===b.dataset.stab);
+    let dot=b.querySelector(".sdot");if(d&&!dot)b.insertAdjacentHTML("beforeend",'<span class="sdot" title="Unsaved changes"></span>');if(!d&&dot)dot.remove()});
+  const el=$("setDirty");el.classList.toggle("on",ch.length>0);
+  el.textContent=ch.length?`Unsaved: ${ch.map(k=>SETF[k][1]).join(", ")}`:"No changes to save.";
+  $("setSave").disabled=!ch.length;return ch}
+function setFieldErr(k,msg){const e=document.querySelector(`#settings [data-ferr="${k}"]`);if(e)e.textContent=msg||"";
+  const f=$("setForm");if(f[k]&&f[k].classList)f[k].classList.toggle("bad",!!msg)}
+function setClearErrs(){Object.keys(SETF).forEach(k=>setFieldErr(k,""));$("setErr").textContent=""}
+function setClose(){if(setDirty().length&&!confirm("Close without saving your changes?"))return;$("settings").close()}
+async function openSettings(tab){
   const op=await loadSettings(),f=$("setForm");
   $("dispTheme").value=DISP.theme;$("dispClock").value=DISP.clock;
   f.callsign.value=op.callsign||"";f.name.value=op.name||"";f.grid.value=op.grid||"";f.reach_km.value=op.reach_km||300;f.keep_awake.value=op.keep_awake||"traffic";f.keep_weeks.value=op.keep_weeks||6;f.keep_weeks.dataset.was=op.keep_weeks||6;f.ai_summary.checked=op.ai_summary!==false;
   f.winlink_dir.innerHTML=(op.installs||[]).map(i=>`<option value="${esc(i.path)}"${i.path===op.winlink_dir?" selected":""}>${esc(i.path)}${i.active?" (active "+esc(i.active)+")":""}</option>`).join("");
   $("wlNone").textContent=(op.installs||[]).length?"":"No Winlink Express found on this PC (looked in C:\\RMS Express and the installed-programs list).";
-  fillAccounts(f);$("setErr").textContent="";loadPC();renderAlertSettings();renderLearned();renderKeys();loadCost();loadAgent().then(renderAgentSet);loadLocalNames();renderShare();loadVoice();loadGrok();$("settings").showModal();
-};
-$("setForm").winlink_dir.onchange=()=>fillAccounts($("setForm"));
+  fillAccounts(f);setClearErrs();SETWAS={};Object.keys(SETF).forEach(k=>SETWAS[k]=setVal(f,k));setDirty();
+  let t=tab;if(!t)try{t=localStorage.getItem("hamsidekick.setTab")}catch(e){}setTab(t||"station");
+  loadPC();renderAlertSettings();renderLearned();renderKeys();loadCost();loadAgent().then(renderAgentSet);loadLocalNames();renderShare();loadVoice();loadGrok();
+  if(!$("settings").open)$("settings").showModal();
+}
+$("openSettings").onclick=()=>openSettings();
+$("setTabs").onclick=e=>{const b=e.target.closest("[data-stab]");if(b)setTab(b.dataset.stab)};
+$("setTabs").onkeydown=e=>{if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;const bs=[...$("setTabs").querySelectorAll("[data-stab]")],i=bs.findIndex(b=>b.classList.contains("on"));
+  const n=bs[(i+(e.key==="ArrowRight"?1:bs.length-1))%bs.length];setTab(n.dataset.stab);n.focus()};
+$("setForm").winlink_dir.onchange=()=>{fillAccounts($("setForm"));setDirty()};
+$("setForm").addEventListener("input",e=>{if(e.target.name in SETF){setFieldErr(e.target.name,"");setDirty()}});
+$("setForm").addEventListener("change",e=>{if(e.target.name in SETF)setDirty()});
+$("setX").onclick=setClose;$("setCancel").onclick=setClose;
+$("settings").addEventListener("cancel",e=>{if(setDirty().length&&!confirm("Close without saving your changes?"))e.preventDefault()});
 $("setSave").onclick=async e=>{
-  e.preventDefault();const f=$("setForm");
+  e.preventDefault();const f=$("setForm");setClearErrs();
+  if(!f.callsign.value.trim()){setTab("station");setFieldErr("callsign","Your callsign is needed.");f.callsign.focus();return}
   const kw=+f.keep_weeks.value,was=+f.keep_weeks.dataset.was||6;
   if(kw&&kw<was&&!confirm(`Keep recordings and net history for ${kw} weeks instead of ${was}?\n\nEverything older than ${kw} weeks (recordings, logs, net history and minutes) will be deleted in about a minute. This cannot be undone.`))return;
-  const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({callsign:f.callsign.value,name:f.name.value,grid:f.grid.value,winlink_dir:f.winlink_dir.value,winlink_account:f.winlink_account.value,reach_km:f.reach_km.value,keep_awake:f.keep_awake.value,keep_weeks:f.keep_weeks.value,ai_summary:f.ai_summary.checked})});
-  const d=await r.json();if(!r.ok){$("setErr").textContent=d.error||"not saved";return}
-  OP=d;$("me").textContent=d.callsign+" station";$("settings").close();
+  $("setSave").disabled=true;$("setDirty").textContent="Saving…";
+  let r,d;try{r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({callsign:f.callsign.value,name:f.name.value,grid:f.grid.value,winlink_dir:f.winlink_dir.value,winlink_account:f.winlink_account.value,reach_km:f.reach_km.value,keep_awake:f.keep_awake.value,keep_weeks:f.keep_weeks.value,ai_summary:f.ai_summary.checked})});
+    d=await r.json()}catch(err){r={ok:false};d={error:err.message}}
+  if(!r.ok){const msg=d.error||"not saved",m=msg.toLowerCase();
+    // the error beside its field, on its tab
+    const k=/call/.test(m)?"callsign":/grid/.test(m)?"grid":/reach|km/.test(m)?"reach_km":/week/.test(m)?"keep_weeks":/winlink|folder|account/.test(m)?"winlink_dir":/name/.test(m)?"name":null;
+    if(k){setTab(SETF[k][0]);setFieldErr(k,msg);f[k].focus()}
+    $("setErr").textContent="Not saved: "+msg;setDirty();return}
+  OP=d;$("me").textContent=d.callsign+" station";f.keep_weeks.dataset.was=f.keep_weeks.value;
+  SETWAS={};Object.keys(SETF).forEach(k=>SETWAS[k]=setVal(f,k));setDirty();$("setDirty").textContent="✓ Saved.";
 };
 // ---------- This PC (station/pccheck.py): speed, power settings, what the station changes ----------
 function renderPCNote(){
   const pc=S.pc||{},el=$("pcNote");let h="";
-  if(pc.slow)h+=`<div class="pcn slow">⚠ ${esc(pc.slow.say)} <button onclick="$('openSettings').click()">This PC…</button></div>`;
+  if(pc.slow)h+=`<div class="pcn slow">⚠ ${esc(pc.slow.say)} <button onclick="openPC()">This PC…</button></div>`;
   if(pc.notice)h+=`<div class="pcn"><b>While it transcribes, this station changes your PC's power settings.</b>
     During nets and traffic it keeps the screen on and switches to its own “HAM Sidekick Station” power plan at Best performance,
     then puts your own plan back (laptops run several times slower with the screen off).
-    <button onclick="$('openSettings').click()">See or change it</button><button onclick="pcSeen()">OK</button></div>`;
+    <button onclick="openPC()">See or change it</button><button onclick="pcSeen()">OK</button></div>`;
   for(const w of S.aicost||[]){if(COSTHID.has(w.say))continue;
     h+=`<div class="pcn${w.level==="bad"?" slow":""}">⚠ ${esc(w.say)} ${w.buy?`<a class="btn" href="${esc(w.buy)}" target="_blank" rel="noopener">Buy credits</a>`:""}<button onclick="openCosts()">AI costs…</button><button data-costhide="${esc(w.say)}">Hide</button></div>`}
   el.innerHTML=h;
 }
 const COSTHID=new Set();
 document.addEventListener("click",e=>{const t=e.target.closest("[data-costhide]");if(t){COSTHID.add(t.dataset.costhide);renderPCNote()}});
-function openCosts(){$("openSettings").click();setTimeout(()=>{const h=$("costSet");if(h)h.scrollIntoView({block:"start"})},300)}
+function openCosts(){openSettings("costs")}
 // ---------- AI costs (station/aicost.py): this station's ledger, the budget, the xAI account ----------
 const BUY="https://console.x.ai/team/default/billing";
+const howIt=(html,label="How it works")=>`<details class="why"><summary>${label}</summary><div>${html}</div></details>`;
 const usd=v=>v==null?"?":(v>0&&v<0.01?"$"+Number(v).toFixed(4):"$"+Number(v).toFixed(2));
 async function loadCost(){try{renderCost(await api("/api/aicost"))}catch(e){$("costSet").textContent="Not available."}}
 function renderCost(d){
@@ -1578,7 +1712,7 @@ function renderCost(d){
     <div class="row" style="margin-top:6px"><label class="inl">Monthly budget for this station $<input id="costBudget" type="number" min="0" step="1" style="width:6em" value="${d.budget_usd||""}" placeholder="none"></label>
       <label class="inl">Warn when the account's credit is below $<input id="costLow" type="number" min="0" step="1" style="width:5em" value="${d.low_credit_usd||""}" placeholder="off"></label>
       <button type="button" id="costSave">Save</button> <span class="small" id="costMsg"></span></div>
-    <div class="muted">A warning at 80% of the budget. At 100%, ${esc(d.background.join(", "))} stop until the 1st; what you start yourself (Sidekick replies, chat, Find nets) still runs. Costs come from xAI's own figure on each answer where it gives one, otherwise from xAI's price list (“est”). The bill on the xAI console is the true total.</div>`;
+    ${howIt(`A warning at 80% of the budget. At 100%, ${esc(d.background.join(", "))} stop until the 1st; what you start yourself (Sidekick replies, chat, Find nets) still runs. Costs come from xAI's own figure on each answer where it gives one, otherwise from xAI's price list (“est”). The bill on the xAI console is the true total.`,"How the budget works")}`;
   $("costSave").onclick=async()=>{try{renderCost(await post("/api/aicost",{budget_usd:+$("costBudget").value||0,low_credit_usd:+$("costLow").value||0}));$("costMsg").innerHTML='<span class="ok">Saved.</span>'}catch(e){$("costMsg").innerHTML=`<span class="bad">${esc(e.message)}</span>`}};
   const r=$("costRefresh");if(r)r.onclick=async()=>{r.disabled=true;r.textContent="Asking xAI…";try{renderCost(await post("/api/aicost/refresh",{}))}catch(e){r.textContent=e.message}};
 }
@@ -1587,7 +1721,7 @@ async function loadPC(){try{renderPC(await (await fetch("/api/pc")).json())}catc
 function renderPC(d){
   const m=d.measured||{},f=m.final||{},a=m.accurate||{};
   const rt=x=>x==null?"?":Number(x).toFixed(2)+" s";
-  let h=`<div><b>What the station changes:</b></div><ul>${(d.explain||[]).map(x=>`<li>${esc(x.replace(/^\s*-\s*/,""))}</li>`).join("")}</ul>`;
+  let h=howIt(`<ul>${(d.explain||[]).map(x=>`<li>${esc(x.replace(/^\s*-\s*/,""))}</li>`).join("")}</ul>`,"What the station changes on this PC");
   h+=`<div>Right now: ${d.holding?"<b>holding the screen on and full speed</b> ("+esc(d.why)+")":"your own power settings"+(d.why?" ("+esc(d.why)+")":"")}.</div>`;
   h+=m.measured_at?`<div>Measured ${esc(m.measured_at.replace("T"," "))}: live text ${rt(f.rtf)} per second of audio (${esc(f.device||"")}${f.model?" "+esc(f.model):""}); accurate pass ${esc({both:"during and after each net",final_only:"after each net",none:"not on this PC"}[a.mode||"none"]||a.mode)}${a.model&&a.mode!=="none"?" ("+esc(a.model)+", "+rt(a.rtf)+")":""}. Processor ${m.perf_held??"?"}% of its speed while measuring${m.slowed?" — <b>slowed: measure again</b>":""}.</div>`
     :`<div>Not measured with the screen held on yet.</div>`;
@@ -1695,7 +1829,7 @@ function perfMode(){const a=(S.pc||{}).awake;if(!a||!a.can)return"";   // Window
   const why=perfWhy(a.why);
   return a.on?` <button type="button" class="st perf on" onclick="openPC()" title="Performance mode: full speed, screen held on, the HAM Sidekick Station power plan at Best performance${why?" — because "+esc(why):""}. Your own power settings come back when it ends. Click for This PC.">⚡ Performance mode</button>`
     :` <button type="button" class="st perf" onclick="openPC()" title="Performance mode is off: your own power plan, screen and sleep settings apply${why?" — "+esc(why):""}. Click for This PC.">○ Performance off</button>`}
-function openPC(){$("openSettings").click();setTimeout(()=>{const h=$("pcSet");if(h)h.scrollIntoView({block:"start"})},300)}
+function openPC(){openSettings("pc")}
 function all(){renderRadios();renderNet();renderHints();renderHeard();renderFeed();renderAlerts();renderUrgent()}
 async function lookup(call){
   call=call.trim().toUpperCase();if(!call)return;
@@ -2971,7 +3105,7 @@ document.addEventListener("click",e=>{
   const so=e.target.closest("[data-skopen]");if(so){skOpen(so.dataset.skopen,so.dataset.tab);return}
   const a=e.target.closest("[data-agask]");if(a){a.textContent="Thinking…";agPost(`/api/agent/ask/${enc(a.dataset.agask)}`,{});return}
   const mk=e.target.closest("[data-agmark]");if(mk){agPost(`/api/agent/mark/${enc(mk.dataset.agmark)}`,{what:mk.dataset.v});return}
-  const gs=e.target.closest("[data-goto-settings]");if(gs){$("openSettings").click();setTimeout(()=>{const k=$("keySet");if(k)k.scrollIntoView({block:"center"})},300);return}
+  const gs=e.target.closest("[data-goto-settings]");if(gs){openSettings("ai").then(()=>{const k=$("keySet");if(k)k.scrollIntoView({block:"start"})});return}
   const r=e.target.closest("[data-agrate]");if(r){agPost(`/api/agent/rate/${enc(r.dataset.agrate)}`,{good:r.dataset.v==="1"});return}
   const h=e.target.closest("[data-tts]");if(h){playClip(`/api/tts/draft/${enc(h.dataset.tts)}.mp3`,h);return}
   const v=e.target.closest("[data-aud]");if(v){playClip(`/api/tts/audition/${enc(v.dataset.aud)}.mp3`,v);return}});
@@ -2991,7 +3125,7 @@ async function loadVoice(){try{TTS=await api("/api/tts")}catch(e){TTS=null}rende
 function renderVoice(msg){
   const box=$("voiceSet");if(!box)return;if(!TTS){box.innerHTML='<span class="muted">Not available.</span>';return}
   const cur=TTS.voice||"";
-  box.innerHTML=`<p class="muted">How ${esc(agName())} sounds when you press ▶ (a voice audition, or “Hear it” on a draft). It plays <b>here only, in this browser</b>, never on a radio. Each clip is made once by xAI (from your xAI key, billed by the characters) and kept on this PC; offline, only clips already made can play.${TTS.key_set?"":" <b>Set the xAI key above first.</b>"}</p>
+  box.innerHTML=`<p class="muted" style="margin:0">How ${esc(agName())} sounds when you press ▶. It plays <b>in this browser only</b>, never on a radio.${TTS.key_set?"":' <b class="bad">Set the xAI key first.</b>'}</p>${howIt("Each clip is made once by xAI (from your xAI key, billed by the characters) and kept on this PC; offline, only clips already made can play.")}
    <div class="row"><label>Voice <select id="vcSel"><option value=""${cur?"":" selected"}>(not chosen: ${esc(TTS.default)})</option>${TTS.voices.map(v=>`<option value="${esc(v.voice_id)}"${v.voice_id===cur?" selected":""}>${esc(v.name||v.voice_id)}${v.gender?` (${esc(v.gender)})`:""}</option>`).join("")}</select></label>
     <label>Speed <input id="vcSpd" type="number" min="0.7" max="1.5" step="0.05" value="${esc(TTS.speed||1)}" style="width:5em"></label>
     <button type="button" id="vcSave">Save voice</button> <span class="${msg&&msg.bad?"bad":"ok"}">${esc((msg&&msg.text)||"")}</span></div>
@@ -3007,7 +3141,7 @@ async function loadGrok(){try{GK=await api("/api/grokstt")}catch(e){GK=null}rend
 function renderGrok(msg){
   const box=$("grokSet");if(!box)return;if(!GK){box.innerHTML='<span class="muted">Not available.</span>';return}
   const s=GK.settings||{},t=GK.today||{},on=GK.online||{},sk=Object.entries(t.skipped||{}).map(([k,v])=>`${v} ${k}`).join(", ");
-  box.innerHTML=`<p class="muted">On the radios you tick, each transmission's recording is <b>also</b> sent to xAI's speech-to-text as it is heard (your xAI key), and kept beside this station's own text to see which is better. This station's engine stays the transcriber. The recordings leave this PC. Nothing is ever queued: a transmission heard while offline, while two are already out, or past the day's minutes is skipped.${GK.key_set?"":" <b>Set the xAI key above first.</b>"}</p>
+  box.innerHTML=`<p class="muted" style="margin:0">A test: on the radios you tick, recordings also go to xAI's speech-to-text, to compare with this station's own text.${GK.key_set?"":' <b class="bad">Set the xAI key first.</b>'}</p>${howIt("Each transmission's recording is <b>also</b> sent to xAI as it is heard (your xAI key), and kept beside this station's own text to see which is better. This station's engine stays the transcriber. The recordings leave this PC. Nothing is ever queued: a transmission heard while offline, while two are already out, or past the day's minutes is skipped.")}
    <div class="row">${(S.radios||[]).filter(r=>r.role!=="winlink").map(r=>`<label class="chk"><input type="checkbox" data-gkr="${esc(r.id)}"${(s.radios||{})[r.id]?" checked":""}> ${esc(r.name)}</label>`).join(" ")}</div>
    <div class="row"><label>Minutes a day <input id="gkMin" type="number" min="0" max="1440" value="${esc(s.minutes_per_day??60)}" style="width:5em"></label>
     <label class="chk"><input type="checkbox" id="gkTerms"${s.keyterms!==false?" checked":""}> Hint the call, local names and the net's name</label>
@@ -3028,7 +3162,7 @@ let SH={doc:null,prev:null,map:{},msg:null};
 function renderShare(){
   const box=$("shareSet");if(!box)return;
   if(!$("shExport")){                                   // the static part: built once, so the chosen file survives redraws
-    box.innerHTML=`<p class="muted">Move your <b>net schedule</b>, <b>Sidekick's choices</b> and <b>local names</b> to another station, or take another station's. The file holds no keys, no call sign and nothing about your radios; a net names its radio by a hint (name, band, mode) and you choose the matching radio here when you import. Importing never deletes: a net with the same name and start time is updated, new ones are added, and your current files are saved first.</p>
+    box.innerHTML=`<p class="muted" style="margin:0">Move your <b>net schedule</b>, <b>Sidekick's choices</b> and <b>local names</b> to another station, or take another station's.</p>${howIt("The file holds no keys, no call sign and nothing about your radios; a net names its radio by a hint (name, band, mode) and you choose the matching radio here when you import. Importing never deletes: a net with the same name and start time is updated, new ones are added, and your current files are saved first.","What is in the file?")}
      <div class="row"><label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="shIdent" style="width:auto"> include my Sidekick identity (its on-air name, my check-in line, my first name, region)</label></div>
      <div class="row"><button type="button" id="shExport">Export settings…</button>
       <input type="file" id="shFile" accept=".json,application/json"> <button type="button" id="shPrev">Preview import…</button> <span id="shMsg"></span></div>
@@ -3087,13 +3221,13 @@ function lnRead(all){
       also:g("also").split("\n").map(x=>x.trim()).filter(x=>x.includes("="))}}).filter(e=>all||e.name)}
 function renderLocalNames(msg){
   const box=$("lnSet");if(!box||!LN)return;
-  box.innerHTML=`<p class="muted">Your area's clubs, repeaters and web sites, written the way they should read. Whisper writes a name said as a word as an ordinary word (“the Sark Link repeater”, “SarkNet”, “go to SarkOnline”); the station repairs it in the log, search, the minutes and the Winlink messages (the heard words are kept), and lists the names said on a net under <b>Local terms</b> in the ICS-213. A plain word (“we met at the park”) is changed only when it reads as a name: a capital mid-sentence, or a radio word right beside it.</p>
+  box.innerHTML=`<p class="muted" style="margin:0">Your area's clubs, repeaters and web sites, written the way they should read in the log, the minutes and Winlink.</p>${howIt(`Whisper writes a name said as a word as an ordinary word (“the Sark Link repeater”, “SarkNet”, “go to SarkOnline”); the station repairs it in the log, search, the minutes and the Winlink messages (the heard words are kept), and lists the names said on a net under <b>Local terms</b> in the ICS-213. A plain word (“we met at the park”) is changed only when it reads as a name: a capital mid-sentence, or a radio word right beside it.`)}
    <label>Area <input id="lnArea" value="${esc(LN.area||"")}" maxlength="80" placeholder="Springfield County" style="text-transform:none"></label>
    <datalist id="lnNets">${(LN.nets||[]).map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
    <div id="lnList">${(LN.names||[]).map(lnEntryHtml).join("")||'<p class="muted">No local names yet. Add one, or import your area’s pack.</p>'}</div>
    <div class="row"><button type="button" id="lnAdd">Add a name</button> <button type="button" class="primary" id="lnSave">Save local names</button> <span id="lnMsg" class="${msg&&msg.bad?"bad":"ok"}">${esc((msg&&msg.text)||LN.err||"")}</span></div>
    <h4 style="margin-top:10px">Share with your area</h4>
-   <p class="muted">An <b>area pack</b> holds these names (no callsigns, nothing about you). Give it to other operators in your area (a club web site, an email) and they import it here, or save it as <code>area-pack.json</code> beside <code>install.cmd</code> before installing (the installer imports it).</p>
+   <p class="muted" style="margin:0">An <b>area pack</b> holds these names (no callsigns, nothing about you) for other operators in your area.</p>${howIt("Give it to other operators in your area (a club web site, an email) and they import it here, or save it as <code>area-pack.json</code> beside <code>install.cmd</code> before installing (the installer imports it).","How do they use it?")}
    <div class="row"><a href="/api/local-names/pack" download="area-pack.json"><button type="button">Export area pack</button></a>
      <input type="file" id="lnFile" accept=".json,application/json"> <input id="lnUrl" placeholder="https://… area pack" style="text-transform:none;min-width:14em"> <button type="button" id="lnImp">Import</button></div>`;
   box.querySelector("#lnAdd").onclick=()=>{LN.names=lnRead(true);LN.area=$("lnArea").value;LN.names.push({name:"",said:"word"});renderLocalNames();
@@ -3112,7 +3246,7 @@ function renderLocalNames(msg){
 function renderAgentSet(){
   const box=$("agentSet");if(!AG){box.innerHTML="";return}const s=AG.settings||{};
   const opt=(v,l,on)=>`<option value="${esc(v)}"${on?" selected":""}>${esc(l)}</option>`;
-  box.innerHTML=`<p class="muted">The station agent listens and <b>drafts</b> what it would say on each radio where you switch it to Draft (on the radio's card). It never transmits. Two speeds: the <b>model</b> decides each turn in under a second (check-ins, acknowledgements, short answers); a question that needs thinking gets “working on it” and goes to the <b>thinking model</b> while the net carries on, and when net control next asks for comments it says it has a response ready, then reads it when told to go ahead. Offline, fixed rules keep the same steps (check in, acknowledge, announce and read an answer already made). Every draft is checked against FCC Part 97 in the station's own code (identification every 10 minutes and at the end of a contact, saying it is automated, no business, music, codes or relayed messages, emergency traffic first, your license privileges); a draft that breaks one is marked <b>Would not send</b>.</p>
+  box.innerHTML=`<p class="muted" style="margin:0">Sidekick listens and <b>drafts</b> what it would say on each radio you switch to Draft (on the radio's card). Sending is a separate choice on each radio.</p>${howIt(`The station agent listens and <b>drafts</b> what it would say on each radio where you switch it to Draft (on the radio's card). Two speeds: the <b>model</b> decides each turn in under a second (check-ins, acknowledgements, short answers); a question that needs thinking gets “working on it” and goes to the <b>thinking model</b> while the net carries on, and when net control next asks for comments it says it has a response ready, then reads it when told to go ahead. Offline, fixed rules keep the same steps (check in, acknowledge, announce and read an answer already made). Every draft is checked against FCC Part 97 in the station's own code (identification every 10 minutes and at the end of a contact, saying it is automated, no business, music, codes or relayed messages, emergency traffic first, your license privileges); a draft that breaks one is marked <b>Would not send</b>.`)}
   <label style="display:block;margin:6px 0"><input type="checkbox" id="agOn"${s.enabled?" checked":""} style="width:auto"> <b>Enable the station agent</b> <span class="muted">(off by default; when on, each radio's card gets a ${esc(agName())} Off / Draft switch, also off until you choose Draft)</span></label>
   <div class="agentform">
     <label for="agName">On-air name</label><span><input id="agName" value="${esc(s.name||"")}" maxlength="24" placeholder="${esc(AG.default_name||"Sidekick")}"><br><span class="muted">Your choice; it is said right after the call (“${esc(AG.call||"N0CALL")} ${esc(agName())}”), so a phonetic-alphabet word (Echo, Victor…), a number or a procedure word (Portable, Mobile, Break, Over) is refused: listeners would hear it as part of the call.</span></span>

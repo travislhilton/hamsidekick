@@ -637,10 +637,21 @@ you chose is remembered. Each column shows:
   to the radio, the cable or the settings can be judged by a number (`data\tests.jsonl`).
 - **Help** (top right): opens the two-sided reference card (`/help`, from `station/static/card.html`) in a new tab.
   Print it double-sided on letter paper (flip on the long edge) and keep it by the radio.
-- **Settings** (top right): your callsign, name and grid; which Winlink Express folder (found
-  automatically: `C:\RMS Express` and any other install) and which callsign account sends; **Net alerts**: the chime, and
-  notifications on the station PC; **VHF/UHF reach, km** (300 by default: calls licensed farther away that nothing
-  else confirms are not counted; raise it for a linked repeater system); **Learned fixes** (your ✎ Fix corrections).
+- **Settings** (top right), in tabs (it opens on the tab you used last; the links in the dashboard's notices open
+  their own tab):
+  - **Station**: your callsign, name and grid square; **Display** (colours, 12- or 24-hour clock: this browser only).
+  - **Nets**: **Net alerts** (the chime, and notifications on the station PC); **VHF/UHF reach, km** (300 by
+    default: calls licensed farther away that nothing else confirms are not counted; raise it for a linked repeater
+    system); the **AI net summary**; **Learned fixes** (your ✎ Fix corrections); **Local names**.
+  - **Winlink**: which Winlink Express folder (found automatically: `C:\RMS Express` and any other install) and
+    which callsign account sends.
+  - **Sidekick & AI**: the xAI key, the **Station agent** (Sidekick), **Sidekick's voice**, **Grok speech-to-text**.
+  - **AI costs**, **This PC** (full speed and screen on, how many weeks of recordings and history to keep, what the
+    station changes on this PC) and **Share** (settings with another station).
+
+  Each section says how it saves: **Save below** (the Save bar at the bottom, which names what you changed and marks
+  its tab with a dot; a field it refuses is marked in red beside it), **own Save button**, or **changes at once**.
+  Closing with unsaved changes asks first. The long explanations are behind **Why?** and **How it works**.
 
 Which radios exist (and their sound inputs) and the first nets are set in `C:\HAM-Sidekick-Station\config\station.yaml` (every option is explained in
 `config\station.example.yaml`). After editing it, restart the station: Task Scheduler → **HAM Sidekick Station** →
