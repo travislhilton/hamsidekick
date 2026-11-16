@@ -647,3 +647,12 @@ def test_an_open_dashboard_reloads_on_a_new_build_and_the_band_plan_marks_what_i
     assert "pageCheck()};" in html and 'location.reload();return}' in html and "A new version of the station" in html
     assert "function bpTuned()" in html and "Tuned now:" in html and "data-bptuned" in html and "data-bpgo" in html
     assert "if($(\"bpDlg\")&&$(\"bpDlg\").open&&BP.d){const sig=bpTunedSig()" in html      # retuning redraws it
+
+
+def test_band_plan_has_a_full_spectrum_view_and_vara_fm_width():
+    """Owner 2026-11-16: "another table that shows the full spectrum with all allocated frequencies and all unplanned
+    frequencies that are available for voice and for VARA FM and VARA HF"; VARA FM narrow / wide per modem."""
+    from station.server import STATIC
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert '["all","Full spectrum"]' in html and "<th>Ad hoc voice</th><th>Ad hoc VARA</th>" in html
+    assert 'x.mode==="VARA FM"&&(m.cfg.fm_width!=="wide"||x.wide)' in html and '="fm_width"' in html

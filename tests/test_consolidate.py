@@ -177,6 +177,29 @@ def test_open_for_ad_hoc_voice_and_vara(tmp_path):
     assert _at(lv, 7.255)[0]["uses"] == ["Section HF net"] and not _at(lv, 7.255)[0]["unplanned"]
 
 
+def test_fm_bands_list_free_simplex_channels_and_vara_fm_wide_needs_room(tmp_path):
+    """Owner 2026-11-16: Ad hoc voice showed nothing on 2 m (the local plans name a channel every 20-40 kHz, so no
+    "range" was left), and "For VARA FM we need to consider bandwidth for WIDE and NARROW". FM bands now list the free
+    simplex channels on the usual steps, neighbours in one row; VARA FM wide only where there is about 25 kHz of room;
+    nothing in the leftover gaps between segments (they border repeaters); 6 m below 51 MHz stays SSB ranges."""
+    used = [146.42, 146.46, 146.50, 146.52, 146.54, 146.56, 146.58, 147.45, 147.46, 147.52, 145.03]
+    t = C.build("general", [{"id": "a", "name": "County plan", "authority": "local", "segments": [],
+                             "frequencies": [{"freq_mhz": f, "mode": "FM", "use": f"Tac {f}"} for f in used]}])
+    v, d = C.open_ranges(t, "voice"), C.open_ranges(t, "data")
+    two = [(x["from"], x["to"], x["count"]) for x in v if x["band"] == "2 m"]
+    assert (146.44, 146.44, 1) in two and (146.48, 146.48, 1) in two and (147.48, 147.5, 2) in two
+    assert all(x["channel"] and x["mode"] == "FM" and x["step"] == 0.02 for x in v if x["band"] == "2 m")
+    assert not any(abs(x["from"] - 147.44) < 1e-6 for x in v)      # 10 kHz from 147.45: not free
+    assert not _at(v, 146.6) and not _at(v, 147.99) and not _at(v, 146.37)  # no unplanned gaps beside repeaters
+    seventy = [x for x in v if x["band"] == "70 cm"]
+    assert seventy and max(x["count"] for x in seventy) > 10 and seventy[0]["step"] == 0.025
+    six = [x for x in v if x["band"] == "6 m" and x["from"] < 51]
+    assert six and all(x["mode"] == "USB" and not x.get("channel") for x in six)
+    fm = {x["from"]: x for x in d if x["mode"] == "VARA FM" and x["band"] == "2 m"}
+    assert fm[145.05]["wide"] is False                              # 20 kHz from 145.03: narrow only
+    assert any(x["wide"] for x in fm.values())                       # further off: narrow and wide
+
+
 def test_no_duplicates_when_the_band_plan_is_changed(tmp_path, xai_key):
     """Owner 2026-11-16: "Ensure that there are no duplicates when modifying the band plan" and "Only offer to select
     only those that are not duplicates"."""
@@ -242,14 +265,14 @@ def test_the_search_finds_winlink_gateways_and_they_go_into_the_band_plan(tmp_pa
     st, p, sent, _ = _plans(tmp_path, answer={"clubs": [], "documents": [], "frequencies": [gw, hf, dict(gw)]})
     s = p.search()
     assert "Winlink RMS gateways on VHF / UHF" in sent[0]["input"][0]["content"]
-    g = s["gateways"]
+    g = next(x for x in s["gateways"] if x["key"] == "search:winlink")
     assert g["band"]["in"] and [x["freq_mhz"] for x in g["list"]] == [145.07]       # VHF/UHF only, once
     t = p.consolidated()
     ch = [x for x in _rows(t, "2 m") if x["type"] == "channel" and x["from"] == 145.07]
     assert ch and ch[0]["use"] == "Winlink gateway K7ABC-10 (VARA FM)"
     assert not _at(t["open"]["data"], 145.07)                                       # ad hoc VARA keeps clear of it
     p.choose(g["key"], False)                                                       # leave them out
-    assert not p.state()["gateways"]["band"]["in"]
+    assert not p.state()["gateways"][0]["band"]["in"]
     assert not [x for x in _rows(p.consolidated(), "2 m") if x["type"] == "channel" and x["from"] == 145.07]
     p.choose(g["key"], True)
-    assert p.state()["gateways"]["band"]["in"]
+    assert p.state()["gateways"][0]["band"]["in"]

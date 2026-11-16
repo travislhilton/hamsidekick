@@ -236,3 +236,11 @@ def test_the_one_modem_from_before_becomes_a_shared_modem(tmp_path):
     m = st.vara.view()["modems"][0]
     assert m["cfg"]["use"] == "shared" and m["cfg"]["cmd_port"] == 8400 and m["cfg"]["enabled"]
     assert st.vara.modem(rid).dir() == st.data / "vara"        # its log and received files stay where they were
+
+
+def test_a_vara_fm_modem_says_narrow_or_wide(tmp_path):
+    st, rid = _st(tmp_path, freq=145.07)
+    v = st.vara.settings({"radio": rid, "kind": "fm", "fm_width": "wide", "enabled": True})
+    assert v["modems"][0]["cfg"]["fm_width"] == "wide"
+    with pytest.raises(ValueError, match="narrow or wide"):
+        st.vara.settings({"radio": rid, "fm_width": "medium"})

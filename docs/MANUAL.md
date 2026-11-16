@@ -329,7 +329,7 @@ you chose is remembered. Each column shows:
   channels, then the ARRL's; the FCC rules decide the **You** column and are never outranked. **⚠** marks what to
   check: two plans that disagree, a channel in a range set aside for another use, a kept channel outside your
   privileges. **Plans read** lets you mark a plan as the state coordinator's or a local plan, leave it out, or read
-  them all again. **Print** prints the table. **Ad hoc voice** and **Ad hoc VARA** (owner 2026-11-16) list the ranges
+  them all again. **Print** prints the table. **Full spectrum** (owner 2026-11-16) is one table of every stretch and channel (what it is allocated for, by whom, your privileges) with two more columns: what is open there for **ad hoc voice** and for **ad hoc VARA** (VARA HF on HF and 6 m below 51 MHz, VARA FM above), unplanned stretches marked green. On FM (10 m 29.5+, 6 m 51+, 2 m and up) the ad hoc lists give **free simplex channels** on the usual steps (20 kHz; 25 kHz on 70 cm), neighbours in one row, each at least 15 kHz (25 on 70 cm) from any plan's channel; VARA FM channels say **narrow only** or **narrow & wide** (wide, the 9600-baud data port, needs about 25 kHz: 35 on 70 cm), and a VARA FM modem's **Width** (its setup, the same as in VARA FM) decides which get **Use**. **Ad hoc voice** and **Ad hoc VARA** (owner 2026-11-16) list the ranges
   where you can start a contact or a VARA session: inside your privileges, set aside by no plan for anything else
   (VARA: where a plan sets data aside or no plan names any use, never the CW stretches), clear of every channel in
   the table, your local plans' and the Winlink gateways' included (3 kHz either side on HF, 15–25 kHz on VHF/UHF),
@@ -349,6 +349,15 @@ you chose is remembered. Each column shows:
   their plan no longer lists. A search costs about $0.20–0.50 of xAI. It also finds the area's **Winlink gateways**
   on VHF/UHF (VARA FM, packet): they go into the band plan as one entry under Plans and documents (untick to leave
   them out), so the Ad hoc lists keep clear of them.
+- **Winlink gateways from Winlink Express** (owner 2026-11-16): when Winlink Express is on this PC, the station also
+  reads Express's own RMS channel list (`<Express folder>\<callsign>\Data\RMS VHF Channels.dat` and
+  `RMS Channels.dat`; refresh it in Express: Open Session → Channel Selection → **Update Table Via Internet**, with
+  service codes **PUBLIC EMCOMM**). It keeps only **VARA** channels (VARA FM, VARA FM wide; VARA HF, 500, 2750) with the
+  service codes PUBLIC or EMCOMM, and measures each gateway's distance from its **grid square** to the station (its
+  place in station.yaml, else your grid in Settings, else your license ZIP). Two entries appear under Plans and
+  documents, nearest first, with distance, direction, grid, hours and an EMCOMM mark: **VARA FM gateways within**
+  the search distance (in the band plan at first) and **VARA HF gateways within 370 mi** (offered: tick to add). A new
+  list from Express, a new distance or a new station place rebuilds them; costs nothing (no search, no xAI).
 - **Find nets around the world** (owner 2026-11-14): in Nets → Find nets, **What you can hear around the world today**
   lists, for your antenna, height, power and today's solar flux, each part of the world (Japan, China, Russia,
   Europe, South America, Antarctica, the Pacific…) with the bands and the hours (your time) you hear it at least 60%

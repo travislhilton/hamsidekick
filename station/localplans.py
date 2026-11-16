@@ -48,6 +48,10 @@ DOC_KINDS = {"band_plan": "Band plan", "ares_plan": "ARES plan", "races_plan": "
 FREQ_KINDS = {"repeater": "Repeater", "simplex": "Simplex", "hf_net": "HF net", "winlink": "Winlink gateway",
               "aprs": "APRS", "packet": "Packet", "link": "Link", "other": "Other"}
 GATEWAYS_KEY, GATEWAYS_TITLE = "search:winlink", "Winlink gateways near you (VHF/UHF, from the search)"
+# Winlink Express's own RMS channel list on this PC (station/winlink_channels.py, owner 2026-11-16): VARA only,
+# service codes PUBLIC / EMCOMM, distance from each gateway's grid square
+EXPRESS_KEYS = {"express:vhf": "vhf", "express:hf": "hf"}
+HF_KM = 600                                         # VARA HF gateways: about NVIS reach
 OFFLINE_KINDS = ("band_plan", "ares_plan", "races_plan", "ics205", "comm_plan")
 
 _SHAPE = (
@@ -248,7 +252,66 @@ class Plans:
         return (getattr(a, "cfg", None) or {}).get("license_class") or None
 
     # ----- the view -----
+    def _installs(self) -> list[str]:
+        from . import winlink
+        op = (getattr(self.st, "_saved", lambda: {})() or {}).get("operator") or {}
+        return winlink.find_installs([op["winlink_dir"]] if op.get("winlink_dir") else [])
+
+    def express_gateways(self) -> None:
+        """Rebuild the two "from Winlink Express" entries when the channel list, the distance or the station's place
+        changed. VHF/UHF goes into the band plan at first; VARA HF is offered (most are far away)."""
+        from . import winlink_channels as wc
+        try:
+            where = self.st.where()
+        except Exception:  # noqa: BLE001
+            where = None
+        try:
+            found = wc.files(self._installs())
+        except Exception:  # noqa: BLE001
+            found = {}
+        d = _load(self.st)
+        km = {"vhf": float(d.get("km", DEFAULT_KM)), "hf": float(d.get("hf_km", HF_KM))}
+        ing = d.get("ingested") or {}
+        changed = False
+        for key, kind in EXPRESS_KEYS.items():
+            p = found.get(kind)
+            prev = ing.get(key)
+            if not p or not where:
+                continue                                  # no list on this PC (or no place): keep what was there
+            try:
+                mt = p.stat().st_mtime
+            except OSError:
+                continue
+            sig = [str(p), mt, km[kind], [round(where[0], 3), round(where[1], 3)]]
+            if prev and prev.get("sig") == sig:
+                continue
+            mi = round(km[kind] / 1.609)
+            title = (f"Winlink VARA FM gateways within {mi} mi (VHF/UHF)" if kind == "vhf"
+                     else f"Winlink VARA HF gateways within {mi} mi") + " · Winlink Express's channel list"
+            try:
+                rows = wc.near(p, kind == "hf", where, km[kind])
+            except OSError as e:
+                print(f"localplans: Winlink Express channel list {p}: {e}", flush=True)
+                continue
+            freqs = []
+            for f in wc.as_frequencies(rows, title):
+                c, _ = _clean_freq(f, set(), require_source=False)
+                if c:
+                    freqs.append(c | {"source_doc": title, "gateway": f["gateway"], "kind": "winlink"})
+            ing[key] = {"at": time.time(), "title": title, "kind": "winlink", "org": None, "url": None,
+                        "authority": "local", "segments": [], "frequencies": dedupe(freqs), "sig": sig,
+                        "list_at": mt, "list_file": p.name,
+                        "excluded": prev.get("excluded", kind == "hf") if prev else kind == "hf"}
+            changed = True
+            print(f"localplans: {len(rows)} {kind.upper()} VARA gateways within {mi} mi from {p.name}", flush=True)
+        if changed:
+            with self.lock:
+                d2 = _load(self.st)
+                d2.setdefault("ingested", {}).update({k: ing[k] for k in EXPRESS_KEYS if k in ing})
+                _save(self.st, d2)
+
     def state(self) -> dict:
+        self.express_gateways()
         d = _load(self.st)
         last = d.get("last") or {}
         kept = d.get("kept") or []
@@ -267,11 +330,17 @@ class Plans:
             x["band"] = self._band(x["url"], ing)
         files = [dict(x, band=self._band(f"file:{x['id']}", ing)) for x in d.get("files") or []]
         self._mark_dups(files, last.get("documents") or [], docs, ing)
-        gw = ing.get(GATEWAYS_KEY)
-        gateways = {"key": GATEWAYS_KEY, "title": GATEWAYS_TITLE, "band": self._band(GATEWAYS_KEY, ing),
-                    "list": [{"freq_mhz": f["freq_mhz"], "mode": f.get("mode"), "use": f.get("use"),
-                              "org": f.get("org"), "source_url": f.get("source_url")}
-                             for f in sorted((gw or {}).get("frequencies") or [], key=lambda f: -f["freq_mhz"])]} if gw else None
+        gateways = []
+        for gk in (*EXPRESS_KEYS, GATEWAYS_KEY):
+            gw = ing.get(gk)
+            if not gw:
+                continue
+            fs = gw.get("frequencies") or []
+            gateways.append({"key": gk, "title": gw.get("title") or GATEWAYS_TITLE, "band": self._band(gk, ing),
+                             "express": gk in EXPRESS_KEYS, "list_at": gw.get("list_at"),
+                             "list": [{"freq_mhz": f["freq_mhz"], "mode": f.get("mode"), "use": f.get("use"),
+                                       "org": f.get("org"), "source_url": f.get("source_url"), "gateway": f.get("gateway")}
+                                      for f in (fs if gk in EXPRESS_KEYS else sorted(fs, key=lambda f: -f["freq_mhz"]))]})
         return {"key": bool(self.key()), "location": netfind.location(self.st), "km": d.get("km", DEFAULT_KM),
                 "busy": self.busy, "saving": self.saving, "at": last.get("at"),
                 "stale": bool(last.get("at")) and time.time() - last["at"] > STALE_S,
@@ -326,6 +395,11 @@ class Plans:
     def settings(self, body: dict) -> dict:
         with self.lock:
             d = _load(self.st)
+            if "hf_km" in body:
+                hk = netfind._num(body.get("hf_km"))
+                if not hk or not 50 <= hk <= 3000:
+                    raise ValueError("the HF gateway distance must be 50 to 3000 km")
+                d["hf_km"] = hk
             if "km" in body:
                 km = netfind._num(body.get("km"))
                 if not km or not 5 <= km <= 400:
@@ -653,6 +727,7 @@ class Plans:
     def consolidated(self) -> dict:
         """The consolidated, reconciled band plan for this area (consolidate.py)."""
         from . import consolidate
+        self.express_gateways()
         d = _load(self.st)
         sources = [{"id": k, "name": e.get("title") + (f" ({e['org']})" if e.get("org") else ""),
                     "authority": e.get("authority") or "local", "url": e.get("url"),

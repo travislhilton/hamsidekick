@@ -35,7 +35,7 @@ from . import bandplan
 
 USES = ("chat", "shared", "winlink")
 MODEM = {"radio": None, "kind": "hf", "host": "127.0.0.1", "cmd_port": 8300, "data_port": 8301, "bw": None,
-         "use": "shared", "enabled": False, "handed_off": False}
+         "use": "shared", "enabled": False, "handed_off": False, "fm_width": "narrow"}
 PORTS = (8300, 8310, 8320, 8330, 8340, 8350)       # suggested pairs: cmd, cmd + 1
 CHECK_S = 5
 
@@ -402,6 +402,10 @@ class Link:
             if body["bw"] not in (None, "", 500, 2300, 2750):
                 raise ValueError("VARA HF bandwidth is 500, 2300 or 2750 Hz")
             c["bw"] = body["bw"] or None
+        if "fm_width" in body:                               # VARA FM narrow / wide, as set in VARA FM itself
+            if body["fm_width"] not in ("narrow", "wide"):
+                raise ValueError("VARA FM is narrow or wide")
+            c["fm_width"] = body["fm_width"]
         if "enabled" in body:
             c["enabled"] = bool(body["enabled"])
         for orid, o in mods.items():                         # two modems never share a port on one host

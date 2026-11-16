@@ -244,6 +244,55 @@ def _guard(f: float) -> float:
     return 0.003 if f < 30 else 0.015 if f < 400 else 0.025
 
 
+def WIDE_GUARD(c: float) -> float:  # noqa: N802
+    """How far a VARA FM wide signal stays from another channel: 25 kHz (2 m, 6 m, 1.25 m), 35 kHz on 70 cm."""
+    return 0.025 if c < 400 else 0.035
+
+
+def fm_at(f: float) -> bool:
+    """Where the band is used channel by channel in FM: 10 m 29.5+, 6 m 51+, 2 m and up."""
+    return 29.5 - EPS <= f <= 29.7 + EPS or 51.0 - EPS <= f <= 54.0 or f >= 144.0
+
+
+def _fm_step(f: float) -> float:
+    """The usual FM simplex channel step: 25 kHz on 70 cm and up, 20 kHz below (2 m, 1.25 m, 6 m, 10 m)."""
+    return 0.025 if f >= 400 else 0.02
+
+
+def _fm_points(band: str, p: dict, chans: list[float], kind: str) -> list[dict]:
+    """The free FM simplex frequencies in one open stretch: channel steps from its lower edge, each at least a guard
+    (15 kHz on 2 m and 1.25 m, 25 kHz on 70 cm, as in _guard) from every channel any plan names."""
+    step = _fm_step(p["from"])
+    pts, k = [], 0
+    while True:
+        f = round(p["from"] + k * step, 4)
+        k += 1
+        if f > p["to"] + EPS:
+            break
+        if any(abs(f - c) < (0.015 if c < 400 else 0.025) - EPS for c in chans):
+            continue
+        # VARA FM wide (the 9600-baud data port) spreads to about 25 kHz: it needs more room than narrow (owner
+        # 2026-11-16 "consider bandwidth for WIDE and NARROW"). Voice and narrow: the guard above.
+        wide = not any(abs(f - c) < WIDE_GUARD(c) - EPS for c in chans)
+        pts.append((f, wide))
+    runs: list[list[tuple]] = []
+    for f, wide in pts:                                   # neighbouring free channels make one row
+        if runs and abs(f - runs[-1][-1][0] - step) <= EPS and (kind == "voice" or runs[-1][-1][1] == wide):
+            runs[-1].append((f, wide))
+        else:
+            runs.append([(f, wide)])
+    out = []
+    for rw in runs:
+        r = [f for f, _ in rw]
+        auto = any(x <= r[-1] and y >= r[0] for x, y in bandplan.AUTO_DATA)
+        out.append({"band": band, "from": r[0], "to": r[-1], "channel": True, "step": step, "count": len(r),
+                    "unplanned": p["unplanned"], "uses": p["uses"], "mode": "FM" if kind == "voice" else "VARA FM",
+                    "wide": kind == "data" and rw[0][1],
+                    "auto": auto, "note": ("shared with automatic data stations (Winlink gateways, packet): listen "
+                                           "first, and move off a gateway's frequency" if auto else "")})
+    return out
+
+
 def open_ranges(table: dict, kind: str) -> list[dict]:
     """Stretches where the operator may start an ad hoc `kind` ("voice" or "data", e.g. VARA) session: inside their
     privileges, set aside by no plan for anything else, clear of every channel. Each: {band, from, to, unplanned
@@ -289,7 +338,12 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
             pieces.append({"from": r["from"], "to": r["to"], "uses": uses, "unplanned": not plan, "open_lo": near})
         chans = sorted(r["from"] for r in b["rows"] if r["type"] == "channel")
         for p in pieces:
-            w = WIDTH[kind] if hf else 0
+            if fm_at(p["from"]):
+                if not p["unplanned"]:                    # FM: only where a plan names the use (simplex, local option,
+                    out += _fm_points(b["band"], p, chans, kind)   # digital); the gaps between segments border repeaters  # FM is used channel by channel (owner 2026-11-16: 2 m
+                continue                                      # showed nothing: its plans name a channel every 20-40 kHz)
+            ssb = hf or p["from"] < 51                     # 6 m below 51 MHz is SSB / CW / data, like HF
+            w = WIDTH[kind] if ssb else 0
             cuts = [(f - _guard(f), f + _guard(f)) for f in chans]
             if not p["open_lo"]:
                 cuts.append((p["from"], p["from"] + w))   # the whole signal inside the stretch
@@ -305,11 +359,11 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
             if at < p["to"]:
                 free.append((at, p["to"]))
             for a, z in free:
-                fm = not hf or a >= 29.5                  # 10 m FM (repeaters, simplex) is as wide as VHF FM
-                if z - a < (0.04 if not hf else 0.02 if fm else 0.005 if kind == "voice" else 0.002):
+                fm = not ssb or a >= 29.5 and hf          # 10 m FM (repeaters, simplex) is as wide as VHF FM
+                if z - a < (0.04 if not ssb else 0.02 if fm else 0.005 if kind == "voice" else 0.002):
                     continue
-                mode = ("FM" if fm else "LSB" if a < 10 else "USB") if kind == "voice" and hf else "FM" if kind == "voice" \
-                    else "VARA HF (USB dial)" if hf else "VARA FM"
+                mode = ("FM" if fm else "LSB" if a < 10 else "USB") if kind == "voice" and hf else "USB" if kind == "voice" \
+                    else "VARA HF (USB dial)" if hf or a < 51 else "VARA FM"
                 auto = any(x < z and y > a for x, y in bandplan.AUTO_DATA)
                 out.append({"band": b["band"], "from": round(a, 4), "to": round(z, 4), "unplanned": p["unplanned"],
                             "uses": p["uses"], "mode": mode, "auto": auto,
