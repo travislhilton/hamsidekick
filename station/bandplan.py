@@ -57,31 +57,31 @@ PLAN = [
     (1.8, 1.81, "digital modes"), (1.81, 1.843, "CW"), (1.81, 1.81, "QRP CW calling"), (1.84, 1.84, "FT8"), (1.843, 2.0, "SSB, SSTV and other wideband modes"),
     (1.91, 1.91, "SSB QRP"), (1.995, 2.0, "experimental"),
     # 80 m
-    (3.5, 3.51, "CW DX window"), (3.56, 3.56, "QRP CW calling"), (3.57, 3.6, "RTTY / data"), (3.573, 3.573, "FT8"),
+    (3.5, 3.57, "CW"), (3.5, 3.51, "CW DX window"), (3.56, 3.56, "QRP CW calling"), (3.57, 3.6, "RTTY / data"), (3.573, 3.573, "FT8"),
     (3.585, 3.6, "automatic-control data (Winlink, packet)"), (3.79, 3.8, "DX window (SSB)"), (3.845, 3.845, "SSTV"),
     (3.885, 3.885, "AM calling"), (3.985, 3.985, "SSB QRP"),
     # 60 m
     (5.3305, 5.3305, "60 m channel 1 (USB dial 5.3305; data and CW at centre)"), (5.3465, 5.3465, "60 m channel 2"),
     (5.357, 5.357, "60 m channel 3"), (5.3715, 5.3715, "60 m channel 4"), (5.4035, 5.4035, "60 m channel 5"),
     # 40 m
-    (7.03, 7.03, "QRP CW calling"), (7.04, 7.04, "RTTY / data DX"), (7.074, 7.074, "FT8"), (7.08, 7.125, "RTTY / data"),
+    (7.0, 7.04, "CW"), (7.04, 7.08, "CW and RTTY / data DX"), (7.03, 7.03, "QRP CW calling"), (7.04, 7.04, "RTTY / data DX"), (7.074, 7.074, "FT8"), (7.08, 7.125, "RTTY / data"),
     (7.1, 7.105, "automatic-control data (Winlink, packet)"), (7.171, 7.171, "SSTV"), (7.285, 7.285, "SSB QRP"),
     (7.29, 7.29, "AM calling"),
     # 30 m
-    (10.13, 10.14, "RTTY / data"), (10.136, 10.136, "FT8"), (10.14, 10.15, "packet / automatic-control data"),
+    (10.1, 10.13, "CW"), (10.13, 10.14, "RTTY / data"), (10.136, 10.136, "FT8"), (10.14, 10.15, "packet / automatic-control data"),
     # 20 m
-    (14.06, 14.06, "QRP CW calling"), (14.07, 14.095, "RTTY / data"), (14.074, 14.074, "FT8"),
+    (14.0, 14.07, "CW"), (14.06, 14.06, "QRP CW calling"), (14.07, 14.095, "RTTY / data"), (14.074, 14.074, "FT8"),
     (14.095, 14.0995, "packet / automatic-control data"), (14.1, 14.1, "NCDXF/IARU beacons: do not transmit"),
     (14.1005, 14.112, "packet / automatic-control data (VARA HF calling around 14.105)"),
     (14.23, 14.23, "SSTV"), (14.286, 14.286, "AM calling"), (14.3, 14.3, "maritime mobile and emergency traffic nets"),
     # 17 m
-    (18.1, 18.105, "RTTY / data (FT8 18.100)"), (18.105, 18.11, "packet / automatic-control data"),
+    (18.068, 18.1, "CW"), (18.1, 18.105, "RTTY / data (FT8 18.100)"), (18.105, 18.11, "packet / automatic-control data"),
     (18.11, 18.11, "NCDXF/IARU beacons: do not transmit"),
     # 15 m
-    (21.06, 21.06, "QRP CW calling"), (21.07, 21.11, "RTTY / data"), (21.074, 21.074, "FT8"),
+    (21.0, 21.07, "CW"), (21.06, 21.06, "QRP CW calling"), (21.07, 21.11, "RTTY / data"), (21.074, 21.074, "FT8"),
     (21.09, 21.1, "automatic-control data"), (21.15, 21.15, "NCDXF/IARU beacons: do not transmit"), (21.34, 21.34, "SSTV"),
     # 12 m
-    (24.915, 24.915, "FT8"), (24.92, 24.925, "RTTY / data"), (24.925, 24.93, "packet / automatic-control data"),
+    (24.89, 24.915, "CW"), (24.915, 24.915, "FT8"), (24.92, 24.925, "RTTY / data"), (24.925, 24.93, "packet / automatic-control data"),
     (24.93, 24.93, "NCDXF/IARU beacons: do not transmit"),
     # 10 m
     (28.0, 28.07, "CW"), (28.07, 28.15, "RTTY / data"), (28.074, 28.074, "FT8"), (28.12, 28.189, "automatic-control data"),
@@ -91,7 +91,7 @@ PLAN = [
     # 6 m
     (50.0, 50.1, "CW and beacons"), (50.1, 50.3, "SSB and CW"), (50.125, 50.125, "SSB DX calling"),
     (50.2, 50.2, "SSB calling"), (50.3, 50.6, "all modes"), (50.313, 50.313, "FT8"), (50.6, 50.8, "digital (non-voice)"),
-    (50.8, 51.0, "radio control"), (51.12, 51.48, "FM repeater inputs"), (51.62, 51.98, "FM repeater outputs"),
+    (50.8, 51.0, "radio control"), (51.0, 51.1, "Pacific DX window (weak signal)"), (51.5, 51.6, "FM simplex"), (51.12, 51.48, "FM repeater inputs"), (51.62, 51.98, "FM repeater outputs"),
     (52.0, 52.48, "FM repeater inputs"), (52.5, 52.98, "FM repeater outputs"), (52.525, 52.525, "FM simplex calling"),
     (53.0, 53.48, "FM repeater inputs"), (53.5, 53.98, "FM repeater outputs"),
     # 2 m
@@ -105,6 +105,7 @@ PLAN = [
     (146.4, 146.58, "FM simplex"), (146.52, 146.52, "national FM simplex calling frequency"),
     (146.61, 147.39, "FM repeater outputs"), (147.42, 147.57, "FM simplex"), (147.6, 147.99, "FM repeater inputs"),
     # 1.25 m
+    (219.0, 220.0, "fixed digital message forwarding links only (97.303): not for ad hoc use"),
     (222.0, 222.15, "weak-signal CW / SSB"), (222.1, 222.1, "SSB calling"), (222.15, 222.25, "local option (weak signal, repeater inputs, control)"), (222.25, 223.38, "FM repeater inputs"),
     (223.4, 223.52, "FM simplex"), (223.5, 223.5, "FM simplex calling"), (223.52, 223.64, "digital / packet"),
     (223.64, 223.7, "links and control"), (223.71, 223.85, "local option"), (223.85, 224.98, "FM repeater outputs"),

@@ -162,6 +162,8 @@ def test_open_for_ad_hoc_voice_and_vara(tmp_path):
     vara = _at(d, 14.105)
     assert vara and vara[0]["auto"] and "Winlink" in vara[0]["note"] and vara[0]["mode"].startswith("VARA HF")
     assert not _at(d, 14.074) and not _at(d, 14.1)                 # FT8, the beacons
+    assert _at(d, 14.13)[0]["unplanned"] and _at(d, 21.13)[0]["unplanned"]   # VARA: unplanned ranges too (11-16)
+    assert not _at(d, 3.54) and not _at(d, 7.05) and not _at(d, 219.5)      # HF CW; 219-220 is links only
     assert _at(d, 145.05)[0]["mode"] == "VARA FM" and not _at(d, 144.39)
     assert not any(x["band"] in ("33 cm", "23 cm", "60 m") for x in v + d)
     tech = C.open_ranges(C.build("technician", []), "voice")
@@ -230,3 +232,24 @@ def test_no_duplicates_when_the_band_plan_is_changed(tmp_path, xai_key):
     assert len(ch) == 1 and ch[0]["kept"] and len(ch[0]["statements"]) == 1   # kept from that plan: one statement
     p.keep([tac["id"]])
     assert len([k for k in p.state()["kept"] if k["freq_mhz"] == 147.0]) == 1
+
+
+def test_the_search_finds_winlink_gateways_and_they_go_into_the_band_plan(tmp_path, xai_key):
+    """Owner 2026-11-16: "also search in the winlink gateways and include those for our area (VHF/UHF)"."""
+    gw = {"freq_mhz": 145.07, "mode": "FM", "kind": "winlink", "use": "Winlink gateway K7ABC-10 (VARA FM)",
+          "org": "K7ABC", "source_url": "https://example.org/gateways"}
+    hf = dict(gw, freq_mhz=7.1035, mode="USB", use="Winlink gateway K7ABC (VARA HF)")
+    st, p, sent, _ = _plans(tmp_path, answer={"clubs": [], "documents": [], "frequencies": [gw, hf, dict(gw)]})
+    s = p.search()
+    assert "Winlink RMS gateways on VHF / UHF" in sent[0]["input"][0]["content"]
+    g = s["gateways"]
+    assert g["band"]["in"] and [x["freq_mhz"] for x in g["list"]] == [145.07]       # VHF/UHF only, once
+    t = p.consolidated()
+    ch = [x for x in _rows(t, "2 m") if x["type"] == "channel" and x["from"] == 145.07]
+    assert ch and ch[0]["use"] == "Winlink gateway K7ABC-10 (VARA FM)"
+    assert not _at(t["open"]["data"], 145.07)                                       # ad hoc VARA keeps clear of it
+    p.choose(g["key"], False)                                                       # leave them out
+    assert not p.state()["gateways"]["band"]["in"]
+    assert not [x for x in _rows(p.consolidated(), "2 m") if x["type"] == "channel" and x["from"] == 145.07]
+    p.choose(g["key"], True)
+    assert p.state()["gateways"]["band"]["in"]

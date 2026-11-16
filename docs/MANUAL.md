@@ -314,9 +314,12 @@ you chose is remembered. Each column shows:
   privileges. **Plans read** lets you mark a plan as the state coordinator's or a local plan, leave it out, or read
   them all again. **Print** prints the table. **Ad hoc voice** and **Ad hoc VARA** (owner 2026-11-16) list the ranges
   where you can start a contact or a VARA session: inside your privileges, set aside by no plan for anything else
-  (VARA: only where a plan sets data aside, never the CW stretches), clear of every channel in the table, your local
-  plans' included (3 kHz either side on HF, 15–25 kHz on VHF/UHF), with room for the whole signal. **Unplanned**
-  marks ranges no plan names any use for; ranges shared with Winlink gateways say so. Listen first.
+  (VARA: where a plan sets data aside or no plan names any use, never the CW stretches), clear of every channel in
+  the table, your local plans' and the Winlink gateways' included (3 kHz either side on HF, 15–25 kHz on VHF/UHF),
+  with room for the whole signal. **Unplanned** (green) marks ranges no plan names any use for; ranges shared with
+  automatic Winlink stations say so. On **Ad hoc VARA**, **Use** sets your VARA radio (the Winlink radio set up for
+  VARA chat) to the middle of a range that fits its modem (VARA HF or VARA FM): a CAT radio is tuned, otherwise its
+  card is set and you set the radio. Both lists run from the highest band down, as the table does. Listen first.
 - **Plans** (Nets → Plans, owner 2026-11-15): the **band plan** is built in (your privileges for phone, data and CW
   by license class, set in Settings → Station agent, and what the ARRL band plan sets each segment aside for) and
   works with no internet. **Find local plans** searches for the clubs and EMCOMM groups within the distance you set,
@@ -326,7 +329,9 @@ you chose is remembered. Each column shows:
   documents are saved on this PC (download them from the list) so they are there in an outage. Plans that are
   members-only are never fetched: add your copy with **Add a plan you have** and its frequencies are read and offered
   the same way (the file stays on this PC). Search again now and then: it marks new frequencies and kept channels
-  their plan no longer lists. A search costs about $0.20–0.50 of xAI.
+  their plan no longer lists. A search costs about $0.20–0.50 of xAI. It also finds the area's **Winlink gateways**
+  on VHF/UHF (VARA FM, packet): they go into the band plan as one entry under Plans and documents (untick to leave
+  them out), so the Ad hoc lists keep clear of them.
 - **Find nets around the world** (owner 2026-11-14): in Nets → Find nets, **What you can hear around the world today**
   lists, for your antenna, height, power and today's solar flux, each part of the world (Japan, China, Russia,
   Europe, South America, Antarctica, the Pacific…) with the bands and the hours (your time) you hear it at least 60%

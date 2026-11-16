@@ -232,7 +232,8 @@ def lookup(table: dict, freq_mhz) -> dict | None:
 # ----- open for ad hoc use (owner 2026-11-16: "I also need a way to see unplanned frequency ranges where I can do
 # ad hoc VARA sessions and also Voice sessions") -----
 # Never: beacons, satellites, repeater inputs / outputs, links, ATV, experimental. Voice also avoids the data segments
-# (and on VHF/UHF the weak-signal SSB / CW stretches); VARA avoids weak-signal and FM simplex (that is for voice).
+# (and on VHF/UHF the weak-signal SSB / CW stretches); VARA goes where a plan sets data aside or no plan names any use
+# (unplanned), never HF CW / weak signal.
 _NEVER = {"beacon", "satellite", "repeater_in", "repeater_out", "link", "atv", "experimental"}
 _AVOID = {"voice": {"data"}, "data": {"weak", "simplex"}}
 WIDTH = {"voice": 0.003, "data": 0.003}       # an SSB voice or VARA HF (2.75 kHz) signal on HF, kept inside the stretch
@@ -268,8 +269,9 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
             c = set().union(*(cats(s["use"]) for s in plan)) if plan else set()
             if c & _NEVER:
                 continue
-            if kind == "data" and ("data" not in c or (hf and "weak" in c)):
-                continue                                  # VARA only where a plan sets data aside (never HF CW)
+            if kind == "data" and ((plan and "data" not in c) or (hf and "weak" in c)):
+                continue                                  # VARA: where a plan sets data aside, or no plan names a use
+                                                          # (owner 2026-11-16: "unplanned" for VARA too); never HF CW
             cw_only = any(re.search(r"\bcw\b", (s["use"] or "").lower())
                           and not re.search(r"ssb|phone|voice|sideband", (s["use"] or "").lower()) for s in plan)
             if kind == "voice" and (c & _AVOID["voice"] or (not hf and "weak" in c) or cw_only):

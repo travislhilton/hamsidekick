@@ -47,6 +47,7 @@ DOC_KINDS = {"band_plan": "Band plan", "ares_plan": "ARES plan", "races_plan": "
              "comm_plan": "Communications plan", "repeater_list": "Repeater list", "other": "Other"}
 FREQ_KINDS = {"repeater": "Repeater", "simplex": "Simplex", "hf_net": "HF net", "winlink": "Winlink gateway",
               "aprs": "APRS", "packet": "Packet", "link": "Link", "other": "Other"}
+GATEWAYS_KEY, GATEWAYS_TITLE = "search:winlink", "Winlink gateways near you (VHF/UHF, from the search)"
 OFFLINE_KINDS = ("band_plan", "ares_plan", "races_plan", "ics205", "comm_plan")
 
 _SHAPE = (
@@ -78,7 +79,11 @@ def _prompt(loc: dict, km: int) -> str:
             "3. Communications plans: county and section ARES emergency communications plans, county RACES plans, "
             "published ICS-205 radio plans, and the frequencies they assign (primary and alternate repeaters, "
             "simplex and tactical channels, linked systems, Winlink gateways, HF emergency nets). Only public "
-            "documents: never a members-only or signed-in page.\n" + _SHAPE)
+            "documents: never a members-only or signed-in page.\n"
+            f"4. Winlink RMS gateways on VHF / UHF (VARA FM and packet) within about {km} km: winlink.org's public "
+            "gateway listing and map, the area's ARES / club pages and the state's Winlink pages. Each one as a "
+            "frequency with kind \"winlink\", use \"Winlink gateway <its callsign> (VARA FM)\" or \"(packet)\", its "
+            "callsign as org, and the page it is listed on.\n" + _SHAPE)
 
 
 def _extract_prompt(name: str, text: str) -> tuple[str, str]:
@@ -262,12 +267,17 @@ class Plans:
             x["band"] = self._band(x["url"], ing)
         files = [dict(x, band=self._band(f"file:{x['id']}", ing)) for x in d.get("files") or []]
         self._mark_dups(files, last.get("documents") or [], docs, ing)
+        gw = ing.get(GATEWAYS_KEY)
+        gateways = {"key": GATEWAYS_KEY, "title": GATEWAYS_TITLE, "band": self._band(GATEWAYS_KEY, ing),
+                    "list": [{"freq_mhz": f["freq_mhz"], "mode": f.get("mode"), "use": f.get("use"),
+                              "org": f.get("org"), "source_url": f.get("source_url")}
+                             for f in sorted((gw or {}).get("frequencies") or [], key=lambda f: -f["freq_mhz"])]} if gw else None
         return {"key": bool(self.key()), "location": netfind.location(self.st), "km": d.get("km", DEFAULT_KM),
                 "busy": self.busy, "saving": self.saving, "at": last.get("at"),
                 "stale": bool(last.get("at")) and time.time() - last["at"] > STALE_S,
                 "clubs": last.get("clubs") or [], "documents": last.get("documents") or [], "frequencies": found,
                 "left_out": last.get("left_out") or [], "error": last.get("error"), "cost_usd": last.get("cost_usd"),
-                "changes": last.get("changes") or {}, "kept": kept, "files": files,
+                "changes": last.get("changes") or {}, "kept": kept, "files": files, "gateways": gateways,
                 "license_class": self._class(), "doc_kinds": DOC_KINDS, "freq_kinds": FREQ_KINDS}
 
     def _mark_dups(self, files: list[dict], documents: list[dict], docs: dict, ing: dict) -> None:
@@ -375,11 +385,19 @@ class Plans:
             last = {"at": time.time(), "clubs": clubs, "documents": docs, "frequencies": freqs, "left_out": out[:60],
                     "changes": changes, "cost_usd": round(ticks / 1e10, 3) if isinstance(ticks, (int, float)) else None,
                     "error": None if (clubs or docs or freqs) else "the search found nothing with a source page"}
+            gws = [dict(f, source_doc=GATEWAYS_TITLE) for f in freqs if f["kind"] == "winlink" and f["freq_mhz"] > 30]
             with self.lock:
                 d = _load(self.st)
                 d["last"] = last
+                ing = d.setdefault("ingested", {})
+                prev = ing.get(GATEWAYS_KEY) or {}
+                if gws or prev:                   # owner 2026-11-16: "include those for our area (VHF/UHF)"
+                    ing[GATEWAYS_KEY] = {"at": time.time(), "title": GATEWAYS_TITLE, "kind": "winlink", "org": None,
+                                         "url": None, "authority": "local", "excluded": prev.get("excluded", False),
+                                         "segments": [], "frequencies": dedupe(gws)}
                 _save(self.st, d)
-            print(f"localplans: {len(clubs)} clubs, {len(docs)} documents, {len(freqs)} frequencies", flush=True)
+            print(f"localplans: {len(clubs)} clubs, {len(docs)} documents, {len(freqs)} frequencies, "
+                  f"{len(gws)} VHF/UHF Winlink gateways", flush=True)
         finally:
             self.busy = False
         self.save_copies(background=True)
