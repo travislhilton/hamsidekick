@@ -60,6 +60,15 @@ def _fcc_segments() -> list[tuple[float, float, str]]:
     return out
 
 
+def _w(use) -> str:
+    return " ".join(re.sub(r"[^0-9a-z.]+", " ", str(use or "").lower()).split()).strip(" .")
+
+
+def _norm_url(u) -> str:
+    u = re.sub(r"^https?://(www\.)?", "", str(u or "").strip().lower()).split("#")[0]
+    return u.rstrip("/")
+
+
 def _privs(a: float, b: float, cls: str | None) -> dict | None:
     if not cls or cls not in bandplan.ALLOC:
         return None
@@ -75,6 +84,7 @@ def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None) 
     srcs = [{"id": "fcc", "name": "FCC rules (97.301, 97.305)", "authority": "fcc"},
             {"id": "arrl", "name": "ARRL band plan", "authority": "arrl"}]
     ranges, points = [], []
+    said = set()                                  # (from, to, source, words): a source saying the same thing twice
     for a, b, w in _fcc_segments():
         ranges.append((a, b, "fcc", "fcc", w))
     for a, b, w in bandplan.PLAN:
@@ -93,15 +103,35 @@ def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None) 
             if not bandplan.band(a) or not bandplan.band(b):
                 continue
             use = " ".join(str(g.get("use") or "").split())[:120]
+            k = (round(a, 4), round(b, 4), s["id"], _w(use))
+            if k in said:
+                continue
+            said.add(k)
             if b - a > EPS:
                 ranges.append((a, b, s["id"], auth, use))
             else:
                 points.append({"freq": a, "src": s["id"], "auth": auth, "use": use})
         for f in s.get("frequencies") or []:
-            points.append({"freq": f["freq_mhz"], "src": s["id"], "auth": auth, "use": f.get("use"), "ch": f})
+            k = (round(float(f["freq_mhz"]), 4), round(float(f["freq_mhz"]), 4), s["id"], _w(f.get("use")))
+            if k in said:
+                continue
+            said.add(k)
+            points.append({"freq": f["freq_mhz"], "src": s["id"], "auth": auth, "use": f.get("use"), "ch": f,
+                           "url": s.get("url"), "file": s["id"][5:] if str(s["id"]).startswith("file:") else None})
     if kept:
         srcs.append({"id": "kept", "name": "Your plan channels", "authority": "kept", "channels": len(kept)})
         for k in kept:
+            f4 = round(float(k["freq_mhz"]), 4)
+            # the same channel from the plan it was kept from: one statement, marked as yours
+            same = next((p for p in points if round(float(p["freq"]), 4) == f4 and _w(p["use"]) == _w(k.get("use"))
+                         and ((p.get("url") and _norm_url(p["url"]) == _norm_url(k.get("source_url")))
+                              or (p.get("file") and p["file"] == k.get("file_id")))), None)
+            if same:
+                same["kept"] = True
+                continue
+            if any(p["src"] == "kept" and round(float(p["freq"]), 4) == f4 and _w(p["use"]) == _w(k.get("use"))
+                   for p in points):
+                continue
             points.append({"freq": k["freq_mhz"], "src": "kept", "auth": "kept", "use": k.get("use"), "ch": k})
     names = {s["id"]: s["name"] for s in srcs}
 
@@ -175,7 +205,7 @@ def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None) 
                         flags.append(f"its input {f + off:.4f} is outside your privileges")
             out_rows.append({"type": "channel", "from": f, "to": f, "use": top["use"], "by": names.get(top["src"]),
                              "authority": top["auth"], "statements": st, "flags": flags, "privileges": priv,
-                             "kept": any(p["auth"] == "kept" for p in ps), "mode": ch.get("mode"),
+                             "kept": any(p["auth"] == "kept" or p.get("kept") for p in ps), "mode": ch.get("mode"),
                              "offset_mhz": ch.get("offset_mhz"), "tone_hz": ch.get("tone_hz"),
                              "priority": ch.get("priority"), "org": ch.get("org"), "source_url": ch.get("source_url")})
         out_rows.sort(key=lambda r: (r["from"], r["type"] == "channel"))

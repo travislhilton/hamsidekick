@@ -94,7 +94,7 @@ def _extract_prompt(name: str, text: str) -> tuple[str, str]:
 
 
 def _clean_segments(raw) -> list[dict]:
-    out = []
+    out, seen = [], set()
     for g in raw or []:
         if not isinstance(g, dict):
             continue
@@ -106,6 +106,10 @@ def _clean_segments(raw) -> list[dict]:
         a, b = min(a, b), max(a, b)
         if not bandplan.band(a) or not bandplan.band(b) or b - a > 60:
             continue
+        k = (round(a, 4), round(b, 4), words(use))
+        if k in seen:
+            continue                                  # the same range, said twice
+        seen.add(k)
         out.append({"from_mhz": round(a, 4), "to_mhz": round(b, 4), "use": use})
     return out[:600]
 
@@ -131,9 +135,35 @@ def _url_ok(u) -> bool:
     return isinstance(u, str) and u.lower().startswith(("http://", "https://")) and len(u) < 500
 
 
+def words(use) -> str:
+    """A use as compared for duplicates: "FM Simplex," and "fm simplex" are the same."""
+    return " ".join(re.sub(r"[^0-9a-z.]+", " ", str(use or "").lower()).split()).strip(" .")
+
+
+def same_key(f: dict) -> tuple:
+    """A channel's identity for duplicates: frequency, offset, tone and use (not where it was found)."""
+    off, tone = f.get("offset_mhz"), f.get("tone_hz")
+    return (round(float(f["freq_mhz"]), 4), round(off, 4) if off is not None else None,
+            round(tone, 1) if tone is not None else None, words(f.get("use")))
+
+
+def dedupe(freqs: list[dict]) -> list[dict]:
+    """One entry per channel: the first kept, gaps filled from the later ones (priority, net, org, tone)."""
+    out: dict[tuple, dict] = {}
+    for f in freqs:
+        k = same_key(f)
+        if k not in out:
+            out[k] = f
+        else:
+            for x in ("priority", "net", "org", "kind"):
+                if not out[k].get(x) or (x == "kind" and out[k][x] == "other"):
+                    if f.get(x):
+                        out[k][x] = f[x]
+    return list(out.values())
+
+
 def _fid(f: dict) -> str:
-    return "p" + hashlib.sha1(json.dumps([round(f["freq_mhz"], 4), f.get("offset_mhz"), f.get("tone_hz"),
-                                          (f.get("use") or "").casefold()]).encode()).hexdigest()[:8]
+    return "p" + hashlib.sha1(json.dumps(list(same_key(f))).encode()).hexdigest()[:8]
 
 
 def _clean_freq(raw, seen: set[str], require_source: bool = True) -> tuple[dict | None, str]:
@@ -161,6 +191,14 @@ def _clean_freq(raw, seen: set[str], require_source: bool = True) -> tuple[dict 
     out["plan_says"] = seg["what"] if seg else None
     out["id"] = _fid(out)
     return out, ""
+
+
+def _merge_found(last: dict, new: list[dict], from_this) -> None:
+    """Frequencies found, after a plan is read (again): that plan's earlier channels are replaced by the new ones, and
+    a channel already listed (found by the search or another plan) is not listed twice."""
+    keep = [f for f in last.get("frequencies") or [] if not from_this(f)]
+    have = {same_key(f) for f in keep}
+    last["frequencies"] = keep + [f for f in dedupe(new) if same_key(f) not in have]
 
 
 def _path(st) -> Path:
@@ -191,7 +229,7 @@ class Plans:
         self.lock = threading.Lock()
         self.busy = False
         self.saving = False
-        self.copy_lock = threading.Lock()
+        self.copy_lock = threading.RLock()           # one copy / read at a time (choose() reads under it too)
         self.reading: set[str] = set()               # plans being read into the band plan now (choose)
 
     def docdir(self) -> Path:
@@ -209,14 +247,21 @@ class Plans:
         d = _load(self.st)
         last = d.get("last") or {}
         kept = d.get("kept") or []
-        kept_ids = {k["id"] for k in kept}
-        found = [dict(f, kept=f["id"] in kept_ids) for f in last.get("frequencies") or []]
+        kept_ids, kept_keys = {k["id"] for k in kept}, {same_key(k) for k in kept}
+        found, seen_keys = [], set()                 # offered to keep: only channels not kept and not listed already
+        for f in last.get("frequencies") or []:
+            k = same_key(f)
+            if k in seen_keys:
+                continue
+            seen_keys.add(k)
+            found.append(dict(f, kept=f["id"] in kept_ids or k in kept_keys))
         docs = d.get("docs") or {}
         ing = d.get("ingested") or {}
         for x in last.get("documents") or []:
             x["saved"] = docs.get(x["url"])
             x["band"] = self._band(x["url"], ing)
         files = [dict(x, band=self._band(f"file:{x['id']}", ing)) for x in d.get("files") or []]
+        self._mark_dups(files, last.get("documents") or [], docs, ing)
         return {"key": bool(self.key()), "location": netfind.location(self.st), "km": d.get("km", DEFAULT_KM),
                 "busy": self.busy, "saving": self.saving, "at": last.get("at"),
                 "stale": bool(last.get("at")) and time.time() - last["at"] > STALE_S,
@@ -224,6 +269,41 @@ class Plans:
                 "left_out": last.get("left_out") or [], "error": last.get("error"), "cost_usd": last.get("cost_usd"),
                 "changes": last.get("changes") or {}, "kept": kept, "files": files,
                 "license_class": self._class(), "doc_kinds": DOC_KINDS, "freq_kinds": FREQ_KINDS}
+
+    def _mark_dups(self, files: list[dict], documents: list[dict], docs: dict, ing: dict) -> None:
+        """A plan or file that is the same document as another (the same address, or the same bytes) gets
+        band["dup"] = the other's title and is not offered for the band plan. The one already read wins, then files,
+        then the search's order."""
+        items = [(f"file:{x['id']}", x.get("name") or x.get("title"), x, None,
+                  (ing.get(f"file:{x['id']}") or {}).get("sha") or self._sha(x)) for x in files]
+        items += [(x["url"], x["title"], x, netfind._norm_url(x["url"]),
+                   (docs.get(x["url"]) or {}).get("sha") or self._sha(docs.get(x["url"]) or {})) for x in documents]
+        items.sort(key=lambda t: not t[2]["band"]["read"])
+        by_url, by_sha = {}, {}
+        for key, title, x, url, sha in items:
+            first = (by_url.get(url) if url else None) or (by_sha.get(sha) if sha else None)
+            if first and not x["band"]["in"]:
+                x["band"]["dup"] = first
+                continue
+            if url:
+                by_url.setdefault(url, title)
+            if sha:
+                by_sha.setdefault(sha, title)
+
+    def _sha(self, rec: dict) -> str | None:
+        """A saved copy's content hash (copies saved before 2026-11-16 have none recorded), remembered by file."""
+        p = self.docdir() / rec["path"] if rec.get("path") else None
+        if not p:
+            return None
+        try:
+            st = p.stat()
+        except OSError:
+            return None
+        cache = self.__dict__.setdefault("_shas", {})
+        k = (str(p), st.st_mtime_ns, st.st_size)
+        if k not in cache:
+            cache[k] = hashlib.sha1(p.read_bytes()).hexdigest()
+        return cache[k]
 
     def _band(self, key: str, ing: dict) -> dict:
         """One plan's place in the band plan: {"in", "reading", "error", "segments", "channels", "authority"}."""
@@ -273,16 +353,19 @@ class Plans:
                 obj = self._json(text)
             except ValueError:
                 obj = {}
-            clubs = [c for c in (self._club(x) for x in obj.get("clubs") or []) if c]
-            docs = [x for x in (self._doc(x, seen) for x in obj.get("documents") or []) if x]
-            freqs, out, ids = [], [], set()
+            clubs = list({c["name"].casefold(): c for c in reversed(
+                [c for c in (self._club(x) for x in obj.get("clubs") or []) if c])}.values())[::-1]
+            docs = list({netfind._norm_url(x["url"]): x for x in reversed(
+                [x for x in (self._doc(x, seen) for x in obj.get("documents") or []) if x])}.values())[::-1]
+            freqs, out = [], []
             for raw in obj.get("frequencies") or []:
                 f, why = _clean_freq(raw, seen)
-                if f and f["id"] not in ids:
-                    ids.add(f["id"])
+                if f:
                     freqs.append(f)
                 elif why:
                     out.append(why)
+            freqs = dedupe(freqs)
+            ids = {f["id"] for f in freqs}
             kept = d.get("kept") or []
             prev = {f["id"] for f in (d.get("last") or {}).get("frequencies") or []}
             changes = {"new": [f["id"] for f in freqs if prev and f["id"] not in prev],
@@ -367,7 +450,8 @@ class Plans:
                         name, kind = f"{sid}.txt", "text/plain"
                         (self.docdir() / name).write_text(f"{x['title']}\n{x['url']}\nSaved {time.strftime('%Y-%m-%d')}"
                                                           f"\n\n{body}", encoding="utf-8")
-                    rec.update(path=name, type=kind, bytes=(self.docdir() / name).stat().st_size, id=sid)
+                    rec.update(path=name, type=kind, bytes=(self.docdir() / name).stat().st_size, id=sid,
+                               sha=hashlib.sha1(data).hexdigest())
                 except Exception as e:  # noqa: BLE001 - one document never stops the rest
                     rec["error"] = f"{type(e).__name__}: {e}"[:160]
                 with self.lock:
@@ -395,7 +479,7 @@ class Plans:
                 freqs.append(f)
             elif why:
                 out.append(why)
-        return _clean_segments(obj.get("segments")), freqs, out
+        return _clean_segments(obj.get("segments")), dedupe(freqs), out
 
     def ingest(self, force: bool = False, keys: list[str] | None = None, include: bool = False) -> dict:
         """Read every saved public plan (not yet read, or `force`) with xAI: its band segments and channels go into
@@ -404,6 +488,10 @@ class Plans:
         key = self.key()
         if not key:
             raise ValueError("set the xAI key first (Settings -> Station agent): it reads the plans")
+        with self.copy_lock:                         # never two reads of one plan at once
+            return self._ingest(key, force, keys, include)
+
+    def _ingest(self, key, force, keys, include) -> dict:
         d = _load(self.st)
         docs = d.get("docs") or {}
         meta = {x["url"]: x for x in (d.get("last") or {}).get("documents") or []}
@@ -417,7 +505,8 @@ class Plans:
                    "org": m.get("org"), "date": m.get("date"), "url": url,
                    "authority": (done.get(url) or {}).get("authority")
                    or ("coordinator" if rec.get("kind") == "band_plan" else "local"),
-                   "excluded": False if include else (done.get(url) or {}).get("excluded", False)}
+                   "excluded": False if include else (done.get(url) or {}).get("excluded", False),
+                   "sha": rec.get("sha") or self._sha(rec)}
             try:
                 segs, freqs, _ = self._read_plan(key, ent["title"], self.docdir() / rec["path"])
                 for f in freqs:
@@ -430,9 +519,7 @@ class Plans:
                 d = _load(self.st)
                 d.setdefault("ingested", {})[url] = ent
                 last = d.setdefault("last", {"at": None, "clubs": [], "documents": [], "frequencies": []})
-                have = {f["id"] for f in last.get("frequencies") or []}
-                last["frequencies"] = (last.get("frequencies") or []) + [f for f in ent.get("frequencies") or []
-                                                                          if f["id"] not in have]
+                _merge_found(last, ent.get("frequencies") or [], lambda f: f.get("source_doc") and f.get("source_url") == url)
                 _save(self.st, d)
             print(f"localplans: read {ent['title'][:60]}: {len(ent.get('segments') or [])} segments, "
                   f"{len(ent.get('frequencies') or [])} channels{' (' + ent['error'] + ')' if ent.get('error') else ''}",
@@ -462,6 +549,13 @@ class Plans:
             raise ValueError("that plan is members-only: it is never fetched. If you have it, add it below as a file")
         if not self.key():
             raise ValueError("set the xAI key first (Settings -> Sidekick & AI): it reads the plans")
+        shown = next((x for x in self.state()["documents"] if x["url"] == key), None)
+        if shown and shown["band"].get("dup"):
+            raise ValueError(f"that is the same document as “{shown['band']['dup']}”: tick that one instead")
+        rec0 = (d.get("docs") or {}).get(key) or {}
+        dup = rec0.get("path") and self._same_doc(rec0.get("sha") or self._sha(rec0), key)
+        if dup:
+            raise ValueError(f"that is the same document as “{dup}”, already read: tick that one instead")
         with self.lock:
             if key in self.reading:
                 return self.state()
@@ -484,6 +578,15 @@ class Plans:
                                 + str(rec.get("error") or "the page did not answer")}
                             _save(self.st, d2)
                         return
+                    dup = self._same_doc(rec.get("sha") or self._sha(rec), key)
+                    if dup:
+                        with self.lock:
+                            d2 = _load(self.st)
+                            d2.setdefault("ingested", {})[key] = {
+                                "at": time.time(), "title": doc["title"], "kind": doc["kind"], "url": key,
+                                "org": doc.get("org"), "error": f"the same document as “{dup}”: tick that one"}
+                            _save(self.st, d2)
+                        return
                     self.ingest(force=True, keys=[key], include=True)
             except Exception as e:  # noqa: BLE001
                 print(f"localplans: reading {key[:80]} failed: {e}", flush=True)
@@ -498,6 +601,20 @@ class Plans:
         else:
             run()
         return self.state()
+
+    def _same_doc(self, sha: str | None, key: str) -> str | None:
+        """The title of another plan already read whose document is byte for byte this one, or None."""
+        if not sha:
+            return None
+        d = _load(self.st)
+        docs = d.get("docs") or {}
+        for k, e in (d.get("ingested") or {}).items():
+            if k == key or e.get("error"):
+                continue
+            other = e.get("sha") or (self._sha(docs[k]) if k in docs else None)
+            if other == sha:
+                return e.get("title") or k
+        return None
 
     def set_source(self, key: str, excluded=None, authority=None) -> dict:
         """The operator's say on one ingested plan: leave it out of the band plan, or name it the coordinator's."""
@@ -558,18 +675,22 @@ class Plans:
             raise ValueError(f"the file is larger than {MAX_DOC_BYTES // 1024 ** 2} MB")
         if Path(name).suffix.lower() not in (".pdf", ".txt", ".docx", ".html", ".htm", ".csv"):
             raise ValueError("add a PDF, Word (.docx), text, CSV or web page file")
+        sha = hashlib.sha1(data).hexdigest()
+        sid = sha[:12]
+        dup = self._same_doc(sha, f"file:{sid}")
+        if dup:
+            raise ValueError(f"this file is the same document as “{dup}”, already in Plans: tick that one instead")
         text = knowledge.extract(name, data)
         key = self.key()
         if not key:
             raise ValueError("set the xAI key first (Settings -> Station agent): it reads the frequencies")
-        sid = hashlib.sha1(data).hexdigest()[:12]
         self.docdir().mkdir(parents=True, exist_ok=True)
         stored = f"{sid}{Path(name).suffix.lower()}"
         (self.docdir() / stored).write_bytes(data)
         sys_, user = _extract_prompt(name, text)
         obj = self._call_extract(key, sys_, user)
         segs = _clean_segments(obj.get("segments"))
-        freqs, out = [], []
+        freqs, out = [], []  # (deduped below)
         for raw in obj.get("frequencies") or []:
             f, why = _clean_freq(dict(raw if isinstance(raw, dict) else {}, source_url=""), set(),
                                  require_source=False)
@@ -591,10 +712,9 @@ class Plans:
             d.setdefault("ingested", {})[f"file:{sid}"] = {
                 "at": time.time(), "title": Path(name).stem, "kind": "your file", "org": None, "url": None,
                 "authority": prev.get("authority") or "local", "excluded": prev.get("excluded", False),
-                "segments": segs, "frequencies": freqs}
+                "segments": segs, "frequencies": dedupe(freqs), "sha": sha}
             last = d.setdefault("last", {"at": None, "clubs": [], "documents": [], "frequencies": []})
-            have = {f["id"] for f in last.get("frequencies") or []}
-            last["frequencies"] = (last.get("frequencies") or []) + [f for f in freqs if f["id"] not in have]
+            _merge_found(last, freqs, lambda f: f.get("file_id") == sid)
             last["left_out"] = (last.get("left_out") or []) + out
             _save(self.st, d)
         return self.state() | {"added_file": name, "found": len(freqs)}
@@ -621,9 +741,14 @@ class Plans:
             d = _load(self.st)
             found = {f["id"]: f for f in (d.get("last") or {}).get("frequencies") or []}
             kept = {k["id"]: k for k in d.get("kept") or []}
+            have = {same_key(k): k["id"] for k in kept.values()}
             for i in want:
                 if i in found:
+                    old = have.get(same_key(found[i]))
+                    if old and old != i:
+                        continue                     # that channel is kept already (found again elsewhere)
                     kept[i] = dict(found[i], kept_at=time.time())
+                    have[same_key(found[i])] = i
             d["kept"] = sorted(kept.values(), key=lambda k: (k["freq_mhz"] > 30, k["freq_mhz"]))
             _save(self.st, d)
         return self.state()

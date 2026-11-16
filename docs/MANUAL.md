@@ -306,7 +306,9 @@ you chose is remembered. Each column shows:
   each plan you want in it (your state coordinator's band plan, ARES / RACES / ICS-205 / club plans; a file you add
   goes in when you add it): the plan is saved on this PC if need be and read into its ranges and channels (one xAI
   call, a few cents), then merged in. Nothing is read until you tick it; untick to leave a plan out (ticking it
-  again is free). The state coordinator's words come first, then local plans, then your kept
+  again is free). Nothing is offered twice (owner 2026-11-16): a plan that is the same document as another (the
+  same address, or the same file) says so and has no tick; a frequency already kept, or already listed, is not offered
+  again; reading a plan again replaces its channels; a kept channel and the plan it came from are one row. The state coordinator's words come first, then local plans, then your kept
   channels, then the ARRL's; the FCC rules decide the **You** column and are never outranked. **⚠** marks what to
   check: two plans that disagree, a channel in a range set aside for another use, a kept channel outside your
   privileges. **Plans read** lets you mark a plan as the state coordinator's or a local plan, leave it out, or read

@@ -173,3 +173,60 @@ def test_open_for_ad_hoc_voice_and_vara(tmp_path):
     lv = C.open_ranges(local, "voice")
     assert not _at(lv, 7.2) and not _at(lv, 7.199) and _at(lv, 7.21)       # a local channel carved out
     assert _at(lv, 7.255)[0]["uses"] == ["Section HF net"] and not _at(lv, 7.255)[0]["unplanned"]
+
+
+def test_no_duplicates_when_the_band_plan_is_changed(tmp_path, xai_key):
+    """Owner 2026-11-16: "Ensure that there are no duplicates when modifying the band plan" and "Only offer to select
+    only those that are not duplicates"."""
+    dup_answer = {"clubs": [{"name": "County ARES"}, {"name": "county ares"}],
+                  "documents": [{"title": "County ARES plan", "url": "https://example.org/ares-plan.pdf",
+                                 "kind": "ares_plan", "public": True},
+                                {"title": "County ARES plan (again)", "url": "http://www.example.org/ares-plan.pdf/",
+                                 "kind": "ares_plan", "public": True},
+                                {"title": "Mirror of the plan", "url": "https://mirror.example.net/plan.pdf",
+                                 "kind": "comm_plan", "public": True}],
+                  "frequencies": [{"freq_mhz": 147.48, "mode": "FM", "use": "Tactical simplex 1", "kind": "simplex",
+                                   "source_url": "https://example.org/ares-plan.pdf"},
+                                  {"freq_mhz": 147.480, "mode": "FM", "use": "tactical  Simplex 1.", "priority": "alternate",
+                                   "source_url": "https://example.org/ares"}]}
+    st, p, _, _ = _plans(tmp_path, answer=dup_answer)
+    seg = {"from_mhz": 146.61, "to_mhz": 147.39, "use": "FM repeater outputs"}
+    reads = []
+
+    def extract(key, sys, user):
+        reads.append(1)
+        return {"segments": [seg, dict(seg, use="FM Repeater Outputs.")],
+                "frequencies": [{"freq_mhz": 147.0, "mode": "FM", "use": "ARES tactical"},
+                                {"freq_mhz": 147.0, "mode": "FM", "use": "ARES Tactical"}]}
+    p.extract, p._text_of = extract, (lambda path: "a plan")
+    s = p.search()
+    p.save_copies()                                   # every copy is the same PDF bytes (the test fetcher)
+    s = p.state()
+    assert len(s["clubs"]) == 1 and len(s["documents"]) == 2               # the same address once
+    found = [f for f in s["frequencies"] if not f["kept"]]
+    assert len(found) == 1 and found[0]["priority"] == "alternate"         # one channel, its details merged
+    url, mirror = "https://example.org/ares-plan.pdf", "https://mirror.example.net/plan.pdf"
+    p.choose(url, True, background=False)
+    s = p.state()
+    m = next(x for x in s["documents"] if x["url"] == mirror)
+    assert m["band"]["dup"] == "County ARES plan"                          # the same bytes: not offered
+    with pytest.raises(ValueError, match="same document"):
+        p.choose(mirror, True, background=False)
+    with pytest.raises(ValueError, match="same document"):
+        p.add_file("ares.pdf", b"%PDF-1.4 a plan")                         # uploaded again as a file
+    ent = p.consolidated()
+    r = next(x for x in _rows(ent, "2 m") if x["type"] == "range" and x["from"] <= 147.0 <= x["to"])
+    assert [x["use"] for x in r["statements"] if x["authority"] == "local"] == ["FM repeater outputs"]
+    ch = [x for x in _rows(ent, "2 m") if x["type"] == "channel" and x["from"] == 147.0]
+    assert len(ch) == 1 and len(ch[0]["statements"]) == 1
+    n = len(p.state()["frequencies"])
+    p.choose(url, True, again=True, background=False)                      # read again: replaced, not added
+    assert len(p.state()["frequencies"]) == n and len(reads) == 2
+    tac = next(f for f in p.state()["frequencies"] if f["freq_mhz"] == 147.0)
+    p.keep([tac["id"]])
+    s = p.state()
+    assert not [f for f in s["frequencies"] if f["freq_mhz"] == 147.0 and not f["kept"]]   # kept: not offered again
+    ch = [x for x in _rows(p.consolidated(), "2 m") if x["type"] == "channel" and x["from"] == 147.0]
+    assert len(ch) == 1 and ch[0]["kept"] and len(ch[0]["statements"]) == 1   # kept from that plan: one statement
+    p.keep([tac["id"]])
+    assert len([k for k in p.state()["kept"] if k["freq_mhz"] == 147.0]) == 1
