@@ -272,6 +272,8 @@ class Walk:
         self.goto()
         self.p.click("#openSettings")
         self.p.wait_for_selector("#settings[open]")
+        if self.p.locator("#settings [data-stab=ai]").count():          # Settings in tabs since 2026-11-16 (e4736db)
+            self.p.click("#settings [data-stab=ai]")
         self.p.wait_for_selector("#agName", timeout=15000)
 
     def _key_box(self):
