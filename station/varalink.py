@@ -40,6 +40,22 @@ PORTS = (8300, 8310, 8320, 8330, 8340, 8350)       # suggested pairs: cmd, cmd +
 CHECK_S = 5
 
 
+ADHOC_SUFFIX = ".hsadhoc"     # a HAM Sidekick ad hoc channels file (adhoc.export), sent over VARA (owner 2026-11-16)
+
+
+def _adhoc_summary(p: Path) -> dict | None:
+    """What a received ad hoc channels file holds, for its Install button: {from, channels, voice, data} or None."""
+    from . import adhoc
+    try:
+        obj = json.loads(p.read_text(encoding="utf-8"))
+        rows, rep = adhoc.import_([], obj)
+    except (OSError, ValueError):
+        return None
+    return {"from": str(obj.get("from") or "")[:12] or None, "channels": len(rows),
+            "voice": sum(r["kind"] == "voice" for r in rows), "data": sum(r["kind"] == "data" for r in rows),
+            "skipped": len(rep["skipped"])}
+
+
 class Modem:
     """One radio's VARA modem."""
 
@@ -217,8 +233,12 @@ class Modem:
         d = self.dir() / "inbox"
         if not d.is_dir():
             return []
-        return [{"name": p.name, "bytes": p.stat().st_size, "at": p.stat().st_mtime}
-                for p in sorted(d.iterdir(), key=lambda p: -p.stat().st_mtime) if p.is_file()][:100]
+        out = [{"name": p.name, "bytes": p.stat().st_size, "at": p.stat().st_mtime}
+               for p in sorted(d.iterdir(), key=lambda p: -p.stat().st_mtime) if p.is_file()][:100]
+        for f in out:                                 # another operator's reserved ad hoc channels: offered to Install
+            if f["name"].lower().endswith(ADHOC_SUFFIX) and f["bytes"] < 200_000:
+                f["adhoc"] = _adhoc_summary(d / f["name"])
+        return out
 
     # ----- the operator's actions -----
     def _v(self):
@@ -255,6 +275,14 @@ class Modem:
                 except ValueError:
                     raise ValueError("the file did not arrive whole: try again") from None
                 self._v().send_file(name=str(body.get("name") or "file"), data=data)
+            elif what == "adhoc":                    # my reserved ad hoc channels to the station I am connected to
+                from .server import _plans
+                rows = _plans(self.link.st).adhoc()
+                if not rows:
+                    raise ValueError("no reserved ad hoc channels to send: reserve some in Band plan → Ad hoc first")
+                data, _, _ = _plans(self.link.st).adhoc_export()
+                call = re.sub(r"[^A-Z0-9-]", "", (json.loads(data).get("from") or "station").upper())[:12] or "STATION"
+                self._v().send_file(name=f"{call}-ad-hoc-channels{ADHOC_SUFFIX}", data=data)
             elif what == "handoff":                  # a shared modem: Winlink Express's turn now
                 if self.cfg()["use"] != "shared":
                     raise ValueError("only a modem shared with Winlink Express is handed over")

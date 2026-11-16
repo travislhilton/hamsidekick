@@ -244,3 +244,46 @@ def test_a_vara_fm_modem_says_narrow_or_wide(tmp_path):
     assert v["modems"][0]["cfg"]["fm_width"] == "wide"
     with pytest.raises(ValueError, match="narrow or wide"):
         st.vara.settings({"radio": rid, "fm_width": "medium"})
+
+
+def test_ad_hoc_channels_go_over_vara_and_install_with_one_click(tmp_path):
+    """Owner 2026-11-16: "a shortcut to send my reserved ad-hoc data over a VARA connection if one is already set up
+    and when it arrives on the other side to have a click and install for a special kind of file like that"."""
+    import json
+    st, rid = _st(tmp_path, freq=445.525, cls="technician")
+    srv = serve(st, "127.0.0.1", 0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        _post(base, "/api/vara/settings", {"enabled": True, "radio": rid})
+        _post(base, "/api/vara/connect", {"call": "K7ABC"})
+        with pytest.raises(urllib.error.HTTPError):                     # nothing reserved yet
+            _post(base, "/api/vara/adhoc", {})
+        _post(base, "/api/adhoc", {"add": {"freq_mhz": 445.525, "kind": "data", "width": "wide", "name": "VARA 1"}})
+        _post(base, "/api/adhoc", {"add": {"freq_mhz": 446.525, "kind": "voice", "name": "Tac 1"}})
+        _post(base, "/api/vara/adhoc", {})
+        what, name, data = FakeVara.made[-1].calls[-1]
+        assert what == "file" and name.endswith(varalink.ADHOC_SUFFIX)
+        assert json.loads(data)["format"] == "hamsidekick-adhoc-channels"
+        # the other side: the file lands in its inbox and is offered to Install (read as data, never run)
+        _post(base, "/api/adhoc", {"clear": "data"})
+        _post(base, "/api/adhoc", {"clear": "voice"})
+        inbox = st.data / "vara" / "radios" / rid / "inbox"
+        inbox.mkdir(parents=True, exist_ok=True)
+        (inbox / ("20261116-1200-K7ABC-" + name)).write_bytes(data)
+        (inbox / "20261116-1201-K7ABC-bad.hsadhoc").write_bytes(b"<script>")
+        with urllib.request.urlopen(base + "/api/vara") as r:
+            got = {f["name"]: f.get("adhoc") for f in json.loads(r.read())["modems"][0]["inbox"]}
+        good = "20261116-1200-K7ABC-" + name
+        assert got[good]["channels"] == 2 and got[good]["voice"] == 1 and got["20261116-1201-K7ABC-bad.hsadhoc"] is None
+        r = _post(base, "/api/adhoc/install", {"name": good})
+        assert r["report"]["added"] == 2
+        with urllib.request.urlopen(base + "/api/adhoc") as h:
+            assert {(a["freq_mhz"], a["name"]) for a in json.loads(h.read())["adhoc"]} == {(445.525, "VARA 1"),
+                                                                                       (446.525, "Tac 1")}
+        with pytest.raises(urllib.error.HTTPError):
+            _post(base, "/api/adhoc/install", {"name": "20261116-1201-K7ABC-bad.hsadhoc"})
+        with pytest.raises(urllib.error.HTTPError):
+            _post(base, "/api/adhoc/install", {"name": "../vara.json"})
+    finally:
+        srv.shutdown()

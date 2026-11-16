@@ -224,6 +224,11 @@ def make_handler(station):
                 return
             if u.path == "/api/localplans":                      # Nets -> Plans (localplans.py)
                 return self._json(_plans(station).state())
+            if u.path in ("/api/adhoc/export", "/api/adhoc/export.csv"):     # reserved ad hoc channels (adhoc.py)
+                data, ctype, name = _plans(station).adhoc_export("csv" if u.path.endswith(".csv") else "json")
+                return self._send(200, data, ctype, {"Content-Disposition": f'attachment; filename="{name}"'})
+            if u.path == "/api/adhoc":
+                return self._json({"adhoc": _plans(station).adhoc()})
             if u.path == "/api/bandplan/area":                   # the consolidated band plan (consolidate.py)
                 return self._json(_plans(station).consolidated())
             if u.path == "/api/bandplan":                        # the built-in band plan (bandplan.py)
@@ -332,8 +337,8 @@ def make_handler(station):
                       "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
-                      "/api/localplans/choose"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
-                      "listen", "cq", "chat", "file", "handoff", "takeback")}
+                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
+                      "listen", "cq", "chat", "file", "adhoc", "handoff", "takeback")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
             alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss|unskip)", u.path)        # pre-net alert
             item = re.fullmatch(r"/api/items(?:/(\d+)(/delete)?)?", u.path)                             # minutes items
@@ -420,6 +425,12 @@ def make_handler(station):
                     if what == "settings":
                         return self._json(station.vara.settings(body))
                     return self._json(station.vara.act(what, body))
+                if u.path == "/api/adhoc":                       # reserve / unreserve / rename (adhoc.py)
+                    return self._json(_plans(station).adhoc_set(body))
+                if u.path == "/api/adhoc/install":               # {"name": a .hsadhoc file in a VARA inbox}
+                    return self._json(_plans(station).adhoc_install(station.vara.inbox_file(str(body.get("name") or ""))))
+                if u.path == "/api/adhoc/import":                # {"data": an export, "replace": bool}
+                    return self._json(_plans(station).adhoc_import(body.get("data"), bool(body.get("replace"))))
                 if u.path.startswith("/api/localplans/"):        # Nets -> Plans (localplans.py)
                     lp, what = _plans(station), u.path.rsplit("/", 1)[1]
                     if what == "settings":

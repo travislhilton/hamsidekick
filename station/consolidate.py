@@ -25,8 +25,8 @@ import re
 
 from . import bandplan
 
-RANK = {"coordinator": 0, "local": 1, "kept": 2, "arrl": 3, "fcc": 4}
-AUTH = {"coordinator": "State coordinator", "local": "Local plan", "kept": "Your channel", "arrl": "ARRL band plan",
+RANK = {"coordinator": 0, "local": 1, "kept": 2, "adhoc": 3, "arrl": 4, "fcc": 5}
+AUTH = {"coordinator": "State coordinator", "local": "Local plan", "kept": "Your channel", "adhoc": "Your ad hoc channel", "arrl": "ARRL band plan",
         "fcc": "FCC rules"}
 CATS = [("beacon", r"beacon"), ("satellite", r"satellit|\bsat\b"), ("repeater_in", r"\binputs?\b"),
         ("repeater_out", r"\boutputs?\b|repeater(?!.*input)"), ("simplex", r"simplex|calling|tactical"),
@@ -78,7 +78,8 @@ def _privs(a: float, b: float, cls: str | None) -> dict | None:
     return {k: any(x <= a + EPS and b - EPS <= y for x, y in bandplan.ALLOC[cls][k]) for k in bandplan.KINDS}
 
 
-def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None) -> dict:
+def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None,
+          adhoc: list[dict] | None = None) -> dict:
     """sources: [{"id", "name", "authority": coordinator | local, "segments": [{"from_mhz", "to_mhz", "use"}],
     "frequencies": [channel dicts]}]. kept: the confirmed plan channels. -> {"bands": [...], "sources": [...]}"""
     cls = (cls or "").lower() or None
@@ -119,6 +120,12 @@ def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None) 
             said.add(k)
             points.append({"freq": f["freq_mhz"], "src": s["id"], "auth": auth, "use": f.get("use"), "ch": f,
                            "url": s.get("url"), "file": s["id"][5:] if str(s["id"]).startswith("file:") else None})
+    if adhoc:                                     # the operator's reserved ad hoc channels (adhoc.py): ★ rows
+        from .adhoc import label
+        srcs.append({"id": "adhoc", "name": "Your ad hoc channels", "authority": "adhoc", "channels": len(adhoc)})
+        for a in adhoc:
+            points.append({"freq": a["freq_mhz"], "src": "adhoc", "auth": "adhoc", "use": label(a),
+                           "ch": {"mode": "FM"}, "adhoc": a})
     if kept:
         srcs.append({"id": "kept", "name": "Your plan channels", "authority": "kept", "channels": len(kept)})
         for k in kept:
@@ -189,7 +196,7 @@ def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None) 
                         flags.append(f"{x['source']} says “{x['use']}”; {y['source']} says “{y['use']}”")
             inside = next((r for r in out_rows if r["from"] - EPS <= f <= r["to"] + EPS and r["authority"] != "fcc"),
                           None)
-            if inside and top["auth"] != "arrl" and top["use"] and differ(top["use"], inside["use"]) and not cats(top["use"]) & {"beacon"}:
+            if inside and top["auth"] not in ("arrl", "adhoc") and top["use"] and differ(top["use"], inside["use"]) and not cats(top["use"]) & {"beacon"}:
                 flags.append(f"sits in {inside['from']:g}–{inside['to']:g}, which {inside['by']} sets aside for "
                              f"“{inside['use']}”")
             priv = None
@@ -197,7 +204,7 @@ def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None) 
                 mode = ch.get("mode") or ("FM" if f > 30 else "USB")
                 c = bandplan.check(f, mode, cls)
                 priv = c["ok"]
-                if c["ok"] is False and any(p["auth"] in ("kept", "coordinator", "local") for p in ps):
+                if c["ok"] is False and any(p["auth"] in ("kept", "coordinator", "local", "adhoc") for p in ps):
                     flags.append(f"outside your privileges: {c['why']}")
                 off = ch.get("offset_mhz")
                 if off:
@@ -207,6 +214,8 @@ def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None) 
             out_rows.append({"type": "channel", "from": f, "to": f, "use": top["use"], "by": names.get(top["src"]),
                              "authority": top["auth"], "statements": st, "flags": flags, "privileges": priv,
                              "kept": any(p["auth"] == "kept" or p.get("kept") for p in ps), "mode": ch.get("mode"),
+                             "adhoc": [{k: p["adhoc"].get(k) for k in ("kind", "width", "name")}
+                                       for p in ps if p.get("adhoc")],
                              "offset_mhz": ch.get("offset_mhz"), "tone_hz": ch.get("tone_hz"),
                              "priority": ch.get("priority"), "org": ch.get("org"), "source_url": ch.get("source_url")})
         out_rows.sort(key=lambda r: (r["from"], r["type"] == "channel"))
@@ -392,7 +401,10 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
                 pieces[-1]["open_hi"] = True
             pieces.append({"from": r["from"], "to": r["to"], "uses": uses, "unplanned": not plan, "open_lo": near,
                            "share": share})
-        chans = sorted(r["from"] for r in b["rows"] if r["type"] == "channel")
+        # every channel is cut out, but the operator's own reservations for this kind stay listed (marked reserved)
+        chans = sorted(r["from"] for r in b["rows"] if r["type"] == "channel" and not (
+            r.get("adhoc") and all(s["authority"] == "adhoc" for s in r["statements"])
+            and all(a["kind"] == kind for a in r["adhoc"])))
         for i, p in enumerate(pieces):
             if fm_at(p["from"]):
                 if not p["unplanned"]:                    # FM: only where a plan names the use (simplex, local option,

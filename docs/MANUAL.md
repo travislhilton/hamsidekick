@@ -341,7 +341,21 @@ offered, since the station cannot tell which side of the line it is on. Channels
 146 MHz odd 20 kHz channels such as 145.510; 146 and up, 1.25 m even ones; 70 cm 25 kHz). A channel on a segment's
 edge is left out where the next segment is not open, and **wide** is offered only where a 25 kHz signal stays
 inside the stretch. Coordinated digital channels (a Winlink gateway's, a link's) are never offered ad hoc: put an
-ARES or club plan that names digital simplex channels in Plans and they are offered too. **Ad hoc voice** and **Ad hoc VARA** (owner 2026-11-16) list the ranges
+ARES or club plan that names digital simplex channels in Plans and they are offered too.
+
+**Your reserved ad hoc channels** (owner 2026-11-16). In **Ad hoc VARA** and **Ad hoc voice** every VHF/UHF FM range
+is split into its channels: click **☆ 445.525** to reserve it (VARA FM narrow or wide as the channel allows; FM voice
+in Ad hoc voice), again to release it. **★ My ad hoc … channels** at the top lists them: give each a name (e.g. "VARA
+1", "Tac 1"), change a VARA channel's width, **Use** it on a VARA radio. In the band plan, the full spectrum and the
+printout a reserved channel is a **★ my ad hoc** row (purple). It stays on the ad hoc list (marked ★) instead of being
+cut out, a voice reservation is not offered to VARA, and one the plans no longer leave open (a plan read later, a new
+gateway, or another operator's set on a station with different privileges) is marked ⚠ with why.
+**Sharing**: **Export my set** saves a file (`ad-hoc-channels.json`, VARA FM and voice together); the other operator
+uses **Import a set…** (adds and renames; tick **Import replaces my set** to replace). **For CHIRP (CSV)** puts them in
+a radio's memories (CHIRP → File → Import). Connected over VARA, **★ Send my ad hoc channels** (VARA window, or **★ Send
+over VARA** in the band plan) sends them as a `.hsadhoc` file; the other station's VARA window shows **★ Install N ad hoc
+channels from <call>** beside it: one click adds them. The file is only ever read as data (every channel checked),
+never run. **Ad hoc voice** and **Ad hoc VARA** (owner 2026-11-16) list the ranges
   where you can start a contact or a VARA session: inside your privileges, set aside by no plan for anything else
   (VARA: where a plan sets data aside or no plan names any use, never the CW stretches), clear of every channel in
   the table, your local plans' and the Winlink gateways' included (3 kHz either side on HF, 15–25 kHz on VHF/UHF),

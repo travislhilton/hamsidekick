@@ -787,7 +787,7 @@ class Plans:
                     "authority": e.get("authority") or "local", "url": e.get("url"),
                     "segments": e.get("segments") or [], "frequencies": e.get("frequencies") or []}
                    for k, e in (d.get("ingested") or {}).items() if not e.get("excluded") and not e.get("error")]
-        t = consolidate.build(self._class(), sources, d.get("kept") or [])
+        t = consolidate.build(self._class(), sources, d.get("kept") or [], d.get("adhoc") or [])
         t["read"] = [{"key": k, "title": e.get("title"), "org": e.get("org"), "kind": e.get("kind"),
                       "authority": e.get("authority"), "excluded": bool(e.get("excluded")), "error": e.get("error"),
                       "segments": len(e.get("segments") or []), "channels": len(e.get("frequencies") or []),
@@ -798,8 +798,72 @@ class Plans:
         t["searched_at"] = (d.get("last") or {}).get("at")
         t["key"] = bool(self.key())
         t["open"] = {k: consolidate.open_ranges(t, k) for k in ("voice", "data")}
+        t["adhoc"] = self._adhoc_status(t, d.get("adhoc") or [])
         t["winlink_list"] = self.list_note()
         return t
+
+    # ----- the operator's reserved ad hoc channels (adhoc.py) -----
+    @staticmethod
+    def _adhoc_status(t: dict, rows: list[dict]) -> list[dict]:
+        """Each reservation with "open": still on the ad hoc list for its kind (a plan read later, a new gateway or
+        another operator's set imported here may have closed it), "fits" (a wide one on a channel with room for
+        wide) and "why" when not."""
+        pts = {}
+        for k in ("voice", "data"):
+            for x in t["open"][k]:
+                if x.get("channel"):
+                    for i in range(x["count"]):
+                        pts[(k, round(x["from"] + i * x["step"], 4))] = x
+        out = []
+        for r in rows:
+            x = pts.get((r["kind"], round(r["freq_mhz"], 4)))
+            why = None
+            if not x:
+                why = ("no longer open for ad hoc " + ("VARA FM" if r["kind"] == "data" else "FM voice")
+                       + " here: a plan or channel in the band plan now uses it, or it is outside your privileges")
+            elif r["kind"] == "data" and r.get("width") == "wide" and not x.get("wide"):
+                why = "too close to another channel for VARA FM wide: use it narrow"
+            out.append(dict(r, open=bool(x), ok=not why, why=why, band=bandplan.band(r["freq_mhz"])))
+        return out
+
+    def adhoc(self) -> list[dict]:
+        return list(_load(self.st).get("adhoc") or [])
+
+    def adhoc_set(self, body: dict) -> dict:
+        from . import adhoc
+        with self.lock:
+            d = _load(self.st)
+            d["adhoc"] = adhoc.apply(d.get("adhoc") or [], body or {})
+            _save(self.st, d)
+        return {"adhoc": d["adhoc"]}
+
+    def adhoc_import(self, obj, replace: bool = False) -> dict:
+        from . import adhoc
+        with self.lock:
+            d = _load(self.st)
+            d["adhoc"], rep = adhoc.import_(d.get("adhoc") or [], obj, replace)
+            _save(self.st, d)
+        return {"adhoc": d["adhoc"], "report": rep}
+
+    def adhoc_install(self, path) -> dict:
+        """A received .hsadhoc file (VARA inbox) merged into my set: only ever read as data, never run."""
+        if not path:
+            raise ValueError("that file is no longer in the VARA inbox")
+        try:
+            obj = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            raise ValueError("that is not a HAM Sidekick ad hoc channels file") from None
+        return dict(self.adhoc_import(obj), source=str(obj.get("from") or "") or None)
+
+    def adhoc_export(self, fmt: str = "json") -> tuple[bytes, str, str]:
+        from . import adhoc
+        rows = self.adhoc()
+        if fmt == "csv":
+            return adhoc.chirp_csv(rows).encode("utf-8"), "text/csv", "ad-hoc-channels-chirp.csv"
+        op = (getattr(self.st, "_saved", lambda: {})() or {}).get("operator") or {}
+        call = (op.get("callsign") or "").upper() or None
+        return (json.dumps(adhoc.export(rows, call), indent=1).encode("utf-8"), "application/json",
+                "ad-hoc-channels.json")
 
     def doc_file(self, sid: str) -> tuple[Path, str, str] | None:
         """(path, content type, download name) of a saved copy or file, by its id."""
