@@ -57,6 +57,28 @@ def make_handler(station):
         def log_message(self, *a):
             pass
 
+        def _helper_file(self, name: str):
+            """install.cmd (this station's address inside), install.ps1, and the helper's four files."""
+            from . import phone
+            root = Path(__file__).resolve().parent
+            files = {"files/__init__.py": root / "__init__.py", "files/winlink.py": root / "winlink.py",
+                     "files/lzhuf.py": root / "lzhuf.py", "files/winlink_helper.py": root / "winlink_helper.py",
+                     "install.ps1": root.parent / "install" / "windows" / "install-winlink-helper.ps1"}
+            if name in files and files[name].exists():
+                return self._send(200, files[name].read_bytes(), "text/plain; charset=utf-8",
+                                  {"X-Content-Type-Options": "nosniff"})
+            if name == "install.cmd":
+                urls = phone.addresses(self.headers.get("Host"), self.server.server_address[1])
+                url = (urls[0]["url"] if urls else f"http://{self.headers.get('Host')}/").rstrip("/")
+                cmd = ("@echo off\r\nrem HAM Sidekick Winlink helper: puts this station's Winlink messages in this PC's "
+                       "Winlink Express Outbox.\r\nrem No administrator rights needed. Station: " + url + "\r\n"
+                       "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$f = Join-Path $env:TEMP "
+                       "'install-winlink-helper.ps1'; Invoke-WebRequest -UseBasicParsing '" + url +
+                       "/winlink-helper/install.ps1' -OutFile $f; & $f -Station '" + url + "'\"\r\npause\r\n")
+                return self._send(200, cmd.encode("ascii", "replace"), "application/octet-stream",
+                                  {"Content-Disposition": 'attachment; filename="install-winlink-helper.cmd"'})
+            return self._json({"error": "not found"}, 404)
+
         def _send(self, code, body: bytes, ctype="application/json", extra=None):
             self.send_response(code)
             self.send_header("Content-Type", ctype)
@@ -83,6 +105,8 @@ def make_handler(station):
                 return self._send(200, page, "text/html; charset=utf-8")
             if u.path in ("/", "/index.html"):
                 return self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path.startswith("/winlink-helper/"):           # the Winlink helper for another PC, served from here
+                return self._helper_file(u.path[len("/winlink-helper/"):])
             if u.path == "/api/phone":                         # "Open on a phone": addresses + QR codes
                 from . import phone
                 port = self.server.server_address[1]
@@ -122,6 +146,14 @@ def make_handler(station):
                 return self._json({"text": test_text(station.cfg.get("callsign")), "history": station.test_history()})
             if u.path == "/api/settings":
                 return self._json(station.operator())
+            if u.path == "/api/winlink/helpers":                # Winlink helpers on other PCs (winlink_helpers.py)
+                return self._json({"helpers": station.wlhelpers.list(self.client_address[0])})
+            wj = re.fullmatch(r"/api/winlink/job/([0-9a-f]{32})", u.path)
+            if wj:
+                try:
+                    return self._json(station.wlhelpers.job(wj.group(1)))
+                except LookupError:
+                    return self._json({"error": "no such job"}, 404)
             if u.path == "/api/winlink/express":                # the Winlink dialog: is Winlink Express open?
                 from . import winlink
                 return self._json({"running": winlink.express_running()})
@@ -289,7 +321,8 @@ def make_handler(station):
             m = re.fullmatch(r"/api/radios/([\w-]+)(?:/(pause|clear|listen|level|setup))?", u.path)
             who = re.fullmatch(r"/api/tx/(\w+)/speaker", u.path)
             fix = re.fullmatch(r"/api/tx/(\w+)/correct", u.path)                                        # ✎ Fix
-            routes = {"/api/radio-list", "/api/settings", "/api/winlink/preview", "/api/winlink/send", "/api/accurate", "/api/test",
+            routes = {"/api/radio-list", "/api/settings", "/api/winlink/preview", "/api/winlink/send",
+                      "/api/winlink/helper/poll", "/api/winlink/helper/done", "/api/accurate", "/api/test",
                       "/api/history/minutes", "/api/history/summary", "/api/learned", "/api/local-names", "/api/local-names/import",
                       "/api/pc/measure", "/api/pc/seen", "/api/settings-pack/preview", "/api/settings-pack/apply",
                       "/api/nets/assign", "/api/netfind/settings", "/api/netfind/search", "/api/netfind/add",
@@ -441,6 +474,10 @@ def make_handler(station):
                                                               body.get("title")))
                 if u.path == "/api/winlink/send":
                     return self._json(station.winlink_send(body))
+                if u.path == "/api/winlink/helper/poll":         # a Winlink helper on another PC asks for its jobs
+                    return self._json(station.wlhelpers.poll(body, self.client_address[0]))
+                if u.path == "/api/winlink/helper/done":
+                    return self._json(station.wlhelpers.done(body))
                 if u.path == "/api/test":
                     return self._json(station.score_test(body.get("radio"), body.get("tx")))
                 if u.path == "/api/accurate" and body.get("ids"):          # older transmissions, by id

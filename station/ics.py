@@ -4,18 +4,10 @@ General Message summarising it. The operator reviews and edits everything before
 from datetime import datetime, timedelta
 
 from . import speaker
+from .winlink import fit  # noqa: F401 - lives in winlink.py, which the Winlink helper ships on its own
 
 ROWS_309 = 30
 CALL_MAX, SUB_MAX = 13, 90          # Winlink's Form-309 viewer: From/To maxlength 13, Subject 90, Page 2
-
-
-def fit(s: str, n: int) -> str:
-    """Shorten to the form's box, at a word boundary, marked with '...'."""
-    s = " ".join(str(s or "").split())
-    if len(s) <= n:
-        return s
-    cut = s[:n - 3].rsplit(" ", 1)[0] if " " in s[:n - 3] else s[:n - 3]
-    return cut.rstrip(" ,;:") + "..."
 
 
 def sessions(tx: list[dict], rid: str, gap_min: int = 15) -> list[dict]:

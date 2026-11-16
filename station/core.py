@@ -272,6 +272,15 @@ class Station:
             threading.Thread(target=self.vara.restart, daemon=True, name="vara-start").start()
 
     @property
+    def wlhelpers(self):
+        """The Winlink helpers on other PCs (station/winlink_helpers.py)."""
+        h = self.__dict__.get("_wlhelpers")
+        if h is None:
+            from .winlink_helpers import Helpers
+            h = self.__dict__["_wlhelpers"] = Helpers(self)
+        return h
+
+    @property
     def vara(self):
         v = self.__dict__.get("_vara")
         if v is None:
@@ -599,13 +608,26 @@ class Station:
                 "operator": {k: op[k] for k in ("callsign", "name", "winlink_dir", "winlink_account", "express_running")}}
 
     def winlink_send(self, body: dict) -> dict:
-        """Build the chosen drafts from the installed templates and place them in the account's Outbox."""
+        """Build the chosen drafts from the installed templates and place them in the account's Outbox.
+        `target`: a Winlink helper's id = that PC's Outbox instead (station/winlink_helpers.py): queued, and the
+        answer is {"job"} for the window to follow."""
         from . import winlink
         op = self.operator()
+        to = [c.upper() for c in body.get("to", []) if re.fullmatch(r"[A-Za-z0-9]{3,8}(-\d{1,2})?", str(c))]
+        target = str(body.get("target") or "station")
+        if target != "station":
+            if not to:
+                raise ValueError("choose at least one recipient")
+            drafts = [{"form": d["form"], "values": {str(k): str(v) for k, v in (d.get("values") or {}).items()}}
+                      for d in body.get("drafts", []) if isinstance(d, dict) and d.get("form") in winlink.TEMPLATES]
+            if not drafts:
+                raise ValueError("no forms selected")
+            return self.wlhelpers.queue(target, to, drafts, grid=op.get("grid"), install=body.get("install") or None,
+                                        account=body.get("account") or None, radio=body.get("radio"),
+                                        start=body.get("start"))
         install, account = op.get("winlink_dir"), op.get("winlink_account")
         if not install or not account:
             raise ValueError("set the Winlink Express folder and callsign account in Settings first")
-        to = [c.upper() for c in body.get("to", []) if re.fullmatch(r"[A-Za-z0-9]{3,8}(-\d{1,2})?", str(c))]
         if not to:
             raise ValueError("choose at least one recipient")
         msgs = []

@@ -493,6 +493,8 @@ a.btn{display:inline-block;padding:4px 10px;border:1px solid var(--line,#888);bo
 .bpt tr.flag td{box-shadow:inset 3px 0 0 var(--warn)}.bpt td{font-family:inherit}.bpt .bps{display:block;margin-bottom:2px}.bppv span{font-weight:600;margin-right:6px;white-space:nowrap}.bppv .no{opacity:.4;text-decoration:line-through;font-weight:400}
 .bpband{margin:14px 0 4px}.bpband h4{display:inline;margin-right:.5em}
 @media print{body>*:not(#bpDlg){display:none!important}#bpDlg{position:static;width:auto;border:0;box-shadow:none}#bpDlg .noprint{display:none!important}.nlistwrap{overflow:visible!important}}
+.wlwhere{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}.wlw{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.wlw.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}.wlw input{margin-top:3px;width:auto!important;flex:none;min-height:0}
 .st{white-space:nowrap;color:var(--muted)}button.st.perf{background:none;border:0;padding:0;margin:0;font:inherit;cursor:pointer;opacity:.75}button.st.perf.on{opacity:1;font-weight:600}.st.ok{color:var(--ok)}.st.warn{color:var(--warn)}.st.bad{color:var(--bad)}
 #settings .savebar{position:sticky;bottom:-16px;background:var(--panel);border-top:1px solid var(--line);margin:12px -16px -16px;padding:10px 16px;z-index:2}
 button:disabled{cursor:not-allowed}
@@ -1609,27 +1611,61 @@ async function wlPreview(body){
   const r=await fetch("/api/winlink/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const d=await r.json();
   if(!r.ok){$("wlBody").innerHTML=`<p class="bad">${esc(d.error||"could not prepare")}</p><button onclick="$('wl').close()">Close</button>`;return}
+  // where the messages go: this station's PC, or a Winlink helper on another PC (station/winlink_helpers.py); the
+  // helper on the computer this browser runs on comes first, then the last choice
+  try{d.helpers=(await api("/api/winlink/helpers")).helpers}catch(e){d.helpers=[]}
+  let last=null;try{last=localStorage.getItem("hamsidekick.wlTarget")}catch(e){}
+  const here=d.helpers.find(h=>h.here&&h.online);
+  d.target=here?here.id:(last&&d.helpers.some(h=>h.id===last)?last:"station");
   WL=d;renderWl();
+}
+function wlTarget(){return WL&&WL.target!=="station"?(WL.helpers||[]).find(h=>h.id===WL.target)||null:null}
+function wlAgo(s){return s<90?`${s} s ago`:s<5400?`${Math.round(s/60)} min ago`:`${Math.round(s/3600)} h ago`}
+function wlWhere(){
+  const box=$("wlWhere");if(!box||!WL)return;const op=WL.operator,hs=WL.helpers||[];
+  const opt=(id,title,desc,cls)=>`<label class="wlw${WL.target===id?" on":""}"><input type="radio" name="wlwhere" value="${esc(id)}"${WL.target===id?" checked":""}> <span><b>${title}</b> <span class="small ${cls||"muted"}">${desc}</span></span></label>`;
+  let h=opt("station","This station's PC",op.winlink_dir?`${esc(op.winlink_account||"?")} in ${esc(op.winlink_dir)}`:"Winlink Express not found here",op.winlink_dir?"muted":"bad");
+  for(const x of hs){const inst=(x.installs||[])[0];
+    const st=!x.online?`<span class="bad">not answering (last ${esc(wlAgo(x.ago_s))})</span>`:!inst?'<span class="bad">no Winlink Express found there</span>'
+      :x.express_running?'<span class="warnc">Winlink Express is open there</span>':`<span class="ok">ready</span> · ${esc(inst.active||inst.accounts[0]||"?")} in ${esc(inst.path)}`;
+    h+=opt(x.id,`${esc(x.name)}${x.here?" (this computer)":""}`,st,"")}
+  const sel=wlTarget(),inst=sel&&(sel.installs||[])[0];
+  if(sel&&inst&&inst.accounts.length>1)h+=`<div class="small">Send as <select id="wlAcct">${inst.accounts.map(a=>`<option${a===(WL.account||inst.active)?" selected":""}>${esc(a)}</option>`).join("")}</select></div>`;
+  h+=`<div class="small muted">Winlink Express on another Windows PC: open this dashboard on that PC, then <a href="/winlink-helper/install.cmd" download>get the helper for this PC</a> and run it (no administrator rights; if Windows warns, More info → Run anyway). It builds the forms from that PC's own Winlink Express.</div>`;
+  box.innerHTML=h;
+  box.querySelectorAll("input[name=wlwhere]").forEach(r=>r.onchange=()=>{WL.target=r.value;WL.account=null;try{localStorage.setItem("hamsidekick.wlTarget",r.value)}catch(e){}wlWhere();wlExpress()});
+  const a=$("wlAcct");if(a)a.onchange=()=>{WL.account=a.value};
 }
 let WL_POLL=null;
 function wlExpress(running){         // Winlink Express open: the button is off until it is closed (checked every 2 s)
   const b=$("wlSend"),n=$("wlExp");if(!b||!n)return;
-  const nodir=!(WL&&WL.operator&&WL.operator.winlink_dir),off=!!running||nodir;
+  const h=wlTarget(),inst=h&&(h.installs||[])[0];
+  if(h)running=h.online&&h.express_running;else if(running===undefined)running=WL.express_running;
+  WL.express_running=running;
+  const where=h?` on ${h.name}`:"";
+  const nodir=h?!inst:!(WL&&WL.operator&&WL.operator.winlink_dir),gone=h&&!h.online,off=!!running||nodir||gone;
   n.hidden=!running;b.disabled=off;
+  n.innerHTML=`<b>Winlink Express is open${esc(where)}.</b> Close it there to put these messages in its Outbox; the button turns on as soon as it is closed. (Express keeps its Outbox list in memory and would overwrite what is written.)`;
   // the state must be obvious at a glance (owner 2026-11-12): grey with the reason while it can't write, the
   // full-colour "ready" button the moment Winlink Express is closed
-  b.textContent=running?"🔒 Close Winlink Express first":nodir?"Choose the Winlink Express folder in Settings":"✓ Put in Winlink Express Outbox";
+  b.textContent=gone?`The Winlink helper on ${h.name} is not answering`:running?`🔒 Close Winlink Express${where} first`
+    :nodir?(h?`No Winlink Express found on ${h.name}`:"Choose the Winlink Express folder in Settings"):`✓ Put in Winlink Express Outbox${where}`;
   b.classList.toggle("ready",!off);
-  b.title=running?"Winlink Express is open: close it, and this button turns on by itself (checked every 2 seconds)"
-    :nodir?"Settings → Winlink Express folder":"Winlink Express is closed: ready to write the messages to its Outbox";
-  const k=$("wlReady");if(k){k.hidden=off;}
+  b.title=gone?"Is that PC on, and signed in? The helper starts when you sign in there.":running?"Winlink Express is open: close it, and this button turns on by itself (checked every 2 seconds)"
+    :nodir?(h?"Install Winlink Express on that PC":"Settings → Winlink Express folder"):"Winlink Express is closed: ready to write the messages to its Outbox";
+  const k=$("wlReady");if(k){k.hidden=off;k.textContent=`✓ Winlink Express is closed${where}: ready to put the messages in its Outbox.`}
   clearTimeout(WL_POLL);
   if($("wl").open)WL_POLL=setTimeout(async()=>{
-    try{const r=await api("/api/winlink/express");wlExpress(r.running)}catch(e){WL_POLL=setTimeout(()=>wlExpress(running),2000)}},2000);
+    try{
+      if(WL.helpers&&WL.helpers.length||wlTarget()){const hs=(await api("/api/winlink/helpers")).helpers;
+        const sig=x=>JSON.stringify(x.map(y=>[y.id,y.online,y.express_running,(y.installs||[]).length]));
+        const ch=sig(hs)!==sig(WL.helpers||[]);WL.helpers=hs;if(ch)wlWhere()}
+      if(wlTarget())wlExpress();else{const r=await api("/api/winlink/express");wlExpress(r.running)}
+    }catch(e){WL_POLL=setTimeout(()=>wlExpress(running),2000)}},2000);
 }
 function renderWl(){
   const d=WL,op=d.operator;
-  const warn=!op.winlink_dir?'<p class="bad">Set your Winlink Express folder in Settings first.</p>':"";
+  const warn=!op.winlink_dir&&!(d.helpers||[]).length?'<p class="bad">Set your Winlink Express folder in Settings first.</p>':"";
   const to=d.to.map(p=>`<label class="chk"><input type="checkbox" name="to" value="${esc(p.call)}"${p.confirmed?" checked":""}> <b>${esc(p.call)}</b> ${esc(p.name||"")} <span class="muted">${p.confirmed?"":p.lapsed?`(licence ${esc(String(p.lapsed).toLowerCase())}: check it)`:"(not in any callbook: check it)"}</span></label>`).join("")||'<p class="muted">No callsigns were identified.</p>';
   const forms=d.drafts.map((f,i)=>{
     const body=f.form==="ics213"?`<label>Subject <input data-i="${i}" data-k="Subjectline" value="${esc(f.values.Subjectline)}" style="text-transform:none;width:100%"></label><label>Message<textarea data-i="${i}" data-k="Message" rows="9">${esc(f.values.Message)}</textarea></label>`
@@ -1637,15 +1673,15 @@ function renderWl(){
     return `<details open><summary><label class="chk"><input type="checkbox" name="form" value="${i}" checked> ${esc(f.label)}</label></summary>${body}</details>`}).join("");
   $("wlBody").innerHTML=`<h3>Winlink messages</h3>${warn}<div id="wlAcc" class="wlacc"></div>
    <div class="small">From <input type="datetime-local" step="1" id="wlS" value="${esc(d.start)}"> to <input type="datetime-local" step="1" id="wlE" value="${esc(d.end)}"> <button id="wlRe">Update</button> <span class="muted">${d.count} transmissions</span></div>
-   <p class="small muted">Sending as <b>${esc(op.winlink_account||"?")}</b> from ${esc(op.winlink_dir||"?")}.</p>
+   <h4>Put them in the Outbox on</h4><div id="wlWhere" class="wlwhere"></div>
    <h4>To <span class="tocount muted small"></span></h4>
    <div class="small" style="margin-bottom:4px"><button type="button" id="toNone">Uncheck all</button> <button type="button" id="toAll">Check all</button> <button type="button" id="toConf">Only callbook-confirmed</button></div>
    <div class="tolist">${to}</div><div class="small">Add: <input id="wlAdd" maxlength="11" placeholder="callsign"> <button id="wlAddB">Add</button></div>
    <h4>Forms</h4>${forms}
-   <p id="wlExp" class="bad" role="status" hidden><b>Winlink Express is open.</b> Close Winlink Express to put these messages in its Outbox; the button turns on as soon as it is closed. (Express keeps its Outbox list in memory and would overwrite what the station writes.)</p>
+   <p id="wlExp" class="bad" role="status" hidden></p>
    <p id="wlReady" class="okband" role="status" hidden>✓ Winlink Express is closed: ready to put the messages in its Outbox.</p>
    <div class="row"><button id="wlSend" class="primary wlsend">Put in Winlink Express Outbox</button> <button onclick="$('wl').close()">Close</button> <span id="wlMsg"></span></div>`;
-  wlExpress(op.express_running);
+  wlWhere();wlExpress(op.express_running);
   const box=$("wlBody"),toBoxes=()=>[...box.querySelectorAll("input[name=to]")];
   const count=()=>{const n=toBoxes().filter(x=>x.checked).length;box.querySelector(".tocount").textContent=`(${n} of ${toBoxes().length} checked)`};
   const setAll=f=>{toBoxes().forEach(x=>{x.checked=f(x)});count()};
@@ -1663,10 +1699,20 @@ function renderWl(){
     const to=[...$("wlBody").querySelectorAll("input[name=to]:checked")].map(x=>x.value);
     const drafts=[...$("wlBody").querySelectorAll("input[name=form]:checked")].map(x=>d.drafts[+x.value]);
     const m=$("wlMsg");m.className="";m.textContent="Writing…";
-    const r=await fetch("/api/winlink/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to,drafts,radio:d.radio,start:d.start})});
-    const res=await r.json();
+    const h=wlTarget(),inst=h&&(h.installs||[])[0];
+    const req={to,drafts,radio:d.radio,start:d.start};
+    if(h)Object.assign(req,{target:h.id,install:inst&&inst.path,account:WL.account||(inst&&inst.active)||null});
+    const r=await fetch("/api/winlink/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(req)});
+    let res=await r.json();
     if(!r.ok){m.className="bad";m.textContent=res.error||"not written";
       if(r.status===409)wlExpress(true);else alert(res.error||"Nothing was written to the Outbox.");return}
+    if(res.job){                        // a helper on another PC writes it: follow the job (the helper asks every 3 s)
+      const b=$("wlSend");b.disabled=true;m.textContent=`Waiting for ${res.pc}…`;
+      for(let i=0;i<150&&res.state!=="written"&&res.state!=="error";i++){await new Promise(z=>setTimeout(z,1000));
+        try{res=await api("/api/winlink/job/"+res.job)}catch(e){}}
+      b.disabled=false;
+      if(res.state!=="written"){m.className="bad";m.textContent=`Not written on ${res.pc}: ${res.error||"no answer"}`;return}
+      m.className="ok";m.textContent=`${res.result.written.length} message(s) are in the ${res.result.account} Outbox on ${res.pc}. Open Winlink Express there to check them, then connect to send.`;return}
     m.className="ok";m.textContent=`${res.written.length} message(s) are in the ${res.account} Outbox. Open Winlink Express to check them, then connect to send.`;
   };
 }

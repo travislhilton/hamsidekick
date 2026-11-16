@@ -524,7 +524,14 @@ you chose is remembered. Each column shows:
   any callsign). Edit, then **Put in Winlink Express Outbox**; Winlink Express sends them the next time you
   connect. Close Winlink Express first: while it is open the dialog says so and the button stays off (checked
   every 2 seconds; it turns on as soon as Express is closed), and a refused write is logged. The station backs up
-  Winlink's message list before each write.
+  Winlink's message list before each write. **Put them in the Outbox on** chooses where: this station's PC, or
+  another Windows PC running the **Winlink helper** (listed with ready / Winlink Express open / not answering; the
+  computer the browser runs on comes first, marked "this computer"; a choice of callsign account when it has
+  several). The helper builds the forms from that PC's own Winlink Express and writes them there under the same
+  rule; the window waits for its answer (written, or why not). Install it on that PC from the same window: **get
+  the helper for this PC** downloads `install-winlink-helper.cmd` with this station's address inside (no
+  administrator rights; Python 3.12 is installed for the user if missing; task "HAM Sidekick Winlink Helper" starts
+  it at sign-in; log in `%LOCALAPPDATA%\HAM Sidekick Winlink Helper\helper.log`).
 - **The end of a net** (`station/netclose.py`). **Net control closes it:** when net control says so on the air
   ("hearing none, we'll go ahead and close the net", "this net is now closed", "closing the net", "secure the net",
   "this concludes tonight's net", "returning the repeater to normal amateur use"; "QRT" and "N7XYZ clear" only from

@@ -132,6 +132,15 @@ def fill(s: str, values: dict, sender: str) -> str:
 
 
 # ---------- message ----------
+def fit(s: str, n: int) -> str:
+    """Shorten to the form's box, at a word boundary, marked with '...'."""
+    s = " ".join(str(s or "").split())
+    if len(s) <= n:
+        return s
+    cut = s[:n - 3].rsplit(" ", 1)[0] if " " in s[:n - 3] else s[:n - 3]
+    return cut.rstrip(" ,;:") + "..."
+
+
 def new_mid() -> str:
     return "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(12))
 
@@ -155,7 +164,6 @@ def build(form: str, template: dict, values: dict, sender: str, to: list[str], g
           now: datetime | None = None, mid: str | None = None) -> dict:
     """One message: {'mid','subject','to','mime' (bytes),'size','date'}."""
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    from .ics import fit
     lim = template.get("limits") or {}
     values = {k: fit(v, lim[k.lower()]) if k.lower() in lim and len(str(v)) > lim[k.lower()] else v for k, v in values.items()}
     mid = mid or new_mid()
