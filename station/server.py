@@ -16,7 +16,7 @@ from . import speaker
 STATIC = Path(__file__).parent / "static"
 HELP_CARDS = {"/help": "card.html", "/card": "card.html", "/help/sidekick": "sidekick_card.html",   # Help: the three
               "/help/conversation": "conversation_card.html", "/help/vara": "vara_card.html",
-              "/help/bandplan": "bandplan_card.html"}                                    # reference cards
+              "/help/bandplan": "bandplan_card.html", "/help/adhoc": "adhoc_card.html"}                                    # reference cards
 
 
 def _plans(station):

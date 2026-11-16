@@ -548,10 +548,10 @@ def test_sidekick_card_is_served_and_linked():
     assert HELP_CARDS["/help/sidekick"] == "sidekick_card.html"
 
 
-def test_help_has_five_cards_each_linking_the_others():
+def test_help_has_six_cards_each_linking_the_others():
     from station.server import HELP_CARDS, STATIC
     pages = {"/help": "card.html", "/help/sidekick": "sidekick_card.html", "/help/conversation": "conversation_card.html",
-             "/help/vara": "vara_card.html", "/help/bandplan": "bandplan_card.html"}
+             "/help/vara": "vara_card.html", "/help/bandplan": "bandplan_card.html", "/help/adhoc": "adhoc_card.html"}
     for path, src in pages.items():
         assert HELP_CARDS[path] == src
         html = (STATIC / src).read_text(encoding="utf-8")
@@ -568,6 +568,9 @@ def test_help_has_five_cards_each_linking_the_others():
     assert "Find local plans" in bp and "Who speaks first" in bp and "97.305" in bp
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert 'href="/help/vara"' in idx and idx.count('href="/help/bandplan"') == 2
+    ad = (STATIC / "adhoc_card.html").read_text(encoding="utf-8")      # owner 2026-11-16: ad hoc channels card
+    assert "445.025" in ad and "6 characters" in ad and "CHIRP" in ad and "Install" in ad and "Export my set" in ad
+    assert 'href="/help/adhoc"' in idx and "★ Install" in vara and "Ad hoc channels" in bp
 
 
 def test_end_button_names_a_conversation_outside_a_net():

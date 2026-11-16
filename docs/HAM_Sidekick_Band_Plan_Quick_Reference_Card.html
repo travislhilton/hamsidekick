@@ -91,7 +91,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 </head>
 <body>
 <div class="page-header">
-  <nav class="card-nav" aria-label="Reference cards"><a href="/help">The station</a><a href="/help/sidekick">Sidekick, the AI assistant</a><a href="/help/conversation">Record a conversation</a><a href="/help/vara">VARA chat and files</a><a href="/help/bandplan" aria-current="page">Band plan for your area</a></nav>
+  <nav class="card-nav" aria-label="Reference cards"><a href="/help">The station</a><a href="/help/sidekick">Sidekick, the AI assistant</a><a href="/help/conversation">Record a conversation</a><a href="/help/vara">VARA chat and files</a><a href="/help/bandplan" aria-current="page">Band plan for your area</a><a href="/help/adhoc">Ad hoc channels</a></nav>
   <h1>Band Plan for Your Area: Quick Reference Card</h1>
   <p class="page-intro">Finding your area's band plans and EMCOMM plans, keeping your channels, and reading the one consolidated table. Two sides, US Letter. Print double-sided ("flip on long edge") and keep it with the station's card.</p>
   <button class="print-btn" onclick="window.print()">PRINT</button>
@@ -116,7 +116,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
   <div class="steps">
     <div class="step"><div class="step-num">4</div><div class="step-text"><span class="k">Nets</span> → <b>Plans</b> → set <b>Within … km</b> → <span class="k">Find local plans</span><small>Up to two minutes; about $0.20–0.50. It looks for clubs and EMCOMM groups, your state coordinator's band plan, public ARES, RACES and ICS-205 plans, and the VHF/UHF Winlink gateways (in the band plan unless you untick them).</small></div></div>
     <div class="step"><div class="step-num">5</div><div class="step-text"><b>Choose the plans for your band plan:</b> <b>Plans and documents</b> → tick <b>In the band plan</b><small>The ticked plan is saved on this PC if it is not yet (<b>offline copy</b>) and read into ranges and channels: one xAI call, a few cents. Untick to leave it out (ticking it again is free). Nothing is read until you tick it.</small></div></div>
-    <div class="step"><div class="step-num">6</div><div class="step-text"><b>Winlink gateways, free:</b> with Winlink Express on this PC, its channel list is read for <b>VARA</b> gateways (PUBLIC, EMCOMM) by distance from their grid square<small>Refresh it in Express: Channel Selection → <b>Update Table Via Internet</b> (the station asks when it is over 10 days old or never downloaded). VARA FM in range goes in; VARA HF is offered.</small></div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-text"><b>Winlink gateways, free:</b> with Winlink Express on this PC, its channel list is read for <b>VARA</b> gateways (PUBLIC, EMCOMM) by distance from their grid square<small>Refresh it in Express: Channel Selection → <b>Update Table Via Internet</b> (the station asks when it is over 10 days old or never downloaded; not using VARA FM, VARA HF or Winlink? <b>I don't use …</b> on the note, or Settings → <b>Winlink</b> → <b>Winlink gateway lists</b>). VARA FM in range goes in; VARA HF is offered. A list you update is picked up within a minute.</small></div></div>
     <div class="step"><div class="step-num">7</div><div class="step-text"><b>Members-only plan?</b> <b>Add a plan you have</b> → choose the file (PDF, Word, text)<small>The station never signs in anywhere. Your file stays on this PC and is read the same way.</small></div></div>
   </div>
 
@@ -140,7 +140,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 
   <p class="card-part">Open it <span>(dashboard header)</span></p>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><div class="step-text"><span class="k">Band plan</span> → one table per band<small><b>Show</b>: all, HF, VHF / UHF or one band · <b>Only where I may transmit</b> · <b>Only what to check</b> · <b>Channels</b> on or off · <span class="k">Print</span>. Highest band first. <b>Full spectrum</b>: every stretch and channel with what is open there for ad hoc voice and VARA. <b>Ad hoc voice</b> / <b>Ad hoc VARA</b>: open ranges (HF), free simplex channels (VHF/UHF, 20 kHz steps, 25 on 70 cm), clear of every channel and gateway; green <b>unplanned</b> = no plan uses it. VARA FM: <b>narrow only</b> or <b>narrow &amp; wide</b> (wide needs ~25 kHz). <b>Shared</b> for VARA FM: 2 m 145.5–145.8, 1.25 m 223.71–223.85, 70 cm 445–447. <b>☆</b> on a channel reserves it as yours (<b>★ my ad hoc</b>); <b>Export</b> or <b>★ Send</b> over VARA shares the set. <span class="k">Use</span> tunes a VARA radio there. 📻 marks what each radio is tuned to.</small></div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text"><span class="k">Band plan</span> → one table per band<small><b>Show</b>: all, HF, VHF / UHF or one band · <b>Only where I may transmit</b> · <b>Only what to check</b> · <b>Channels</b> on or off · <span class="k">Print</span>. Highest band first. <b>Full spectrum</b>: every stretch and channel with what is open there for ad hoc voice and VARA. <b>Ad hoc voice</b> / <b>Ad hoc VARA</b>: where you may start a contact, channel by channel (VHF/UHF) or as ranges (HF); <span class="k">☆</span> reserves a channel as your <b>★ my ad hoc</b> (purple), shared by <b>Export</b> or over VARA: see the <b>Ad hoc channels</b> card. <span class="k">Use</span> tunes a VARA radio there. 📻 marks what each radio is tuned to (<b>Tuned now</b> jumps to it).</small></div></div>
   </div>
 
   <p class="card-part">The columns</p>
@@ -157,14 +157,15 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
     <tr><td>1 · State coordinator</td><td>The area's band plan (repeater pairs, simplex, packet)</td></tr>
     <tr><td>2 · Local plans</td><td>ARES, RACES, ICS-205, club plans and your own files</td></tr>
     <tr><td>3 · Your channels</td><td>What you kept on the Plans tab</td></tr>
-    <tr><td>4 · ARRL band plan</td><td>The national voluntary plan, built in</td></tr>
+    <tr><td>★ Your ad hoc</td><td>Channels you reserved (Ad hoc tabs): your group's agreement</td></tr>
+    <tr><td>4 · ARRL band plan</td><td>The national voluntary plan, built in. Where the coordinator's plan covers a stretch, its words (not the ARRL's) decide what is open ad hoc</td></tr>
   </table>
 
   <p class="card-part">⚠ What to check</p>
   <table class="tier-table">
     <tr><td>Plans differ</td><td>Two plans set the same stretch aside for different uses (e.g. weak signal vs packet). Both are shown: follow the higher one, or ask the coordinator</td></tr>
     <tr><td>Channel in another use</td><td>A channel sits in a range set aside for something else (a simplex channel in repeater outputs)</td></tr>
-    <tr><td>Outside your privileges</td><td>A kept channel, or its repeater input, is outside your class</td></tr>
+    <tr><td>Outside your privileges</td><td>A kept or reserved channel, or its repeater input, is outside your class</td></tr>
   </table>
 
   <p class="card-part">Your say on each plan</p>

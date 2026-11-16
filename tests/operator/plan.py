@@ -30,7 +30,7 @@ PLAN = {
     "station:wrong.meter-red-none": ("9798fc53", "human", "Needs a real radio's audio"),
     "station:wrong.wrong-net-name": ("1a32b221", "unit", 'A net counts only on its own frequency: tests/test_schedule.py'),
     "station:wrong.outbox-refused": ("8ad1b632", "unit", 'Winlink Express open is refused: tests/test_winlink.py'),
-    "station:wrong.page-won-t-open": ("5a331ba3", "human", 'Signing in to Windows / phone on the same Wi-Fi'),
+    "station:wrong.page-won-t-open": ("c99238b3", "human", 'Signing in to Windows / phone on the same Wi-Fi; ✕ / Esc closes any window (test_station popups)'),
     "sidekick:switch.off": ("ff0f1109", "ui", "The radio's Sidekick switch has Off (no switch at all while the agent is off: every radio Off)"),
     "sidekick:switch.draft": ("de513c61", "ui+sandbox", "Sidekick Off → Draft on the radio's card"),
     "sidekick:switch.send": ("cca1c940", "ui", "Send is NOT offered while the radio's Transmit switch is off"),

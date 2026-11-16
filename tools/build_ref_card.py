@@ -47,7 +47,8 @@ PUBLIC_PDF = "https://cdn.jsdelivr.net/gh/travislhilton/hamsidekick@master/docs/
 CARDS = [(SRC, NAME), (ROOT / "station" / "static" / "sidekick_card.html", "HAM_Sidekick_Assistant_Quick_Reference_Card"),
          (ROOT / "station" / "static" / "conversation_card.html", "HAM_Sidekick_Conversation_Quick_Reference_Card"),
          (ROOT / "station" / "static" / "vara_card.html", "HAM_Sidekick_VARA_Quick_Reference_Card"),
-         (ROOT / "station" / "static" / "bandplan_card.html", "HAM_Sidekick_Band_Plan_Quick_Reference_Card")]
+         (ROOT / "station" / "static" / "bandplan_card.html", "HAM_Sidekick_Band_Plan_Quick_Reference_Card"),
+         (ROOT / "station" / "static" / "adhoc_card.html", "HAM_Sidekick_Ad_Hoc_Channels_Quick_Reference_Card")]
 
 
 def main() -> int:
