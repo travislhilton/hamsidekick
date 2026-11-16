@@ -75,10 +75,13 @@ def test_an_old_or_missing_channel_list_asks_the_operator_to_update_it(tmp_path,
     monkeypatch.setattr(p, "_installs", lambda: [str(inst)])
     assert p.state()["winlink_list"]["ask"] is False                     # both lists fresh
     hf = next(inst.glob("*/Data/" + wc.HF_FILE))
-    old = time.time() - 45 * 86400
+    nine = time.time() - 9 * 86400 - 60
+    os.utime(hf, (nine, nine))
+    assert p.state()["winlink_list"]["ask"] is False                     # 9 days: fine (owner: "10 days")
+    old = time.time() - 11 * 86400 - 60
     os.utime(hf, (old, old))
     n = p.state()["winlink_list"]
-    assert n["ask"] and {k["kind"]: (k["stale"], k["days"]) for k in n["kinds"]} == {"vhf": (False, 0), "hf": (True, 45)}
+    assert n["ask"] and {k["kind"]: (k["stale"], k["days"]) for k in n["kinds"]} == {"vhf": (False, 0), "hf": (True, 11)}
     hf.unlink()                                                          # a new Express: never downloaded
     n = p.consolidated()["winlink_list"]
     assert n["ask"] and next(k for k in n["kinds"] if k["kind"] == "hf")["missing"]

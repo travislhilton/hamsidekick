@@ -358,7 +358,7 @@ you chose is remembered. Each column shows:
   documents, nearest first, with distance, direction, grid, hours and an EMCOMM mark: **VARA FM gateways within**
   the search distance (in the band plan at first) and **VARA HF gateways within 370 mi** (offered: tick to add). A new
   list from Express, a new distance or a new station place rebuilds them; costs nothing (no search, no xAI).
-  When Express is on this PC but a list has **never been downloaded** (a new Express) or is **more than 30 days old**,
+  When Express is on this PC but a list has **never been downloaded** (a new Express) or is **more than 10 days old**,
   the Plans tab and the band plan ask you to update it (which list, how old, and where in Express); **Remind me in a
   week** hides the note for 7 days. Update the list in Express **whenever you like**: the station checks it every
   minute and an open band plan or Plans tab refreshes by itself.

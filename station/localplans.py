@@ -52,7 +52,7 @@ GATEWAYS_KEY, GATEWAYS_TITLE = "search:winlink", "Winlink gateways near you (VHF
 # service codes PUBLIC / EMCOMM, distance from each gateway's grid square
 EXPRESS_KEYS = {"express:vhf": "vhf", "express:hf": "hf"}
 HF_KM = 600                                         # VARA HF gateways: about NVIS reach
-LIST_STALE_DAYS = 30            # older than this, the operator is asked to update Express's channel list (owner 11-16)
+LIST_STALE_DAYS = 10            # older than this, the operator is asked to update Express's channel list (owner 11-16)
 LIST_SNOOZE_S = 7 * 86400
 OFFLINE_KINDS = ("band_plan", "ares_plan", "races_plan", "ics205", "comm_plan")
 

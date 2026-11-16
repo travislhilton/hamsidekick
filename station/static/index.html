@@ -2147,7 +2147,7 @@ function bpTuned(){return (S.radios||[]).filter(r=>r.freq_mhz).map(r=>{const m=v
   return {id:r.id,name:r.name||r.id,f:+r.freq_mhz,mode:r.mode||"",vara:m&&m.cfg.use!=="winlink"&&m.cfg.enabled?"VARA "+(m.cfg.kind==="hf"?"HF":"FM"):m?"VARA "+(m.cfg.kind==="hf"?"HF":"FM")+" (Winlink Express)":""}})}
 function bpChanHit(r,t){const tol=r.from<30?0.001:0.0025;return Math.abs(t.f-r.from)<=tol}
 function bpRangeHit(x,t){return t.f>=x.from-1e-6&&t.f<=x.to+1e-6}
-// Ask for a fresh Winlink Express channel list (owner 2026-11-16): none yet, or older than 30 days
+// Ask for a fresh Winlink Express channel list (owner 2026-11-16): none yet, or older than 10 days
 function wlListNote(n){if(!n||!n.ask)return"";const bad=n.kinds.filter(k=>k.stale);
   return `<div class="note warnbox noprint" role="status"><b>Please update Winlink Express's RMS channel list</b> so the band plan knows the Winlink gateways near you: ${bad.map(k=>`<b>${esc(k.label)}</b> ${k.missing?"has never been downloaded":`is ${k.days} days old`}`).join(" and ")}.
    <div class="small">In Winlink Express: <b>Open Session</b> → ${bad.map(k=>`<b>${k.kind==="vhf"?"VARA FM Winlink":"VARA HF Winlink"}</b>`).join(" (then again for ")}${bad.length>1?")":""} → <b>Channel Selection</b> → <b>Update Table Via Internet</b> (service codes <b>PUBLIC EMCOMM</b>). The station reads the new list by itself.</div>
