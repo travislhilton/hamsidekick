@@ -93,7 +93,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 <div class="page-header">
   <nav class="card-nav" aria-label="Reference cards"><a href="/help">The station</a><a href="/help/sidekick">Sidekick, the AI assistant</a><a href="/help/conversation">Record a conversation</a><a href="/help/vara" aria-current="page">VARA chat and files</a><a href="/help/bandplan">Band plan for your area</a></nav>
   <h1>VARA Chat and Files: Quick Reference Card</h1>
-  <p class="page-intro">Keyboard chat and file transfer over VARA HF and VARA FM: setting up, connecting, sending files and handing VARA to Winlink Express. Two sides, US Letter. Print double-sided ("flip on long edge") and keep it with the station's card.</p>
+  <p class="page-intro">Keyboard chat and file transfer over VARA HF and VARA FM: setting up one VARA modem per data radio, connecting, sending files and taking turns with Winlink Express. Two sides, US Letter. Print double-sided ("flip on long edge") and keep it with the station's card.</p>
   <button class="print-btn" onclick="window.print()">PRINT</button>
 </div>
 <div class="card-row">
@@ -102,28 +102,32 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 <div class="card card-front">
   <p class="card-role">HAM Sidekick Station · VARA</p>
   <span class="card-side">Front · side 1 of 2</span>
-  <h2 class="card-title">VARA Chat and Files: Set Up and Connect</h2>
-  <p class="lead">Keyboard chat and file transfer with another station over <b>VARA HF</b> or <b>VARA FM</b>, through the same VARA modem Winlink Express uses. Everything is <b>sent in the clear</b> and <b>logged on this PC</b>. Nothing transmits unless you click.</p>
+  <h2 class="card-title">Set Up Your VARA Modems</h2>
+  <p class="lead">Keyboard chat and file transfer over <b>VARA HF</b> or <b>VARA FM</b>. Each <b>data radio</b> has <b>one VARA modem</b> (a copy of VARA with its own sound card and ports), and each modem is used for one job. Several can be on the air at once. Everything is <b>sent in the clear</b>; nothing transmits unless you click.</p>
 
-  <p class="card-part">A · Once: set it up</p>
+  <p class="card-part">What each modem is for <span>(Modem setup → Used for)</span></p>
+  <table class="tier-table">
+    <tr><td>Chat &amp; files</td><td>This station only. Winlink Express uses a different modem</td></tr>
+    <tr><td>Shared with Winlink Express</td><td><b>They take turns</b>: while Express is open and you are not in a chat, Express has it; the station takes it back when Express closes</td></tr>
+    <tr><td>Winlink Express only</td><td>The station never connects to it (listed so you see the whole station)</td></tr>
+  </table>
+
+  <p class="card-part">Two ways to set it up</p>
+  <table class="tier-table">
+    <tr><td>One radio, taking turns</td><td>One VARA (ports <b>8300/8301</b>, Express's default) → <b>Shared</b></td></tr>
+    <tr><td>Separate radios</td><td>Radio A: VARA FM <b>8300/8301</b> → <b>Winlink Express only</b>. Radio B: a second VARA <b>8310/8311</b> → <b>Chat &amp; files</b>. A third: 8320/8321</td></tr>
+  </table>
+
+  <p class="card-part">Set up each modem</p>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><div class="step-text"><b>A radio for VARA.</b> On its card: <b>Used for</b> → <span class="k">Winlink only</span><small>Its nets are not recorded on it, and the station never records from the VARA sound card.</small></div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text"><b>Its Transmit switch on:</b> <span class="k">Radios…</span> → the radio → <b>Transmit</b><small>Off = VARA never transmits from this station.</small></div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Your license class:</b> Settings → <b>Station agent</b><small>Every transmission is checked against your data privileges on the radio's frequency.</small></div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text"><b>The radio's frequency</b> on its card (CAT reads it; or <span class="k">Change</span>)</div></div>
-    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Open the VARA modem</b> (VARA HF or VARA FM) as for Winlink, with its sound card and PTT set up there</div></div>
-    <div class="step"><div class="step-num">6</div><div class="step-text">The radio's card → <span class="k">VARA chat</span> → choose <b>VARA HF</b> or <b>VARA FM</b> → <span class="k">Switch VARA on</span><small>Ports 8300 / 8301 are VARA's defaults: change them only if you changed them in VARA. HF: <b>Bandwidth</b> 500, 2300 or 2750 Hz, or VARA's own setting.</small></div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text">The radio's card: <b>Used for</b> → <span class="k">Data (Winlink / VARA)</span><small>Its nets are not recorded, and the station never records from the VARA sound card.</small></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><b>A second copy of VARA?</b> Install or copy it into <b>its own folder</b> (e.g. <span class="mono">C:\VARA FM 2</span>); in it: VARA Setup → <b>TCP port</b> 8310 · Sound card = <b>this radio's</b> · PTT = <b>this radio's</b><small>VARA HF and VARA FM are licensed separately: check VARA's terms for a second copy.</small></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">The card → <span class="k">VARA…</span> → VARA HF or FM · <b>Ports</b> (the next free pair is filled in) · <b>Used for</b> → <span class="k">Add this modem</span></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text"><b>Before it can transmit:</b> Radios… → the radio → <b>Transmit</b> on · your <b>license class</b> (Settings → Sidekick &amp; AI) · the radio's <b>frequency</b> on its card</div></div>
   </div>
 
-  <p class="card-part">B · Make a contact</p>
-  <div class="steps">
-    <div class="step"><div class="step-num">7</div><div class="step-text"><b>Call a station:</b> type its callsign → <span class="k">Connect</span><small>VARA FM can go through a digipeater: type it under <b>via</b>. A call you heard under <b>CQs heard</b> fills in with one tap.</small></div></div>
-    <div class="step"><div class="step-num">8</div><div class="step-text"><b>Or call CQ:</b> <span class="k">Call CQ</span> → confirm<small>Listen first: the window shows <b>channel busy</b> when VARA hears the frequency in use.</small></div></div>
-    <div class="step"><div class="step-num">9</div><div class="step-text"><b>Or wait for a call:</b> tick <b>Answer calls while I am here</b><small>It turns itself off the moment you leave the PC or any check below fails.</small></div></div>
-  </div>
-
-  <div class="note-box warning"><b>When it will transmit</b>, all four, every time: the radio is <b>Winlink only</b> · its <b>Transmit switch</b> is on · <b>you are at the dashboard</b> (keyboard or mouse in the last few minutes) · your <b>license class has data privileges</b> on that frequency. The window's green or amber line says which one is missing.</div>
-  <p class="turn-over">Turn over → side 2: Chat, Files, Winlink Express</p>
+  <div class="note-box warning"><b>Ham practice.</b> A COM port opens in one program only: if the station tunes this radio by CAT, give VARA another PTT (RTS on a separate port, the Digirig's second port, or VOX). Two 2 m radios side by side desense each other: use different bands (Winlink on 2 m, chat on 70 cm or HF) or well-spaced antennas. Each transmission IDs as usual.</div>
+  <p class="turn-over">Turn over → side 2: Contacts, Chat, Files, Taking Turns</p>
 </div>
 
 <!-- ===================== BACK ===================== -->
@@ -131,38 +135,39 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
   <div class="card-head"><div>
   <p class="card-role">HAM Sidekick Station · VARA</p>
   <span class="card-side back">Back · side 2 of 2</span>
-  <h2 class="card-title">Chat, Files and Winlink Express</h2>
+  <h2 class="card-title">Contacts, Chat, Files and Taking Turns</h2>
   </div><div class="card-qr share"><!--CARD_QR:HAM_Sidekick_VARA_Quick_Reference_Card--><span>Share this card</span></div></div>
 
-  <p class="card-part">Connected</p>
+  <p class="card-part">Make a contact <span>(the radio's card → VARA chat; several radios: a tab each)</span></p>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><div class="step-text"><b>Chat:</b> type → <span class="k">Enter</span><small>Up to 4000 characters a message. Theirs and yours show in the window with the time.</small></div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text"><b>Send a file:</b> <b>File</b> → choose it<small>Up to 5 MB. A bar shows progress; the other station checks the file arrived whole (SHA-256) and says so. Small files: VARA is slow (HF, minutes for a page; FM is faster).</small></div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Files received</b> are listed under the chat as downloads<small>Saved in <span class="mono">data\vara\inbox</span>, never opened by the station. Open one only if you expected it.</small></div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text"><b>Finish:</b> <span class="k">Disconnect</span> · <b>at once:</b> <span class="k">Abort</span><small>Abort drops the link immediately and lets go of the transmitter.</small></div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text"><b>Pick a frequency:</b> <span class="k">Band plan</span> → <b>Ad hoc VARA</b> → <span class="k">Use</span> sets the radio there<small>Green <b>unplanned</b> = no plan uses it. Listen first; <b>channel busy</b> shows when VARA hears it in use.</small></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><b>Call:</b> callsign → <span class="k">Connect</span> (FM: a digipeater under <b>via</b>) · or <span class="k">Call CQ</span> · or tick <b>Answer calls</b><small>Answering turns itself off the moment you leave the PC or a check fails.</small></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Chat:</b> type → <span class="k">Enter</span> · <b>Send a file:</b> <b>File</b> → choose it (up to 5 MB; checked with SHA-256 on arrival)</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text"><b>Files received</b>: listed under the chat as downloads, one folder per radio, never opened by the station</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Finish:</b> <span class="k">Disconnect</span> · <b>at once:</b> <span class="k">Abort</span> (drops the link, lets go of the transmitter)</div></div>
   </div>
+
+  <p class="card-part">Taking turns with Winlink Express <span>(a Shared modem)</span></p>
+  <div class="steps">
+    <div class="step"><div class="step-num">6</div><div class="step-text"><b>Automatic:</b> open Winlink Express → the station lets go (after your chat, if one is under way) → close Express → it takes VARA back<small><span class="k">Hand to Winlink Express now</span> / <span class="k">Take it back</span> do the same by hand.</small></div></div>
+  </div>
+
+  <p class="card-part">The window's status line</p>
+  <table class="tier-table">
+    <tr><td>Ready · Listening · Connected</td><td>This station has the modem</td></tr>
+    <tr><td>Winlink Express's turn</td><td>A Shared modem while Express is open</td></tr>
+    <tr><td>"VARA is not answering"</td><td>Is that copy of VARA open, on the ports shown? Another program (Express?) may hold it: a Chat-only modem must not be Express's</td></tr>
+    <tr><td>Connect greyed</td><td>Read the amber line: Transmit switch, you at the PC, license class, or the frequency</td></tr>
+    <tr><td>"no data privileges"</td><td>Outside your class's data segment: Band plan → Ad hoc VARA</td></tr>
+  </table>
 
   <p class="card-part">Who you can talk to</p>
   <table class="tier-table">
     <tr><td>Another HAM Sidekick Station</td><td>Chat <b>and</b> files</td></tr>
-    <tr><td>Any other VARA keyboard program</td><td>Plain chat, line by line ("plain terminal" in the window). Files need this program at both ends</td></tr>
+    <tr><td>Any other VARA keyboard program</td><td>Plain chat ("plain terminal"); files need this program at both ends</td></tr>
   </table>
 
-  <p class="card-part">Winlink Express <span>(VARA serves one program at a time)</span></p>
-  <div class="steps">
-    <div class="step"><div class="step-num">5</div><div class="step-text"><span class="k">Hand VARA to Winlink Express</span> → then open Express and connect as usual</div></div>
-    <div class="step"><div class="step-num">6</div><div class="step-text">Close Express → <span class="k">Take VARA back</span><small>While Express is open the station leaves VARA alone.</small></div></div>
-  </div>
-
-  <p class="card-part">When something looks wrong</p>
-  <table class="tier-table">
-    <tr><td>"VARA is not answering"</td><td>Open the VARA modem; check the ports match VARA's settings; close other programs using VARA</td></tr>
-    <tr><td>Connect is greyed</td><td>Read the amber line: Transmit switch, you at the PC, license class, or the radio's frequency</td></tr>
-    <tr><td>"no data privileges"</td><td>The frequency is outside your class's data segment: dashboard <span class="k">Band plan</span> shows where you may transmit data</td></tr>
-    <tr><td>Stopped listening</td><td>You left the PC, or a check failed: tick <b>Answer calls</b> again</td></tr>
-  </table>
-
-  <p class="card-disclaimer">Part of HAM Sidekick Station (MIT License). You are the control operator for every transmission. Part 97: messages are never encrypted, and the station sends no beacon, relay or automatic reply. The chat and file format is this program's own, published in the project's docs/VARA.md; VARA is a separate product.</p>
+  <p class="card-disclaimer">Part of HAM Sidekick Station (MIT License). You are the control operator for every transmission. Part 97: never encrypted; no beacon, relay or automatic reply. The chat and file format is this program's own (docs/VARA.md); VARA is a separate product.</p>
 </div>
 
 </div>

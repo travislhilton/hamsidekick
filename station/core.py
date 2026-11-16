@@ -268,7 +268,7 @@ class Station:
         threading.Thread(target=self.accurate.run, args=(self.stop,), daemon=True, name="accurate").start()
         threading.Thread(target=self.summarizer.run, args=(self.stop,), daemon=True, name="summary").start()
         threading.Thread(target=self.costs.run, args=(self.stop,), daemon=True, name="aicost").start()
-        if self.vara.cfg()["enabled"]:                     # VARA keyboard chat / files (station/varalink.py)
+        if self.vara.any_enabled():                        # VARA modems: chat / files (station/varalink.py)
             threading.Thread(target=self.vara.restart, daemon=True, name="vara-start").start()
 
     @property

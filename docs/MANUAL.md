@@ -234,7 +234,7 @@ you chose is remembered. Each column shows:
     antenna). A net that can't be heard, or loses a clash, is not listened to or tuned for. What a radio can hear
     comes from its model (2 m / 70 cm FM, IC-705, HF transceiver, or other: not checked; guessed from its name), its
     card's **Antenna: HF | VHF/UHF** (a one-socket multi-band radio such as the IC-705; HF at first) and **Used for:
-    Nets | Winlink only**. Removing a radio in **Radios…** keeps its nets, with no radio. **Add a net** / **Edit**: name, radio, start time, minutes, frequency and
+    Nets | Data (Winlink / VARA)**. Removing a radio in **Radios…** keeps its nets, with no radio. **Add a net** / **Edit**: name, radio, start time, minutes, frequency and
     mode, net control, **Alert, minutes before** (5 by default, 0 = none), **Emergency or priority net** (keeps an
     Urgent board), and **Repeats** like Outlook: **Once**, **Daily**, **Weekly** (every N weeks on chosen days),
     **Monthly** (on day 1–31 or the last day, or on the 1st/2nd/3rd/4th/5th/last chosen weekday, any mix such as
@@ -290,16 +290,33 @@ you chose is remembered. Each column shows:
   **Move to Not heard** / **Keep it**. **Find nets** lists a found net that matches a Not heard one (same frequency and
   start, or same name) apart, under "not heard here", and adds it only with **Add anyway** (it then leaves Not heard).
   Kept in `data/nets_unheard.json`.
-- **VARA chat and files** (owner 2026-11-15): set a radio to **Winlink only**, then **VARA chat** on its card. Open the
-  VARA HF or VARA FM modem as you do for Winlink Express (ports 8300 / 8301 by default), then **Switch VARA on**.
-  Type a callsign and **Connect** (VARA FM can go via a digipeater), or **Call CQ**; tick **Answer calls while I am
-  here** to accept calls. Type and press Enter to chat; **File** sends a file (up to 5 MB, checked on arrival).
-  It transmits only when the radio's Transmit switch is on (Radios…), you are at the dashboard, and your license class
-  (Settings → Station agent) has data privileges on the radio's frequency; the window says why when it will not.
-  **Abort** drops the link at once. To use Winlink Express, click **Hand VARA to Winlink Express**, and **Take VARA
-  back** after closing it. Files received are in the list below the chat as downloads (data/vara/inbox); open them
-  only if you expected them. Chat with another HAM Sidekick Station gets files too; with any other VARA keyboard
-  program you get plain chat.
+- **VARA chat and files** (owner 2026-11-15; several modems 2026-11-16): on a radio's card set **Used for** to
+  **Data (Winlink / VARA)**, then **VARA…** on its card. Each data radio has **one VARA modem** (a copy of VARA HF or
+  VARA FM with that radio's sound card and PTT, at its own TCP ports), used for one job:
+  - **Chat & files**: this station only; Winlink Express uses a different modem.
+  - **Shared with Winlink Express**: they **take turns**. While Express is open and no chat is under way the station
+    lets go of the modem; it takes it back when Express closes. **Hand to Winlink Express now** / **Take it back** do
+    the same by hand.
+  - **Winlink Express only**: the station never connects to it; listed so the station's plan is complete.
+
+  Several modems run at once, each with its own log and received files (`data/vara/radios/<radio>/`); the window has a
+  tab per data radio. **One radio, taking turns:** one VARA at 8300/8301 (Winlink Express's default) → Shared.
+  **Separate radios:** radio A's VARA FM at 8300/8301 → Winlink Express only; a **second copy of VARA in its own
+  folder** (e.g. `C:\VARA FM 2`), its VARA Setup → TCP port **8310** (data 8311), the second radio's sound card and
+  PTT → radio B → Chat & files. A third: 8320/8321. Adding a modem fills in the next free pair, and two modems can never
+  share ports. VARA HF and VARA FM are licensed separately: check VARA's terms for a second copy. Ham practice: a COM
+  port opens in one program only (if the station tunes a radio by CAT, give VARA another PTT: RTS on another port,
+  the interface's second port, or VOX); two 2 m radios side by side desense each other (use different bands, or
+  well-separated antennas).
+
+  Type a callsign and **Connect** (VARA FM can go via a digipeater), or **Call CQ**; tick **Answer calls** to accept
+  calls. Type and press Enter to chat; **File** sends a file (up to 5 MB, checked on arrival). A modem transmits only
+  when its radio's Transmit switch is on (Radios…), you are at the dashboard, and your license class (Settings →
+  Sidekick & AI) has data privileges at that radio's frequency; the window says why when it will not. **Abort** drops
+  the link at once. **Band plan → Ad hoc VARA → Use** sets a chat modem's radio to an open range (one button per
+  modem that fits). "VARA is not answering" means that copy of VARA is not open on those ports, or another program
+  (Winlink Express?) holds it. Files received are listed under the chat as downloads, never opened by the station.
+  Chat with another HAM Sidekick Station gets files too; any other VARA keyboard program gets plain chat.
 - **Band plan for your area** (header → **Band plan**, owner 2026-11-15; its own card: Help → Band plan for your
   area): one table per band of where you may transmit and what each frequency is for. Built in: the FCC rules for
   your license class and the ARRL band plan. In Nets → Plans → **Plans and documents**, tick **In the band plan** on

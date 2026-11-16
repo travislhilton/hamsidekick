@@ -83,7 +83,7 @@ class Vara:
                  data_port: int = DATA_PORT, tx_allowed=None, ptt=None, ptt_mode: str = "vara",
                  winlink_open=None, on_event=None, bw: int | None = None, max_file: int = MAX_FILE,
                  watchdog_s: float = WATCHDOG_S, reconnect_s: float = RECONNECT_S, clock=time.time,
-                 tick_s: float = 0.5):
+                 tick_s: float = 0.5, log_dir=None):
         call = str(mycall or "").strip().upper()
         if not CALL_RE.match(call):
             raise ValueError("set your callsign first (3-7 letters and digits, an optional -SSID)")
@@ -95,7 +95,7 @@ class Vara:
             raise ValueError("PTT by the station needs the station's transmitter")
         if bw is not None and bw not in (500, 2300, 2750):
             raise ValueError("VARA HF bandwidth is 500, 2300 or 2750 Hz")
-        self.dir = Path(data_dir) / "vara"
+        self.dir = Path(log_dir) if log_dir else Path(data_dir) / "vara"     # one folder per modem (varalink.py)
         self.mycall, self.kind, self.host, self.ports = call, kind, host, (int(cmd_port), int(data_port))
         self.tx_allowed = tx_allowed or (lambda: (False, "transmitting is not allowed"))
         self.ptt, self.ptt_mode = ptt, ptt_mode

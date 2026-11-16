@@ -562,7 +562,8 @@ def test_help_has_five_cards_each_linking_the_others():
     conv = (STATIC / "conversation_card.html").read_text(encoding="utf-8")
     assert "Record a Conversation" in conv and "Include conversations" in conv and "conversations only" in conv
     vara = (STATIC / "vara_card.html").read_text(encoding="utf-8")
-    assert "Winlink only" in vara and "Hand VARA to Winlink Express" in vara and "Abort" in vara and "encrypted" in vara
+    assert "Data (Winlink / VARA)" in vara and "Shared with Winlink Express" in vara and "take turns" in vara
+    assert "8310" in vara and "Abort" in vara and "encrypted" in vara
     bp = (STATIC / "bandplan_card.html").read_text(encoding="utf-8")
     assert "Find local plans" in bp and "Who speaks first" in bp and "97.305" in bp
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
