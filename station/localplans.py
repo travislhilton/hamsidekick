@@ -787,7 +787,7 @@ class Plans:
                     "authority": e.get("authority") or "local", "url": e.get("url"),
                     "segments": e.get("segments") or [], "frequencies": e.get("frequencies") or []}
                    for k, e in (d.get("ingested") or {}).items() if not e.get("excluded") and not e.get("error")]
-        t = consolidate.build(self._class(), sources, d.get("kept") or [], d.get("adhoc") or [])
+        t = consolidate.build(self._class(), sources, d.get("kept") or [], self._adhoc_rows(d))
         t["read"] = [{"key": k, "title": e.get("title"), "org": e.get("org"), "kind": e.get("kind"),
                       "authority": e.get("authority"), "excluded": bool(e.get("excluded")), "error": e.get("error"),
                       "segments": len(e.get("segments") or []), "channels": len(e.get("frequencies") or []),
@@ -798,7 +798,8 @@ class Plans:
         t["searched_at"] = (d.get("last") or {}).get("at")
         t["key"] = bool(self.key())
         t["open"] = {k: consolidate.open_ranges(t, k) for k in ("voice", "data")}
-        t["adhoc"] = self._adhoc_status(t, d.get("adhoc") or [])
+        t["adhoc"] = self._adhoc_status(t, self._adhoc_rows(d))
+        t["radio"] = self._radio_view(d, t)
         t["winlink_list"] = self.list_note()
         return t
 
@@ -834,14 +835,73 @@ class Plans:
         rows = self.adhoc()
         return {k: adhoc.suggest(rows, k) for k in adhoc.KINDS} | {"max": adhoc.NAME_MAX}
 
+    @staticmethod
+    def _adhoc_rows(d: dict) -> list[dict]:
+        """The reservations, each with a name and a radio alias (before 2026-11-17 one short name: now the alias)."""
+        from . import adhoc
+        out = []
+        for r in d.get("adhoc") or []:
+            r = dict(r)
+            if "alias" not in r:
+                r["alias"] = adhoc.short_name(r.get("name")) or adhoc.suggest(out, r["kind"])
+            out.append(r)
+        return out
+
     def adhoc(self) -> list[dict]:
-        return list(_load(self.st).get("adhoc") or [])
+        return self._adhoc_rows(_load(self.st))
+
+    # ----- radio channels: the ad hoc set + band-plan channels marked 📻, for a CHIRP file (radiochan.py) -----
+    def _radio_view(self, d: dict, t: dict | None) -> dict:
+        from . import radiochan as R
+        rows = R.listing(t["adhoc"] if t else self._adhoc_rows(d), d.get("radio") or [], d.get("radio_order") or [], t)
+        prof = d.get("radio_profile") or R.DEFAULT_PROFILE
+        pl = R.plan(rows, prof)
+        return {"channels": rows, "marks": d.get("radio") or [], "profile": prof, "start": d.get("radio_start", 1),
+                "profiles": [{"id": k, "label": v["label"], "len": v["len"]} for k, v in R.PROFILES.items()],
+                "alias_max": R.ALIAS_MAX, "left_out": pl["left_out"], "shortened": pl["shortened"],
+                "dups": pl["dups"], "count": len(pl["rows"])}
+
+    def radio_set(self, body: dict) -> dict:
+        """{"add" | "remove" | "edit": a band-plan channel} | {"move": key, "by": ±n, "keys": [shown order]} |
+        {"profile": id} | {"start": n}."""
+        from . import radiochan as R
+        body = body or {}
+        with self.lock:
+            d = _load(self.st)
+            if any(k in body for k in ("add", "remove", "edit")):
+                d["radio"] = R.apply(d.get("radio") or [], body)
+            if "move" in body:
+                d["radio_order"] = R.move(d.get("radio_order") or [], [str(k) for k in body.get("keys") or []],
+                                          str(body["move"]), int(body.get("by") or 0))
+            if "profile" in body:
+                if body["profile"] not in R.PROFILES:
+                    raise ValueError("choose one of the radios listed")
+                d["radio_profile"] = body["profile"]
+            if "start" in body:
+                try:
+                    n = int(body["start"])
+                except (TypeError, ValueError):
+                    raise ValueError("the first memory: a number") from None
+                if not 0 <= n <= 999:
+                    raise ValueError("the first memory is 0 to 999")
+                d["radio_start"] = n
+            _save(self.st, d)
+        return {"ok": True}
+
+    def radio_export(self, profile: str | None = None, start: int | None = None) -> tuple[bytes, str, str]:
+        from . import radiochan as R
+        t = self.consolidated()
+        d = _load(self.st)
+        prof = profile if profile in R.PROFILES else d.get("radio_profile") or R.DEFAULT_PROFILE
+        st = start if start is not None else d.get("radio_start", 1)
+        return (R.chirp_csv(t["radio"]["channels"], prof, st).encode("utf-8"), "text/csv",
+                f"radio-channels-{prof}-chirp.csv")
 
     def adhoc_set(self, body: dict) -> dict:
         from . import adhoc
         with self.lock:
             d = _load(self.st)
-            rows = adhoc.apply(d.get("adhoc") or [], body or {})
+            rows = adhoc.apply(self._adhoc_rows(d), body or {})
             notes = [r.pop("narrowed") for r in rows if "narrowed" in r]
             d["adhoc"] = rows
             _save(self.st, d)
@@ -851,7 +911,10 @@ class Plans:
         from . import adhoc
         with self.lock:
             d = _load(self.st)
-            d["adhoc"], rep = adhoc.import_(d.get("adhoc") or [], obj, replace)
+            d["adhoc"], rep = adhoc.import_(self._adhoc_rows(d), obj, replace)
+            if isinstance(obj, dict) and obj.get("radio_channels"):      # their 📻 channels, when they sent them
+                from . import radiochan
+                d["radio"], rep["radio_added"] = radiochan.import_marks(d.get("radio") or [], obj["radio_channels"])
             _save(self.st, d)
         return {"adhoc": d["adhoc"], "report": rep}
 
@@ -865,14 +928,15 @@ class Plans:
             raise ValueError("that is not a HAM Sidekick ad hoc channels file") from None
         return dict(self.adhoc_import(obj), source=str(obj.get("from") or "") or None)
 
-    def adhoc_export(self, fmt: str = "json") -> tuple[bytes, str, str]:
-        from . import adhoc
+    def adhoc_export(self, fmt: str = "json", radio: bool = False) -> tuple[bytes, str, str]:
+        from . import adhoc, radiochan
         rows = self.adhoc()
         if fmt == "csv":
             return adhoc.chirp_csv(rows).encode("utf-8"), "text/csv", "ad-hoc-channels-chirp.csv"
         op = (getattr(self.st, "_saved", lambda: {})() or {}).get("operator") or {}
         call = (op.get("callsign") or "").upper() or None
-        return (json.dumps(adhoc.export(rows, call), indent=1).encode("utf-8"), "application/json",
+        marks = radiochan.export_marks(_load(self.st).get("radio") or []) if radio else None
+        return (json.dumps(adhoc.export(rows, call, marks), indent=1).encode("utf-8"), "application/json",
                 "ad-hoc-channels.json")
 
     def doc_file(self, sid: str) -> tuple[Path, str, str] | None:

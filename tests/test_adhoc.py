@@ -14,13 +14,14 @@ from station import consolidate as C
 def test_reserve_rename_width_release():
     rows = adhoc.apply([], {"add": {"freq_mhz": 445.525, "kind": "data", "width": "wide"}})
     rows = adhoc.apply(rows, {"add": {"freq_mhz": 446.525, "kind": "voice", "name": "  Tac   1 "}})
-    assert [(r["freq_mhz"], r["kind"], r["width"], r["name"]) for r in rows] == [
-        (445.525, "data", "wide", "VARA1"), (446.525, "voice", None, "TAC 1")]
+    assert [(r["freq_mhz"], r["kind"], r["width"], r["name"], r["alias"]) for r in rows] == [
+        (445.525, "data", "wide", "", "VARA1"), (446.525, "voice", None, "Tac 1", "TAC 1")]
     with pytest.raises(ValueError, match="already"):
         adhoc.apply(rows, {"add": {"freq_mhz": 445.525, "kind": "data"}})
-    rows = adhoc.apply(rows, {"rename": {"freq_mhz": 445.525, "kind": "data", "name": "VARA 1"}})
+    rows = adhoc.apply(rows, {"rename": {"freq_mhz": 445.525, "kind": "data", "name": "County ARES VARA, drills"}})
+    rows = adhoc.apply(rows, {"rename": {"freq_mhz": 445.525, "kind": "data", "alias": "ares vara"}})
     rows = adhoc.apply(rows, {"width": {"freq_mhz": 445.525, "kind": "data", "width": "narrow"}})
-    assert rows[0]["name"] == "VARA 1" and rows[0]["width"] == "narrow"
+    assert (rows[0]["name"], rows[0]["alias"], rows[0]["width"]) == ("County ARES VARA, drills", "ARES VAR", "narrow")
     for bad in ({"freq_mhz": 7.1, "kind": "voice"}, {"freq_mhz": 146.52, "kind": "fax"}, {"kind": "data"},
                 {"freq_mhz": 144.05, "kind": "data"}):
         with pytest.raises(ValueError):
@@ -37,7 +38,8 @@ def test_export_import_between_operators():
     theirs = adhoc.apply([], {"add": {"freq_mhz": 446.525, "kind": "voice"}})
     got, rep = adhoc.import_(theirs, dict(f, channels=f["channels"] + [{"freq_mhz": 14.1, "kind": "data"}]))
     assert rep["added"] == 1 and rep["renamed"] == 1 and len(rep["skipped"]) == 1
-    assert {(r["freq_mhz"], r["name"]) for r in got} == {(445.525, "VARA 1"), (446.525, "TAC 1")}
+    assert {(r["freq_mhz"], r["name"], r["alias"]) for r in got} == {(445.525, "VARA 1", "VARA 1"),
+                                                                     (446.525, "Tac 1", "TAC 1")}
     got, rep = adhoc.import_(got, {"format": adhoc.FORMAT, "channels": [{"freq_mhz": 223.74, "kind": "data"}]},
                              replace=True)
     assert [r["freq_mhz"] for r in got] == [223.74]
@@ -49,9 +51,8 @@ def test_chirp_csv():
     rows = adhoc.apply([], {"add": {"freq_mhz": 446.525, "kind": "voice", "name": "Tac 1"}})
     rows = adhoc.apply(rows, {"add": {"freq_mhz": 145.53, "kind": "data"}})
     r = list(csv.DictReader(io.StringIO(adhoc.chirp_csv(rows))))
-    assert [(x["Name"], x["Frequency"], x["Duplex"], x["Mode"]) for x in r] == [
-        ("TAC 1", "446.525000", "", "FM"), ("VARA1", "145.530000", "", "FM")]
-    assert all(len(x["Name"]) <= 6 for x in r)
+    assert [(x["Location"], x["Name"], x["Frequency"], x["Duplex"], x["Mode"]) for x in r] == [
+        ("1", "VARA1", "145.530000", "", "FM"), ("2", "TAC 1", "446.525000", "", "FM")]
 
 
 def test_in_the_band_plan_marked_and_still_listed():
@@ -59,7 +60,7 @@ def test_in_the_band_plan_marked_and_still_listed():
            {"freq_mhz": 446.525, "kind": "voice", "name": "Tac 1"}]
     t = C.build("technician", [], None, res)
     rows = {r["from"]: r for b in t["bands"] for r in b["rows"] if r["type"] == "channel"}
-    assert rows[445.525]["adhoc"] == [{"kind": "data", "width": "wide", "name": "VARA 1"}]
+    assert rows[445.525]["adhoc"] == [{"kind": "data", "width": "wide", "name": "VARA 1", "alias": None}]
     assert rows[445.525]["use"] == "My ad hoc VARA FM wide: VARA 1" and rows[445.525]["authority"] == "adhoc"
     assert not rows[445.525]["flags"]
     pts = lambda k: {round(x["from"] + i * x["step"], 4): x for x in C.open_ranges(t, k) if x.get("channel")  # noqa: E731
@@ -87,25 +88,29 @@ def test_station_routes(tmp_path):
     assert [a["freq_mhz"] for a in p.adhoc()] == [147.5, 445.525]
     from station.server import STATIC
     html = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert "data-adtog" in html and "/api/adhoc/export.csv" in html and "data-adimport" in html and "★ my ad hoc" in html
+    assert "data-adtog" in html and "/api/radio/export.csv" in html and "data-rcadd" in html and "data-adimport" in html and "★ my ad hoc" in html
 
 
-def test_names_fit_a_baofeng_display():
-    """Owner 2026-11-16: names short enough for a CHIRP slot on radios with few characters. CHIRP's drivers:
-    Baofeng WP970I / UV-82III 6 characters, UV-5R / BF-F8HP / UV-82 7 upper case; so 6, A-Z 0-9 space . / -."""
-    assert adhoc.NAME_MAX == 6
-    assert adhoc.short_name("ares vara #1 longer") == "ARES V"
-    assert adhoc.short_name("tac_2!") == "TAC2" and adhoc.short_name("Net/1.5-x") == "NET/1."
+def test_a_long_name_and_a_radio_alias():
+    """Owner 2026-11-17: a reservation has a name of any length and a radio alias, the short name for the CHIRP export;
+    the owner's Baofeng and Quansheng radios show 8 characters (A-Z 0-9 space . / -)."""
+    assert adhoc.NAME_MAX == 8
+    assert adhoc.short_name("ares vara #1 longer") == "ARES VAR"
+    assert adhoc.short_name("tac_2!") == "TAC2" and adhoc.short_name("Net/1.5-xyz") == "NET/1.5-"
     rows = adhoc.apply([], {"add": {"freq_mhz": 445.525, "kind": "data"}})
-    rows = adhoc.apply(rows, {"add": {"freq_mhz": 445.55, "kind": "data"}})
-    rows = adhoc.apply(rows, {"add": {"freq_mhz": 446.525, "kind": "voice"}})
-    assert [r["name"] for r in rows] == ["VARA1", "VARA2", "TAC1"]
+    rows = adhoc.apply(rows, {"add": {"freq_mhz": 445.55, "kind": "data", "name": "Springfield ARES VARA simplex"}})
+    rows = adhoc.apply(rows, {"add": {"freq_mhz": 446.525, "kind": "voice", "name": "Tactical", "alias": "tac a"}})
+    assert [(r["name"], r["alias"]) for r in rows] == [("", "VARA1"), ("Springfield ARES VARA simplex", "VARA2"),
+                                                      ("Tactical", "TAC A")]
     assert adhoc.suggest(rows, "data") == "VARA3"
-    rows = adhoc.apply(rows, {"rename": {"freq_mhz": 446.525, "kind": "voice", "name": "simplex tactical one"}})
-    assert rows[-1]["name"] == "SIMPLE"
+    assert adhoc.label(rows[1]) == "My ad hoc VARA FM: Springfield ARES VARA simplex"
+    rows = adhoc.apply(rows, {"rename": {"freq_mhz": 446.525, "kind": "voice", "alias": "simplex tactical one"}})
+    assert rows[-1]["alias"] == "SIMPLEX" and rows[-1]["name"] == "Tactical"
     got, _ = adhoc.import_([], {"format": adhoc.FORMAT, "channels": [{"freq_mhz": 147.5, "kind": "voice",
-                                                                       "name": "Old long name"}]})
-    assert got[0]["name"] == "OLD LO"
+                                                                       "name": "OLD LO"}]})   # a version 1 file
+    assert (got[0]["name"], got[0]["alias"]) == ("OLD LO", "OLD LO")
+    f = adhoc.export(rows, "W9XYZ")
+    assert f["version"] == 2 and f["channels"][1]["alias"] == "VARA2" and "radio_channels" not in f
 
 
 def test_wide_reservations_keep_clear_of_each_other(tmp_path):

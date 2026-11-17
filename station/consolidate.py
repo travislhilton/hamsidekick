@@ -214,7 +214,7 @@ def build(cls: str | None, sources: list[dict], kept: list[dict] | None = None,
             out_rows.append({"type": "channel", "from": f, "to": f, "use": top["use"], "by": names.get(top["src"]),
                              "authority": top["auth"], "statements": st, "flags": flags, "privileges": priv,
                              "kept": any(p["auth"] == "kept" or p.get("kept") for p in ps), "mode": ch.get("mode"),
-                             "adhoc": [{k: p["adhoc"].get(k) for k in ("kind", "width", "name")}
+                             "adhoc": [{k: p["adhoc"].get(k) for k in ("kind", "width", "name", "alias")}
                                        for p in ps if p.get("adhoc")],
                              "offset_mhz": ch.get("offset_mhz"), "tone_hz": ch.get("tone_hz"),
                              "priority": ch.get("priority"), "org": ch.get("org"), "source_url": ch.get("source_url")})

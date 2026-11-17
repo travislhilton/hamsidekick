@@ -4,44 +4,40 @@ marker ... the ability to export my ad-hoc reserved frequencies to another opera
 reserved ad-hoc set. Do something similar for FM voice").
 
 A reservation is one VHF/UHF FM channel picked from the band plan's Ad hoc VARA or Ad hoc voice list:
-    {"freq_mhz": 445.525, "kind": "data" | "voice", "width": "narrow" | "wide" (data only), "name": "Ad hoc VARA 1"}
+    {"freq_mhz": 445.525, "kind": "data" | "voice", "width": "narrow" | "wide" (data only),
+     "name": "County ARES VARA simplex" (any length), "alias": "VARA1" (the radio's display, radiochan.ALIAS_MAX)}
 It is the operator's own agreement, not a plan's: the band plan shows it with a ★ marker, the ad hoc lists keep it
 listed (marked reserved) instead of cutting it out, and a reservation the plans no longer leave open is flagged.
 
 Shared as a file: export() -> {"format": FORMAT, "version": 1, "channels": [...]} (import_() takes the same, from this
-station or another), and chirp_csv() for programming a radio's memories with CHIRP.
+station or another), and chirp_csv() for programming a radio's memories with CHIRP (radiochan.py: with the band-plan
+channels marked for the radio, in one file).
 """
 from __future__ import annotations
 
-import csv
-import io
-import re
 import time
 
 from . import bandplan
 from .consolidate import EPS, WIDE_GUARD, fm_at
+from .radiochan import ALIAS_MAX, alias as _alias, long_name
 
 FORMAT = "hamsidekick-adhoc-channels"
-# A channel's name fits the shortest radio display that shows names (owner 2026-11-16: "restricted to short so that
-# when exported as a CHIRP file the name will fit"). CHIRP's drivers: Baofeng UV-5R / BF-F8HP / UV-82 / UV-5X3 7
-# characters, upper case (uv5r.py UV5R_CHARSET); Baofeng WP970I / UV-82III / UV-9R Pro 6 (baofeng_wp970i.py); UV-5RM /
-# UV-17 Pro 12; Yaesu FT-60 6; BF-888S / UV-3R none. So 6, from what every one of them accepts.
-NAME_MAX = 6
-NAME_CHARS = "A-Z0-9 ./-"
+# The radio alias fits the radios' displays (radiochan.ALIAS_MAX: 8, the owner's Baofeng and Quansheng radios; a CHIRP
+# export for a shorter display cuts it). Until 2026-11-17 a reservation had one 6-character name: it becomes the alias.
+NAME_MAX = ALIAS_MAX
 KINDS = ("data", "voice")
 MAX = 200
 
 
 def short_name(text) -> str:
-    """A name a 6-character radio display shows as typed: upper case, letters, digits, space . / - only."""
-    t = re.sub(f"[^{NAME_CHARS}]", "", str(text or "").upper())
-    return " ".join(t.split())[:NAME_MAX].strip()
+    """A radio alias: upper case, letters, digits, space . / - only, ALIAS_MAX characters."""
+    return _alias(text)
 
 
 def suggest(rows: list[dict], kind: str) -> str:
     """The next free default name: VARA1, VARA2 ... for VARA FM, TAC1, TAC2 ... for voice."""
     base = "VARA" if kind == "data" else "TAC"
-    used = {r.get("name") for r in rows}
+    used = {r.get("alias") for r in rows}
     return next(f"{base}{i}" for i in range(1, 1000) if f"{base}{i}" not in used)
 
 
@@ -59,9 +55,9 @@ def clean(raw: dict) -> dict:
     if not bandplan.band(f) or not fm_at(f) or f < 144.1:          # 144.0-144.1 is CW only (97.305)
         raise ValueError(f"{f:g} MHz: ad hoc channels are VHF / UHF FM channels (2 m, 1.25 m, 70 cm)")
     width = raw.get("width") if raw.get("width") in ("narrow", "wide") else "narrow"
-    name = short_name(raw.get("name"))
-    return {"freq_mhz": f, "kind": kind, "width": width if kind == "data" else None, "name": name,
-            "at": float(raw.get("at") or time.time())}
+    al = short_name(raw.get("alias") if raw.get("alias") is not None else raw.get("name"))
+    return {"freq_mhz": f, "kind": kind, "width": width if kind == "data" else None, "name": long_name(raw.get("name")),
+            "alias": al, "at": float(raw.get("at") or time.time())}
 
 
 def too_close(rows: list[dict], r: dict) -> dict | None:
@@ -74,7 +70,7 @@ def too_close(rows: list[dict], r: dict) -> dict | None:
 
 
 def crowd_note(r: dict, n: dict) -> str:
-    return (f"too close to your {n.get('name') or 'reservation'} at {n['freq_mhz']:.3f} for VARA FM wide (it needs "
+    return (f"too close to your {n.get('alias') or n.get('name') or 'reservation'} at {n['freq_mhz']:.3f} for VARA FM wide (it needs "
             f"{round(WIDE_GUARD(r['freq_mhz']) * 1000)} kHz): use narrow, or pick a channel further away")
 
 
@@ -85,12 +81,13 @@ def same(a: dict, b: dict) -> bool:
 def label(r: dict) -> str:
     """Its words in the band plan."""
     what = "VARA FM" + (" wide" if r.get("width") == "wide" else "") if r["kind"] == "data" else "FM voice"
-    return f"My ad hoc {what}" + (f": {r['name']}" if r.get("name") else "")
+    nm = r.get("name") or r.get("alias")
+    return f"My ad hoc {what}" + (f": {nm}" if nm else "")
 
 
 def apply(rows: list[dict], body: dict) -> list[dict]:
-    """{"add": channel} | {"remove": {freq_mhz, kind}} | {"rename": {freq_mhz, kind, name}} | {"width": {freq_mhz,
-    kind, width}} | {"clear": kind}."""
+    """{"add": channel} | {"remove": {freq_mhz, kind}} | {"rename": {freq_mhz, kind, name?, alias?}} | {"width":
+    {freq_mhz, kind, width}} | {"clear": kind}."""
     rows = [dict(r) for r in rows]
     if "add" in body:
         r = clean(body["add"])
@@ -98,22 +95,25 @@ def apply(rows: list[dict], body: dict) -> list[dict]:
             raise ValueError(f"{r['freq_mhz']:g} is reserved already")
         if len(rows) >= MAX:
             raise ValueError(f"at most {MAX} reserved channels")
-        if not r["name"]:
-            r["name"] = suggest(rows, r["kind"])
+        if not r["alias"] or body["add"].get("alias") is None and len(long_name(body["add"].get("name"))) > ALIAS_MAX:
+            r["alias"] = suggest(rows, r["kind"])     # a long name is the name; the alias is VARA1 / TAC1 ...
         if r["kind"] == "data" and r["width"] == "wide" and too_close(rows, r):
             r["width"] = "narrow"                     # next to one of my own reservations: wide would overlap it
             r["narrowed"] = crowd_note(r, too_close(rows, r))
         rows.append(r)
     for k in ("remove", "rename", "width"):
         if k in body:
-            want = clean(dict(body[k], name="", width=body[k].get("width")))
+            want = clean(dict(body[k], name="", alias="", width=body[k].get("width")))
             hit = [x for x in rows if same(x, want)]
             if not hit:
                 raise ValueError(f"{want['freq_mhz']:g} is not reserved")
             if k == "remove":
                 rows = [x for x in rows if not same(x, want)]
             elif k == "rename":
-                hit[0]["name"] = short_name(body[k].get("name"))
+                if "name" in body[k]:
+                    hit[0]["name"] = long_name(body[k]["name"])
+                if "alias" in body[k]:
+                    hit[0]["alias"] = short_name(body[k]["alias"]) or hit[0].get("alias") or suggest(rows, hit[0]["kind"])
             elif want["kind"] == "data":
                 hit[0]["width"] = want["width"]
     if body.get("clear") in KINDS:
@@ -121,10 +121,13 @@ def apply(rows: list[dict], body: dict) -> list[dict]:
     return sorted(rows, key=lambda x: (x["kind"], x["freq_mhz"]))
 
 
-def export(rows: list[dict], callsign: str | None = None) -> dict:
-    return {"format": FORMAT, "version": 1, "exported_at": time.strftime("%Y-%m-%d %H:%M"),
-            "from": callsign or None,
-            "channels": [{k: r.get(k) for k in ("freq_mhz", "kind", "width", "name")} for r in rows]}
+def export(rows: list[dict], callsign: str | None = None, radio: list[dict] | None = None) -> dict:
+    """radio: the band-plan channels marked for the radio (radiochan.export_marks), only when the operator ticks it."""
+    out = {"format": FORMAT, "version": 2, "exported_at": time.strftime("%Y-%m-%d %H:%M"), "from": callsign or None,
+           "channels": [{k: r.get(k) for k in ("freq_mhz", "kind", "width", "name", "alias")} for r in rows]}
+    if radio:
+        out["radio_channels"] = radio
+    return out
 
 
 def import_(rows: list[dict], obj, replace: bool = False) -> tuple[list[dict], dict]:
@@ -141,8 +144,9 @@ def import_(rows: list[dict], obj, replace: bool = False) -> tuple[list[dict], d
             continue
         hit = next((x for x in out if same(x, r)), None)
         if hit:
-            if r["name"] and r["name"] != hit.get("name"):
-                hit["name"] = r["name"]
+            if (r["name"] and r["name"] != hit.get("name")) or (r["alias"] and r["alias"] != hit.get("alias")):
+                hit["name"] = r["name"] or hit.get("name") or ""
+                hit["alias"] = r["alias"] or hit.get("alias")
                 rep["renamed"] += 1
             else:
                 rep["already"] += 1
@@ -150,20 +154,14 @@ def import_(rows: list[dict], obj, replace: bool = False) -> tuple[list[dict], d
         if len(out) >= MAX:
             rep["skipped"].append(f"{r['freq_mhz']:g}: at most {MAX} reserved channels")
             continue
+        if not r["alias"]:
+            r["alias"] = suggest(out, r["kind"])
         out.append(r)
         rep["added"] += 1
     return sorted(out, key=lambda x: (x["kind"], x["freq_mhz"])), rep
 
 
-def chirp_csv(rows: list[dict]) -> str:
-    """CHIRP's memory CSV (File -> Import into a radio's image): simplex FM, no tone, named for the radio's display."""
-    cols = ["Location", "Name", "Frequency", "Duplex", "Offset", "Tone", "rToneFreq", "cToneFreq", "DtcsCode",
-            "DtcsPolarity", "Mode", "TStep", "Skip", "Comment", "URCALL", "RPT1CALL", "RPT2CALL", "DVCODE"]
-    buf = io.StringIO()
-    w = csv.writer(buf, lineterminator="\r\n")
-    w.writerow(cols)
-    for i, r in enumerate(sorted(rows, key=lambda x: (x["kind"] != "voice", x["freq_mhz"]))):
-        short = r.get("name") or f"{r['freq_mhz']:.2f}"[:NAME_MAX]
-        w.writerow([i, short, f"{r['freq_mhz']:.6f}", "", "0.000000", "", "88.5", "88.5", "023", "NN", "FM",
-                    "5.00" if r["freq_mhz"] < 400 else "25.00", "", label(r), "", "", "", ""])
-    return buf.getvalue()
+def chirp_csv(rows: list[dict], profile: str | None = None) -> str:
+    """CHIRP's memory CSV of the reservations alone (radiochan.chirp_csv)."""
+    from . import radiochan
+    return radiochan.chirp_csv(radiochan.listing(rows, [], []), profile or radiochan.DEFAULT_PROFILE)

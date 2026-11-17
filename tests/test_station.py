@@ -569,7 +569,7 @@ def test_help_has_six_cards_each_linking_the_others():
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert 'href="/help/vara"' in idx and idx.count('href="/help/bandplan"') == 2
     ad = (STATIC / "adhoc_card.html").read_text(encoding="utf-8")      # owner 2026-11-16: ad hoc channels card
-    assert "445.025" in ad and "6 characters" in ad and "CHIRP" in ad and "Install" in ad and "Export my set" in ad
+    assert "445.025" in ad and "8 characters" in ad and "CHIRP" in ad and "Install" in ad and "Export my set" in ad
     assert 'href="/help/adhoc"' in idx and "★ Install" in vara and "Ad hoc channels" in bp
 
 

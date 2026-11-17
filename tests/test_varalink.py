@@ -279,7 +279,7 @@ def test_ad_hoc_channels_go_over_vara_and_install_with_one_click(tmp_path):
         r = _post(base, "/api/adhoc/install", {"name": good})
         assert r["report"]["added"] == 2
         with urllib.request.urlopen(base + "/api/adhoc") as h:
-            assert {(a["freq_mhz"], a["name"]) for a in json.loads(h.read())["adhoc"]} == {(445.525, "VARA 1"),
+            assert {(a["freq_mhz"], a["alias"]) for a in json.loads(h.read())["adhoc"]} == {(445.525, "VARA 1"),
                                                                                        (446.525, "TAC 1")}
         with pytest.raises(urllib.error.HTTPError):
             _post(base, "/api/adhoc/install", {"name": "20261116-1201-K7ABC-bad.hsadhoc"})

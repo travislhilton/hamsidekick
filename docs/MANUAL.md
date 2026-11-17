@@ -358,24 +358,27 @@ ARES or club plan that names digital simplex channels in Plans and they are offe
 
 **Your reserved ad hoc channels** (owner 2026-11-16). Its own card: **Help → Ad hoc channels** (`docs/HAM_Sidekick_Ad_Hoc_Channels_Quick_Reference_Card.pdf`). In **Ad hoc VARA** and **Ad hoc voice** every VHF/UHF FM range
 is split into its channels: click **☆ 445.525** to reserve it (VARA FM narrow or wide as the channel allows; FM voice
-in Ad hoc voice), again to release it. **★ My ad hoc … channels** at the top lists them: each gets a name when you reserve it
-(suggested VARA1, VARA2 … / TAC1, TAC2 …): **up to 6 characters, A–Z 0–9 space . / -**, upper case, so it fits a
-channel name on the radios with the shortest displays when programmed with CHIRP (CHIRP's drivers: Baofeng WP970I /
-UV-82III 6, UV-5R / BF-F8HP / UV-82 / UV-5X3 7 upper case, UV-5RM / UV-17 Pro 12, Yaesu FT-60 6; BF-888S and UV-3R
-show no names); rename it there, change a VARA channel's width (a **wide** reservation keeps 25 kHz from your other reserved channels on 2 m and 1.25 m, 35 kHz on 70 cm: reserving wide next to one reserves it narrow and says so, and a wide one set too close is marked ⚠ naming the neighbour), **Use** it on a VARA radio. In the band plan, the full spectrum and the
+in Ad hoc voice), again to release it. **★ My ad hoc … channels** at the top lists them. Each has a **name** (any
+length: what it is, asked when you reserve it) and a **radio alias** (what the radio's display shows: **8 characters,
+A–Z 0–9 space . / -**, suggested VARA1, VARA2 … / TAC1, TAC2 …; owner 2026-11-17: the Baofeng and Quansheng radios show
+8. An older Baofeng UV-5R shows 7: shorten that alias in CHIRP after the import); change either there, change a VARA channel's width (a **wide** reservation keeps 25 kHz from your other reserved channels on 2 m and 1.25 m, 35 kHz on 70 cm: reserving wide next to one reserves it narrow and says so, and a wide one set too close is marked ⚠ naming the neighbour), **Use** it on a VARA radio. In the band plan, the full spectrum and the
 printout a reserved channel is a **★ my ad hoc** row (purple). It stays on the ad hoc list (marked ★) instead of being
 cut out, a voice reservation is not offered to VARA, and one the plans no longer leave open (a plan read later, a new
 gateway, or another operator's set on a station with different privileges) is marked ⚠ with why.
 **Sharing**: **Export my set** saves a file (`ad-hoc-channels.json`, VARA FM and voice together); the other operator
-uses **Import a set…** (adds and renames; tick **Import replaces my set** to replace). **For CHIRP (CSV)** puts them in
-a radio's memories (CHIRP → File → Import). Connected over VARA, **★ Send my ad hoc channels** (VARA window, or **★ Send
+uses **Import a set…** (adds and renames; tick **Import replaces my set** to replace). Tick **with my 💾 radio
+channels** before exporting to send those too (off by default). Connected over VARA, **★ Send my ad hoc channels** (VARA window, or **★ Send
 over VARA** in the band plan) sends them as a `.hsadhoc` file; the other station's VARA window shows **★ Install N ad hoc
 channels from <call>** beside it: one click adds them. The file is only ever read as data (every channel checked),
 never run.
-**Programming the channels into a radio with CHIRP**: Band plan → Ad hoc → **For CHIRP (CSV)** saves
-`ad-hoc-channels-chirp.csv` (simplex FM, no tone, each named as reserved, 6 characters at most). In CHIRP: **Radio →
-Download from radio** (keep a copy of that image), **File → Import** → the CSV → choose free memory locations →
-**Radio → Upload to radio**. A Baofeng handheld has no 9600-baud data port, so use VARA FM **narrow** through it. **Ad hoc voice** and **Ad hoc VARA** (owner 2026-11-16) list the ranges
+**💾 Radio channels → CHIRP** (owner 2026-11-17): in the **Band plan** tab every channel row has **💾+**: it puts that
+frequency on your radio list, with a suggested alias (a repeater's or gateway's callsign, R + the frequency for a
+repeater, else the frequency) you can change beside it; **💾** again takes it off. The **💾 Radio channels** tab lists
+your ★ ad hoc channels and every 💾 channel, in memory order (**↑ ↓**), with name and alias, and a mark that the band
+plan no longer lists is flagged ⚠ (never dropped). Choose **Radio** (*Handheld, 2 m + 70 cm FM*: the rest are left out
+and named, or *Any radio*) and the **First memory**, then **Export for CHIRP**: repeaters carry their offset and access
+tone, the name goes in CHIRP's Comment, and two memories with the same alias are named. In CHIRP: **Radio → Download
+from radio** (keep a copy of that image), **File → Import** → the CSV → **Radio → Upload to radio**. A Baofeng handheld has no 9600-baud data port, so use VARA FM **narrow** through it. **Ad hoc voice** and **Ad hoc VARA** (owner 2026-11-16) list the ranges
   where you can start a contact or a VARA session: inside your privileges, set aside by no plan for anything else
   (VARA: where a plan sets data aside or no plan names any use, never the CW stretches), clear of every channel in
   the table, your local plans' and the Winlink gateways' included (3 kHz either side on HF, 15–25 kHz on VHF/UHF),

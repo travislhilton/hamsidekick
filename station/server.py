@@ -224,8 +224,17 @@ def make_handler(station):
                 return
             if u.path == "/api/localplans":                      # Nets -> Plans (localplans.py)
                 return self._json(_plans(station).state())
+            if u.path == "/api/radio/export.csv":          # radio channels for CHIRP (radiochan.py)
+                q = parse_qs(u.query)
+                try:
+                    start = int((q.get("start") or [""])[0])
+                except ValueError:
+                    start = None
+                data, ctype, name = _plans(station).radio_export((q.get("radio") or [None])[0], start)
+                return self._send(200, data, ctype, {"Content-Disposition": f'attachment; filename="{name}"'})
             if u.path in ("/api/adhoc/export", "/api/adhoc/export.csv"):     # reserved ad hoc channels (adhoc.py)
-                data, ctype, name = _plans(station).adhoc_export("csv" if u.path.endswith(".csv") else "json")
+                data, ctype, name = _plans(station).adhoc_export("csv" if u.path.endswith(".csv") else "json",
+                                                                 radio=parse_qs(u.query).get("radio") == ["1"])
                 return self._send(200, data, ctype, {"Content-Disposition": f'attachment; filename="{name}"'})
             if u.path == "/api/adhoc":
                 return self._json({"adhoc": _plans(station).adhoc(), "suggest": _plans(station).adhoc_suggest()})
@@ -337,7 +346,7 @@ def make_handler(station):
                       "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
-                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
+                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "adhoc", "handoff", "takeback", "join", "leave",
                       "announce", "csend", "retry", "cancel", "closelink", "channel")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
@@ -426,6 +435,8 @@ def make_handler(station):
                     if what == "settings":
                         return self._json(station.vara.settings(body))
                     return self._json(station.vara.act(what, body))
+                if u.path == "/api/radio":                       # 💾 marks, memory order, the radio (radiochan.py)
+                    return self._json(_plans(station).radio_set(body))
                 if u.path == "/api/adhoc":                       # reserve / unreserve / rename (adhoc.py)
                     return self._json(_plans(station).adhoc_set(body))
                 if u.path == "/api/adhoc/install":               # {"name": a .hsadhoc file in a VARA inbox}

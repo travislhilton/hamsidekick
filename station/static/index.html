@@ -492,6 +492,8 @@ a.btn,label.btn{display:inline-block;padding:4px 10px;border:1px solid var(--lin
 #pcSet ul{margin:4px 0 6px 18px;padding:0}#pcSet li.bad{color:#c0392b}#pcSet .fix{color:var(--muted)}
 .vlog{max-height:45vh;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:8px 0}
 .vmsg{margin:3px 0;overflow-wrap:anywhere}.vmsg.out b{color:var(--accent)}
+.rct td input:not(.rcal){min-width:14em;width:100%}.rcal{text-transform:uppercase;width:7.5em!important;max-width:7.5em;font-family:ui-monospace,Consolas,monospace;min-height:0}.rcon{display:inline-flex;gap:4px;align-items:center}.rcon .rcal{width:6.5em;padding:1px 4px;font-size:12.5px}
+.rcbtn{min-height:0;padding:0 6px;font-size:12px}.rcbtn.on{background:color-mix(in srgb,var(--accent,#1f4fbf) 15%,var(--panel));border-color:var(--accent,#1f4fbf)}
 .vbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0}.vbar.on{border-color:#2e8b57;background:color-mix(in srgb,#2e8b57 7%,var(--panel))}
 .vchan{display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:10px;margin:8px 0}@media (max-width:640px){.vchan{grid-template-columns:1fr}}
 .vros{border:1px solid var(--line);border-radius:8px;padding:6px;max-height:52vh;overflow:auto}.vros h5{margin:4px 4px 2px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
@@ -2260,19 +2262,45 @@ function adF(f){return (+f).toFixed(3)}
 function adRes(k,f){return ((BP.d||{}).adhoc||[]).find(a=>a.kind===k&&Math.abs(a.freq_mhz-f)<1e-4)}
 function adChips(x,k){if(!x.channel)return"";const fs=[];for(let i=0;i<x.count;i++)fs.push(+(x.from+i*x.step).toFixed(4));
   const w=k==="data"?(x.wide?"wide":"narrow"):"";
-  return `<div class="adchs noprint" role="group" aria-label="Channels ${bpOpenF(x)}">${fs.map(f=>{const r=adRes(k,f);return `<button class="adch${r?" on":""}" data-adtog="${f}" data-adk="${k}" data-adw="${w}" aria-pressed="${!!r}" title="${r?`Reserved as your ad hoc ${k==="data"?"VARA FM":"FM voice"} channel${r.name?" “"+esc(r.name)+"”":""}: click to release it`:`Reserve ${bpMhz(f)} MHz as your ad hoc ${k==="data"?"VARA FM ("+w+")":"FM voice"} channel`}">${r?"★":"☆"} ${adF(f)}${r&&r.name?" · "+esc(r.name):""}</button>`}).join("")}</div>`}
+  return `<div class="adchs noprint" role="group" aria-label="Channels ${bpOpenF(x)}">${fs.map(f=>{const r=adRes(k,f);return `<button class="adch${r?" on":""}" data-adtog="${f}" data-adk="${k}" data-adw="${w}" aria-pressed="${!!r}" title="${r?`Reserved as your ad hoc ${k==="data"?"VARA FM":"FM voice"} channel${r.name||r.alias?" “"+esc(r.name||r.alias)+"”":""}: click to release it`:`Reserve ${bpMhz(f)} MHz as your ad hoc ${k==="data"?"VARA FM ("+w+")":"FM voice"} channel`}">${r?"★":"☆"} ${adF(f)}${r&&r.alias?" · "+esc(r.alias):""}</button>`}).join("")}</div>`}
 function adMine(k,fitting){const all=(BP.d||{}).adhoc||[],rs=all.filter(a=>a.kind===k),what=k==="data"?"VARA FM":"FM voice";
   return `<div class="admine noprint"><b>★ My ad hoc ${what} channels</b> <span class="small muted">(${rs.length}; ☆ on a channel below reserves it)</span> <a class="small" href="/help/adhoc" target="_blank" rel="noopener">Ad hoc channels card</a>
-   ${rs.length?`<div class="nlistwrap"><table class="nlist bpt"><thead><tr><th>MHz</th>${k==="data"?"<th>Width</th>":""}<th>Name <span class="muted" style="text-transform:none;font-weight:400">(6 characters: fits a Baofeng)</span></th><th></th></tr></thead><tbody>${rs.map(a=>`<tr class="adhoc"><td class="f">★ ${adF(a.freq_mhz)} <span class="small muted">${esc(a.band||"")}</span></td>
+   ${rs.length?`<div class="nlistwrap"><table class="nlist bpt"><thead><tr><th>MHz</th>${k==="data"?"<th>Width</th>":""}<th>Name</th><th>Radio alias <span class="muted" style="text-transform:none;font-weight:400">(${RC_MAX} characters, for CHIRP)</span></th><th></th></tr></thead><tbody>${rs.map(a=>`<tr class="adhoc"><td class="f">★ ${adF(a.freq_mhz)} <span class="small muted">${esc(a.band||"")}</span><div class="small muted">💾 on your radio list</div></td>
      ${k==="data"?`<td><select data-adwidth="${a.freq_mhz}" aria-label="Width for ${bpMhz(a.freq_mhz)}"><option value="narrow"${a.width!=="wide"?" selected":""}>narrow</option><option value="wide"${a.width==="wide"?" selected":""}>wide</option></select></td>`:""}
-     <td><input data-adname="${a.freq_mhz}" data-adk="${k}" value="${esc(a.name||"")}" maxlength="6" style="text-transform:uppercase;width:7em;font-family:ui-monospace,Consolas,monospace" placeholder="${k==="data"?"VARA1":"TAC1"}" title="Up to 6 letters, numbers, space . / - (fits a Baofeng channel display)" aria-label="Name for ${bpMhz(a.freq_mhz)}, up to 6 characters">${a.ok?"":`<div class="small warnc">⚠ ${esc(a.why)}</div>`}</td>
+     <td><input data-adname="${a.freq_mhz}" data-adk="${k}" value="${esc(a.name||"")}" maxlength="80" style="min-width:12em" placeholder="What it is, e.g. ARES VARA simplex" aria-label="Name for ${bpMhz(a.freq_mhz)}">${a.ok?"":`<div class="small warnc">⚠ ${esc(a.why)}</div>`}</td>
+     <td><input data-adalias="${a.freq_mhz}" data-adk="${k}" value="${esc(a.alias||"")}" maxlength="${RC_MAX}" class="rcal" placeholder="${k==="data"?"VARA1":"TAC1"}" title="What the radio's display shows: up to ${RC_MAX} letters, numbers, space . / -" aria-label="Radio alias for ${bpMhz(a.freq_mhz)}, up to ${RC_MAX} characters"></td>
      <td>${k==="data"&&a.open?fitting({mode:"VARA FM",wide:a.width==="wide"}).map((m,_,l)=>`<button class="small" data-bpuse="${a.freq_mhz}" data-radio="${esc(m.radio)}" data-mode="FM">Use${l.length>1?" on "+esc(m.name):""}</button> `).join(""):""}<button class="small quiet" data-adtog="${a.freq_mhz}" data-adk="${k}">Release</button></td></tr>`).join("")}</tbody></table></div>`:`<p class="small muted">None yet.</p>`}
-   <div class="row small" style="margin-top:6px"><a class="btn small" href="/api/adhoc/export" download title="All your reserved ad hoc channels (VARA FM and voice) as a file another HAM Sidekick operator imports">Export my set (${all.length})</a>
-    <a class="btn small" href="/api/adhoc/export.csv" download title="For CHIRP: File → Import, to put them in a radio's memories">For CHIRP (CSV)</a>
+   <div class="row small" style="margin-top:6px"><a class="btn small" href="/api/adhoc/export${BP.adRadio?"?radio=1":""}" download title="All your reserved ad hoc channels (VARA FM and voice) as a file another HAM Sidekick operator imports">Export my set (${all.length}${BP.adRadio?" + "+((((BP.d||{}).radio||{}).marks||[]).length)+" 💾":""})</a>
+    <label class="chk" title="Also put your 💾 radio channels (repeaters, nets ... marked in the band plan) in the file, so the other operator can program the same radio"><input type="checkbox" data-adradio${BP.adRadio?" checked":""}> with my 💾 radio channels</label>
+    <button class="small" data-bpview="radio" title="Your ad hoc channels and the 💾 band plan channels, in memory order, as one CHIRP file">💾 Radio channels → CHIRP</button>
     <label class="btn small" style="cursor:pointer">Import a set…<input type="file" accept=".json,.hsadhoc,application/json" data-adimport style="display:none"></label>
     <label class="chk"><input type="checkbox" data-adreplace> Import replaces my set</label>
     ${((BP.vara||{}).modems||[]).filter(m=>m.state&&m.state.session==="connected").map(m=>`<button class="small" data-adsend="${esc(m.radio)}" title="Send all your reserved ad hoc channels as a file over the VARA link on ${esc(m.name)}: the other station offers ★ Install">★ Send over VARA to ${esc(m.state.peer||"")}</button>`).join(" ")}</div>
    <p class="small muted">Share the exported file with the other operators (or, connected over VARA, <b>★ Send</b> it: their VARA window offers <b>★ Install</b>): they import it (Band plan → Ad hoc → Import a set) and have the same channels, names and widths. A channel their plans or privileges do not leave open is marked ⚠ on their station.</p></div>`}
+// 💾 Radio channels (station/radiochan.py; owner 2026-11-17): any band-plan channel can go on the radio with a short
+// alias; with the ad hoc set it makes one CHIRP file, in memory order, for the chosen radio.
+function rcKey(r){return {freq_mhz:+r.freq_mhz,offset_mhz:r.offset_mhz||null}}
+function rcMark(f,off){return (((BP.d||{}).radio||{}).marks||[]).find(m=>Math.abs(m.freq_mhz-f)<1e-4&&Math.abs((m.offset_mhz||0)-(off||0))<1e-4)}
+function rcCell(r){if((r.adhoc||[]).length)return"";const m=rcMark(r.from,r.offset_mhz);
+  if(m)return ` <span class="rcon noprint"><button class="small rcbtn on" data-rcrm='${esc(JSON.stringify(rcKey(m)))}' aria-pressed="true" title="On your radio list as ${esc(m.alias)}: click to take it off">💾</button><input class="rcal" data-rcalias='${esc(JSON.stringify(rcKey(m)))}' value="${esc(m.alias)}" maxlength="${RC_MAX}" aria-label="Radio alias for ${bpMhz(r.from)}, up to ${RC_MAX} characters" title="What the radio's display shows (${RC_MAX} characters)"></span>`;
+  const add={freq_mhz:r.from,offset_mhz:r.offset_mhz||null,tone_hz:r.tone_hz||null,mode:r.mode||"",org:r.org||"",name:r.use||""};
+  return ` <button class="small rcbtn noprint" data-rcadd='${esc(JSON.stringify(add))}' aria-pressed="false" title="Put ${bpMhz(r.from)} MHz on your radio list (💾 Radio channels → CHIRP)">💾+</button>`}
+function rcView(d){const R=d.radio;if(!R)return"";const ch=R.channels;
+  const ofs=c=>c.offset_mhz?` <span class="muted">${c.offset_mhz>0?"+":"−"}${Math.abs(c.offset_mhz)}${c.tone_hz?" · "+c.tone_hz:""}</span>`:"";
+  const warn=[...R.dups.map(x=>`Two memories would both show <b>${esc(x)}</b>: change one alias`),...R.left_out.map(x=>`Left out: ${esc(x)}`)];
+  return `<p class="small">Everything for your radio in one CHIRP file: your <b>★ ad hoc</b> channels and every band-plan channel you mark <b>💾+</b> (Band plan tab), in this order. Each has a <b>name</b> (any length: goes in CHIRP's Comment) and a <b>radio alias</b> (what the display shows). In CHIRP: <b>Download from radio</b> first, then <b>File → Import</b> this file, check, <b>Upload to radio</b>. Aliases are up to ${RC_MAX} characters: a radio that shows fewer (an older Baofeng UV-5R: 7) needs them shortened in CHIRP before the upload.</p>
+   <div class="row nfrow small noprint"><label>Radio <select data-rcprof>${R.profiles.map(p=>`<option value="${p.id}"${p.id===R.profile?" selected":""}>${esc(p.label)}</option>`).join("")}</select></label>
+    <label>First memory <input type="number" data-rcstart value="${R.start}" min="0" max="999" style="width:5em"></label>
+    <a class="btn small primary" href="/api/radio/export.csv" download>Export for CHIRP (${R.count})</a></div>
+   ${warn.length?`<ul class="small warnc">${warn.map(w=>`<li>${w}</li>`).join("")}</ul>`:""}
+   ${ch.length?`<div class="nlistwrap"><table class="nlist bpt rct"><thead><tr><th>#</th><th>Radio alias</th><th>Name</th><th>MHz</th><th></th></tr></thead><tbody>${ch.map((c,i)=>{const k=JSON.stringify(rcKey(c));
+     return `<tr class="${c.src==="adhoc"?"adhoc":""}"><td class="mono">${R.start+i}</td>
+     <td>${c.src==="adhoc"?`<input class="rcal" data-adalias="${c.freq_mhz}" data-adk="${c.kind}" value="${esc(c.alias)}" maxlength="${RC_MAX}" aria-label="Radio alias">`:`<input class="rcal" data-rcalias='${esc(k)}' value="${esc(c.alias)}" maxlength="${RC_MAX}" aria-label="Radio alias">`}</td>
+     <td>${c.src==="adhoc"?`<input data-adname="${c.freq_mhz}" data-adk="${c.kind}" value="${esc(c.name)}" maxlength="80" aria-label="Name">`:`<input data-rcname='${esc(k)}' value="${esc(c.name)}" maxlength="80" aria-label="Name">`}${c.ok?"":`<div class="small warnc">⚠ ${esc(c.why||"")}</div>`}</td>
+     <td class="f">${bpMhz(c.freq_mhz)} ${esc(c.mode)}${ofs(c)}<div class="small muted">${c.src==="adhoc"?"★ ad hoc "+(c.kind==="data"?"VARA FM":"voice"):"💾 band plan"}</div></td>
+     <td class="noprint" style="white-space:nowrap"><button class="small" data-rcmove="${esc(c.key)}" data-by="-1"${i?"":" disabled"} aria-label="Move up">↑</button><button class="small" data-rcmove="${esc(c.key)}" data-by="1"${i<ch.length-1?"":" disabled"} aria-label="Move down">↓</button>
+       ${c.src==="adhoc"?`<button class="small quiet" data-bpview="${c.kind}" title="Release it in Ad hoc ${c.kind==="data"?"VARA":"voice"}">★</button>`:`<button class="small quiet" data-rcrm='${esc(k)}' title="Take it off the radio list">Remove</button>`}</td></tr>`}).join("")}</tbody></table></div>`
+     :'<p class="muted">Nothing yet. Reserve ad hoc channels (★), or press <b>💾+</b> on any channel in the Band plan tab.</p>'}`}
 function renderBP(){
   const d=BP.d,box=$("bpBody");if(!d){box.innerHTML=`<p class="bad">${esc(BP.msg?BP.msg.text:"Not available")}</p><div class="row"><button onclick="$('bpDlg').close()">Close</button></div>`;return}
   const cls=d.license_class,read=d.read||[];
@@ -2288,7 +2316,7 @@ function renderBP(){
     return `<div class="bpband"><h4>${esc(b.band)}</h4><span class="small muted">${bpMhz(b.from)}–${bpMhz(b.to)} MHz${b.flags?` · <span class="warnc">${b.flags} to check</span>`:""}</span></div>
     <div class="nlistwrap"><table class="nlist bpt"><thead><tr><th>MHz</th><th>Use</th>${cls?"<th>You</th>":""}<th>Sources · notes</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.type==="channel"?"ch":""}${(r.adhoc||[]).length?" adhoc":""}${r.flags.length?" flag":""}${tb.has(r)?" tuned":""}"${tb.has(r)?` data-bptuned="${esc(tb.get(r).map(t=>t.id).join(" "))}"`:""}>
       <td class="f">${r.type==="channel"?`${bpMhz(r.from)}${r.mode?" "+esc(r.mode):""}${r.offset_mhz?` <span class="muted">${r.offset_mhz>0?"+":""}${r.offset_mhz}${r.tone_hz?" · "+r.tone_hz:""}</span>`:""}`:`${bpMhz(r.from)}–${bpMhz(r.to)}`}</td>
-      <td>${tb.has(r)?`<div class="noprint">${tb.get(r).map(t=>bpTag(t,r.type==="channel")).join(" ")}</div>`:""}<b>${esc(r.use||"")}</b>${(r.adhoc||[]).length?' <span class="np adm" title="Your reserved ad hoc channel (Ad hoc voice / Ad hoc VARA)">★ my ad hoc</span>':""}${r.kept?' <span class="np k-ready" style="padding:0 6px">your channel</span>':""}${r.priority?` <span class="np k-tune" style="padding:0 6px">${esc(r.priority)}</span>`:""}<div class="small muted">${esc(AUTHN[r.authority]||"")}${r.by&&r.authority!=="arrl"&&r.authority!=="fcc"?": "+esc(r.by):""}</div></td>
+      <td>${tb.has(r)?`<div class="noprint">${tb.get(r).map(t=>bpTag(t,r.type==="channel")).join(" ")}</div>`:""}<b>${esc(r.use||"")}</b>${(r.adhoc||[]).length?' <span class="np adm" title="Your reserved ad hoc channel (Ad hoc voice / Ad hoc VARA)">★ my ad hoc</span>':""}${r.type==="channel"?rcCell(r):""}${r.kept?' <span class="np k-ready" style="padding:0 6px">your channel</span>':""}${r.priority?` <span class="np k-tune" style="padding:0 6px">${esc(r.priority)}</span>`:""}<div class="small muted">${esc(AUTHN[r.authority]||"")}${r.by&&r.authority!=="arrl"&&r.authority!=="fcc"?": "+esc(r.by):""}</div></td>
       ${cls?`<td class="small">${pv(r)}</td>`:""}
       <td class="small">${r.statements.filter(x=>x.authority!=="fcc"||r.statements.length===1).slice(r.type==="channel"?1:1).map(x=>`<span class="bps muted">${esc(AUTHN[x.authority]||"")}${x.authority==="coordinator"||x.authority==="local"?" ("+esc(x.source)+")":""}: ${esc(x.use||"")}</span>`).join("")}${r.flags.map(f=>`<span class="bps warnc">⚠ ${esc(f)}</span>`).join("")}${r.source_url?`<a class="bps noprint" href="${esc(r.source_url)}" target="_blank" rel="noopener noreferrer">source</a>`:""}</td></tr>`).join("")}</tbody></table></div>`}).join("");
   const srcs=read.length?`<details class="small noprint"${BP.srcOpen?" open":""} data-bpsrc><summary><b>Plans read (${read.length})</b>${d.unread?` · ${d.unread} more saved, not chosen`:""}</summary><p class="muted">Choose which plans are in this table: Nets → <button class="linkish" data-bpplans>Plans</button> → Plans and documents.</p><ul>${read.map(x=>`<li><b>${esc(x.title||"")}</b>${x.org?" · "+esc(x.org):""} · ${x.error?`<span class="warnc">could not be read: ${esc(x.error)}</span>`:`${x.segments} segments, ${x.channels} channels`}
@@ -2320,7 +2348,7 @@ function renderBP(){
   const nflags=d.bands.reduce((n,b)=>n+b.flags,0);
   box.innerHTML=`<h3><a class="small noprint" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;float:right">Card (printable)</a>Band plan${d.location?` <span class="muted small">near ${esc(d.location)}</span>`:""}</h3>
    <p class="small muted"${BP.view==="table"?"":" hidden"}>One table from every plan: the FCC rules (what is legal${cls?` for a ${esc(cls)}`:""}), the ARRL band plan, your state coordinator's plan and the local ARES / RACES / club plans. Where plans say different things the row is marked ⚠, with each plan's words. The state coordinator's words come first, then local plans, then the ARRL's.${cls?"":' <span class="warnc">Set your license class (Settings → Station agent) to see your privileges.</span>'}</p>
-   <nav class="ntabs noprint" role="tablist" aria-label="View" style="margin:6px 0;flex-wrap:wrap">${[["table","Band plan"],["all","Full spectrum"],["voice","Ad hoc voice"],["data","Ad hoc VARA"]].map(([v,l])=>`<button role="tab" class="${BP.view===v?"on":""}" aria-selected="${BP.view===v}" data-bpview="${v}">${l}</button>`).join("")}</nav>
+   <nav class="ntabs noprint" role="tablist" aria-label="View" style="margin:6px 0;flex-wrap:wrap">${[["table","Band plan"],["all","Full spectrum"],["voice","Ad hoc voice"],["data","Ad hoc VARA"],["radio","💾 Radio channels"]].map(([v,l])=>`<button role="tab" class="${BP.view===v?"on":""}" aria-selected="${BP.view===v}" data-bpview="${v}">${l}</button>`).join("")}</nav>
    <div class="row nfrow small noprint"><label>Show <select data-bpband>${bands}</select></label>
      ${BP.view!=="table"?"":cls?`<label class="chk"><input type="checkbox" data-bpmine${BP.mine?" checked":""}> Only where I may transmit</label>`:""}
      ${BP.view==="all"?`<label class="chk"><input type="checkbox" data-bpchans${BP.chans?" checked":""}> Channels</label>`:""}
@@ -2329,7 +2357,7 @@ function renderBP(){
      <button class="small" onclick="window.print()">Print</button></div>
    ${tuned.length?`<p class="small noprint bptunedline"><b>Tuned now:</b> ${tuned.map(t=>`<button class="linkish small" data-bpgo="${esc(t.id)}" title="Show ${esc(t.name)}'s frequency in the table">📻 ${esc(t.name)} ${bpMhz(t.f)} MHz ${esc(t.mode)}${t.vara?" · "+esc(t.vara):""}</button>`).join(" · ")} <span class="muted">(highlighted below)</span></p>`:""}
    ${wlListNote(d.winlink_list)}
-   ${BP.msg?`<p class="${BP.msg.bad?"bad":"ok"}">${esc(BP.msg.text)}</p>`:""}${BP.view==="table"?srcs+(tables||'<p class="muted">Nothing matches.</p>'):BP.view==="all"?full:open}
+   ${BP.msg?`<p class="${BP.msg.bad?"bad":"ok"}">${esc(BP.msg.text)}</p>`:""}${BP.view==="table"?srcs+(tables||'<p class="muted">Nothing matches.</p>'):BP.view==="all"?full:BP.view==="radio"?rcView(d):open}
    <p class="small muted">US rules: 47 CFR 97.301 / 97.305. Band plans are voluntary agreements; the FCC rules are the law.</p>
    <div class="row noprint"><button onclick="$('bpDlg').close()">Close</button></div>`;
   const sd=box.querySelector("[data-bpsrc]");if(sd)sd.ontoggle=()=>BP.srcOpen=sd.open;
@@ -2340,14 +2368,20 @@ document.addEventListener("click",async e=>{const t=e.target.closest&&e.target.c
   try{await post("/api/vara/adhoc",{radio:t.dataset.adsend});BP.msg={text:"Sending your ad hoc channels over VARA: the other station gets ★ Install in its VARA window."}}catch(err){BP.msg={bad:true,text:err.message}}renderBP()});
 document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("#bpDlg [data-adtog]");if(!t)return;
   const f=+t.dataset.adtog,k=t.dataset.adk;if(adRes(k,f))return adPost("/api/adhoc",{remove:{freq_mhz:f,kind:k}});
-  adName(k).then(sug=>{const n=prompt(`Name for ${adF(f)} MHz (${k==="data"?"VARA FM":"FM voice"}): up to 6 letters or numbers, so it fits a Baofeng's channel display when you program it with CHIRP`,sug);
-    if(n===null)return;adPost("/api/adhoc",{add:{freq_mhz:f,kind:k,width:t.dataset.adw||"narrow",name:adShort(n)||sug}},r=>r.note||"")})});
-// 6 characters, A-Z 0-9 space . / - : the shortest radio display that shows names (CHIRP: Baofeng WP970I / UV-82III 6, UV-5R 7)
-function adShort(v){return String(v||"").toUpperCase().replace(/[^A-Z0-9 .\/-]/g,"").replace(/\s+/g," ").slice(0,6).trim()}
+  adName(k).then(sug=>{const n=prompt(`Name for ${adF(f)} MHz (${k==="data"?"VARA FM":"FM voice"}), any length (e.g. "County ARES VARA simplex"). Its radio alias for CHIRP is ${sug}: change it in the list.`,"");
+    if(n===null)return;adPost("/api/adhoc",{add:{freq_mhz:f,kind:k,width:t.dataset.adw||"narrow",name:n.trim(),alias:sug}},r=>r.note||`Reserved ${adF(f)} as ${sug}${n.trim()?" ("+n.trim()+")":""}.`)})});
+// Radio aliases (station/radiochan.py): 8 characters, A-Z 0-9 space . / - (the owner's Baofeng and Quansheng radios, 2026-11-17)
+const RC_MAX=8;
+function adShort(v){return String(v||"").toUpperCase().replace(/[^A-Z0-9 .\/-]/g,"").replace(/\s+/g," ").slice(0,RC_MAX).trim()}
 async function adName(k){try{return (await api("/api/adhoc")).suggest[k]}catch(e){return k==="data"?"VARA1":"TAC1"}}
-document.addEventListener("input",e=>{const t=e.target;if(t.matches&&t.matches("#bpDlg [data-adname]")){const v=adShort(t.value);if(v!==t.value.trim())t.value=v}});
+document.addEventListener("input",e=>{const t=e.target;if(t.matches&&t.matches("#bpDlg .rcal")){const v=adShort(t.value);if(v!==t.value.trim())t.value=v}});
 document.addEventListener("change",async e=>{const t=e.target;if(!t.closest||!t.closest("#bpDlg"))return;
   if(t.matches("[data-adname]"))return adPost("/api/adhoc",{rename:{freq_mhz:+t.dataset.adname,kind:t.dataset.adk,name:t.value}});
+  if(t.matches("[data-adalias]"))return adPost("/api/adhoc",{rename:{freq_mhz:+t.dataset.adalias,kind:t.dataset.adk,alias:t.value}});
+  if(t.matches("[data-adradio]")){BP.adRadio=t.checked;renderBP();return}
+  if(t.matches("[data-rcalias]")||t.matches("[data-rcname]")){const m=JSON.parse(t.dataset.rcalias||t.dataset.rcname);return adPost("/api/radio",{edit:Object.assign(m,t.matches("[data-rcalias]")?{alias:t.value}:{name:t.value})})}
+  if(t.matches("[data-rcprof]"))return adPost("/api/radio",{profile:t.value});
+  if(t.matches("[data-rcstart]"))return adPost("/api/radio",{start:+t.value});
   if(t.matches("[data-adwidth]"))return adPost("/api/adhoc",{width:{freq_mhz:+t.dataset.adwidth,kind:"data",width:t.value}});
   if(t.matches("[data-adimport]")&&t.files&&t.files[0]){let obj;try{obj=JSON.parse(await t.files[0].text())}catch(err){BP.msg={bad:true,text:"That file is not a HAM Sidekick ad hoc channels file."};renderBP();return}
     const rp=!!(document.querySelector("#bpDlg [data-adreplace]")||{}).checked;
@@ -2364,6 +2398,9 @@ document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.c
   try{await post("/api/localplans/settings",off?{list_remind:{[off.dataset.wloff]:false}}:{list_snooze:true});if($("bpDlg").open){BP.d=await api("/api/bandplan/area");renderBP()}await plansLoad();if(NV.tab==="plans"&&$("netsDlg").open)renderPlans()}catch(err){}});
 document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.closest("#bpDlg"))return;
   const bv=t.closest("[data-bpview]");if(bv){BP.view=bv.dataset.bpview;renderBP();return}
+  const ra=t.closest("[data-rcadd]");if(ra){const m=JSON.parse(ra.dataset.rcadd);await adPost("/api/radio",{add:m},()=>{const x=rcMark(m.freq_mhz,m.offset_mhz);return x?`💾 ${bpMhz(m.freq_mhz)} is on your radio list as ${x.alias}: change the alias beside it, or see 💾 Radio channels.`:""});return}
+  const rr=t.closest("[data-rcrm]");if(rr){await adPost("/api/radio",{remove:JSON.parse(rr.dataset.rcrm)});return}
+  const rm=t.closest("[data-rcmove]");if(rm){const keys=(((BP.d||{}).radio||{}).channels||[]).map(c=>c.key);await adPost("/api/radio",{move:rm.dataset.rcmove,by:+rm.dataset.by,keys});return}
   const go=t.closest("[data-bpgo]");if(go){const id=go.dataset.bpgo;let row=[...$("bpBody").querySelectorAll("[data-bptuned]")].find(x=>x.dataset.bptuned.split(" ").includes(id));
     if(!row&&(BP.band!=="all"||BP.mine||BP.flags)){BP.band="all";BP.mine=BP.flags=false;renderBP();row=[...$("bpBody").querySelectorAll("[data-bptuned]")].find(x=>x.dataset.bptuned.split(" ").includes(id))}
     if(row){row.scrollIntoView({block:"center",behavior:"smooth"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash")}
