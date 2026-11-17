@@ -361,7 +361,8 @@ is split into its channels: click **☆ 445.525** to reserve it (VARA FM narrow 
 in Ad hoc voice), again to release it. **★ My ad hoc … channels** at the top lists them. Each has a **name** (any
 length: what it is, asked when you reserve it) and a **radio alias** (what the radio's display shows: **8 characters,
 A–Z 0–9 space . / -**, suggested VARA1, VARA2 … / TAC1, TAC2 …; owner 2026-11-17: the Baofeng and Quansheng radios show
-8. An older Baofeng UV-5R shows 7: shorten that alias in CHIRP after the import); change either there, change a VARA channel's width (a **wide** reservation keeps 25 kHz from your other reserved channels on 2 m and 1.25 m, 35 kHz on 70 cm: reserving wide next to one reserves it narrow and says so, and a wide one set too close is marked ⚠ naming the neighbour), **Use** it on a VARA radio. In the band plan, the full spectrum and the
+8. An older Baofeng UV-5R shows 7: CHIRP keeps the first 7 when it imports, and the 💾 Radio channels tab names two
+aliases that would then read the same, so change one of those); change either there, change a VARA channel's width (a **wide** reservation keeps 25 kHz from your other reserved channels on 2 m and 1.25 m, 35 kHz on 70 cm: reserving wide next to one reserves it narrow and says so, and a wide one set too close is marked ⚠ naming the neighbour), **Use** it on a VARA radio. In the band plan, the full spectrum and the
 printout a reserved channel is a **★ my ad hoc** row (purple). It stays on the ad hoc list (marked ★) instead of being
 cut out, a voice reservation is not offered to VARA, and one the plans no longer leave open (a plan read later, a new
 gateway, or another operator's set on a station with different privileges) is marked ⚠ with why.

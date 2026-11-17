@@ -859,7 +859,7 @@ class Plans:
         return {"channels": rows, "marks": d.get("radio") or [], "profile": prof, "start": d.get("radio_start", 1),
                 "profiles": [{"id": k, "label": v["label"], "len": v["len"]} for k, v in R.PROFILES.items()],
                 "alias_max": R.ALIAS_MAX, "left_out": pl["left_out"], "shortened": pl["shortened"],
-                "dups": pl["dups"], "count": len(pl["rows"])}
+                "dups": pl["dups"], "clash_short": pl["clash_short"], "count": len(pl["rows"])}
 
     def radio_set(self, body: dict) -> dict:
         """{"add" | "remove" | "edit": a band-plan channel} | {"move": key, "by": ±n, "keys": [shown order]} |

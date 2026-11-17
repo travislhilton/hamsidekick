@@ -105,3 +105,20 @@ def test_station_routes_and_sharing(tmp_path):
     p2._class = lambda: "technician"
     rep = p2.adhoc_import(f)["report"]
     assert rep["added"] == 1 and rep["radio_added"] == 1
+
+
+def test_a_seven_character_radio_names_aliases_that_would_read_the_same():
+    """CHIRP's File -> Import keeps the first valid_name_length characters (filter_name; a UV-5R: 7), so the export
+    never cuts an alias but names the two that a 7-character display would show alike (read in CHIRP 2026-11-17)."""
+    items = R.listing([], [R.clean_mark(x) for x in (
+        {"freq_mhz": 145.61, "alias": "VARAFM11"},
+        {"freq_mhz": 145.63, "alias": "VARAFM12"},
+        {"freq_mhz": 146.52, "alias": "CALLING"},
+        {"freq_mhz": 446.0, "alias": "CALLING7"},     # 'CALLING' already: a 7-character radio shows both alike
+        {"freq_mhz": 147.42, "alias": "K7ABC"},
+        {"freq_mhz": 147.48, "alias": "K7ABC"})], [])   # a plain duplicate is named once, under dups
+    p = R.plan(items, "ht")
+    assert [r["chirp_name"] for r in p["rows"]][:2] == ["VARAFM11", "VARAFM12"] and not p["shortened"]
+    assert p["dups"] == ["K7ABC: 147.42 and 147.48 MHz"]
+    assert p["clash_short"] == ["VARAFM11 and VARAFM12 → VARAFM1", "CALLING and CALLING7 → CALLING"]
+    assert "VARAFM12" in R.chirp_csv(items, "ht")

@@ -19,10 +19,13 @@ import time
 
 from .consolidate import EPS
 
-# 8 characters: the owner's Baofeng and Quansheng radios (2026-11-17). The export never cuts an alias: an older radio
-# that shows fewer (Baofeng UV-5R family 7) is fixed by hand in CHIRP after the import (owner: "stick with 8 on the
-# band plan and let the user manually change them after export"). A radio's choice is only its bands and modes.
+# 8 characters: the owner's Baofeng and Quansheng radios (2026-11-17). The export never cuts an alias (owner: "stick
+# with 8 on the band plan and let the user manually change them after export"). An older radio that shows fewer
+# (Baofeng UV-5R family: 7) gets the first 7 from CHIRP itself: File -> Import runs the radio's filter_name, which keeps
+# name[:valid_name_length] (read in CHIRP's import_logic / chirp_common, 2026-11-17). So the only thing to fix by hand
+# is two aliases that read the same once cut (plan()'s "clash_short"). A radio's choice is only its bands and modes.
 ALIAS_MAX = 8
+SHORT_RADIO = 7                                    # the older Baofeng UV-5R family's display
 ALIAS_CHARS = "A-Z0-9 ./-"
 NAME_LONG = 80
 MAX = 400
@@ -185,7 +188,7 @@ def _step(f: float) -> str:
 
 def plan(items: list[dict], profile: str = DEFAULT_PROFILE) -> dict:
     """What a CHIRP export for this kind of radio holds: {"rows": [...with "chirp_name"], "left_out": [why],
-    "shortened": [..], "dups": [..]}."""
+    "shortened": [..], "dups": [..], "clash_short": [two aliases that read the same on a SHORT_RADIO display]}."""
     p = PROFILES.get(profile) or PROFILES[DEFAULT_PROFILE]
     rows, left, short, seen, dups = [], [], [], {}, []
     for r in items:
@@ -205,8 +208,21 @@ def plan(items: list[dict], profile: str = DEFAULT_PROFILE) -> dict:
                 dups.append(f"{nm}: {fmt_f(seen[nm])} and {fmt_f(f)} MHz")
             seen.setdefault(nm, f)
         rows.append(dict(r, chirp_name=nm))
-    return {"rows": rows, "left_out": left, "shortened": short, "dups": dups, "profile": profile,
+    cut, clash = {}, []
+    for r in rows:
+        nm = r["chirp_name"]
+        c = nm[:SHORT_RADIO].strip()
+        if not c or nm in dups_names(dups):
+            continue
+        if c in cut and cut[c] != nm:
+            clash.append(f"{cut[c]} and {nm} → {c}")
+        cut.setdefault(c, nm)
+    return {"rows": rows, "left_out": left, "shortened": short, "dups": dups, "clash_short": clash, "profile": profile,
             "label": p["label"], "len": p["len"]}
+
+
+def dups_names(dups: list[str]) -> set[str]:
+    return {d.split(":", 1)[0] for d in dups}
 
 
 def chirp_csv(items: list[dict], profile: str = DEFAULT_PROFILE, start: int = 1) -> str:
