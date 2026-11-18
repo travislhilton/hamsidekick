@@ -355,6 +355,7 @@ def test_a_link_test_times_random_bytes_and_the_receiver_throws_them_away(pair, 
     on demand by the user". VARA starts slow and steps up, so the test feeds data for a set time and records the
     bytes the other modem took, over time."""
     monkeypatch.setattr(V, "TEST_MIN_S", 0.5)
+    monkeypatch.setattr(V, "TEST_STALE_S", 0.2)                        # the fake modem says BUFFER at once, then nothing
     A, B = pair
     _link(A, B)
     assert A.v.state()["peer_caps"] == ["+TEST"]                       # said in the handshake: HSK1 <call> +TEST
@@ -379,6 +380,7 @@ def test_a_link_test_times_random_bytes_and_the_receiver_throws_them_away(pair, 
 
 def test_a_link_test_needs_a_station_that_understands_it_and_reports_a_cut_link(pair, monkeypatch):
     monkeypatch.setattr(V, "TEST_MIN_S", 30)
+    monkeypatch.setattr(V, "TEST_STALE_S", 0.2)
     A, B = pair
     _link(A, B)
     with A.v.lock:
@@ -428,3 +430,29 @@ def test_a_file_on_its_way_shows_progress_speed_and_time_left(tmp_path):
     t[0] += 4
     v._on_data(b"x" * 3000)                                             # whole (the checksum is wrong: refused)
     assert v.state()["receiving"] is None
+
+
+def test_a_link_test_waits_for_varas_buffer_count_before_feeding_more(tmp_path):
+    """On the air 2026-11-18: VARA's BUFFER line came over a second after the data; the old "0" made every byte look
+    delivered and 106 KB went in at once (a 120 s test took 5 minutes to drain)."""
+    t = [1000.0]
+    wrote = []
+    v = V.Vara(tmp_path, "W9XYZ", winlink_open=lambda: False, clock=lambda: t[0], tx_allowed=lambda: True)
+    v._data = lambda b: wrote.append(len(b))
+    v._cmd = lambda line: None
+    with v.lock:
+        v.st.update(link="up", session="connected", peer="K7ABC", peer_proto="HSK1", peer_caps=["+TEST"])
+    v.available = lambda: (True, "")
+    v.link_test(60)
+    assert len(wrote) == 1
+    for dt in (0.5, 1.0, 2.0, 4.0):                                     # ticks, and VARA has not said BUFFER yet
+        t[0] = 1000.0 + dt
+        v._test_feed()
+    assert len(wrote) == 1 and v.state()["testing"]["bytes"] == 0
+    t[0] = 1005.0
+    v._on_status(f"BUFFER {wrote[0]}")                                  # it has it all, none sent yet
+    assert len(wrote) == 1
+    t[0] = 1010.0
+    v._on_status("BUFFER 300")                                          # most of it is over: now more goes in
+    assert len(wrote) == 2 and v.state()["testing"]["bytes"] == wrote[0] - 300
+    assert sum(wrote) < 4 * 1024

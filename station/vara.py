@@ -71,6 +71,7 @@ BLOCKED = {".exe", ".bat", ".cmd", ".com", ".ps1", ".vbs", ".vbe", ".js", ".jse"
 CAPS = "+TEST"                      # after our call in the handshake: what this build understands beyond MSG / FILE
 TEST_S, TEST_MIN_S, TEST_MAX_S = 60, 15, 180
 TEST_MAX_BYTES = 400_000
+TEST_STALE_S = 6.0
 TEST_CHUNK = (1024, 16384)          # a test keeps this much ahead of the modem: about 15 s of data at the current speed
 CALL_RE = re.compile(r"^[A-Z0-9]{3,7}(-([1-9]|1[0-5]|T|R))?$")
 
@@ -301,7 +302,7 @@ class Vara:
             seq = self._next_seq()
             now = self.clock()
             self.test = {"seq": seq, "start": now, "max_s": seconds, "sent": 0, "feeding": True, "ended": False,
-                         "curve": [[0.0, 0]], "write_at": 0.0, "rand": os.urandom, "levels": [], "bps": [],
+                         "curve": [[0.0, 0]], "write_at": 0.0, "buffer_at": 0.0, "rand": os.urandom, "levels": [], "bps": [],
                          "end_at": None, "sn": []}
             self.st["testing"] = {"seq": seq, "s": 0, "bytes": 0, "max_s": seconds}
         self._cmd("COMPRESSION FILES")
@@ -319,7 +320,13 @@ class Vara:
             now = self.clock()
             el = now - t["start"]
             buf = int(self.st["buffer"] or 0)
-            if now - t["write_at"] >= 0.3:                         # a BUFFER line from before our last write lies
+            # Is VARA's BUFFER count newer than our last write? On the air its line came over a second after the
+            # write, and the old "0" made every byte look delivered: 106 KB went in at once. A line counts when it
+            # comes 0.3 s or more after the write; with no line at all for TEST_STALE_S the last count is taken.
+            if from_buffer and now - t["write_at"] >= 0.3:
+                t["buffer_at"] = now
+            fresh = t["buffer_at"] > t["write_at"] or now - t["write_at"] >= TEST_STALE_S
+            if fresh:
                 done = max(t["curve"][-1][1], min(t["sent"], t["sent"] - buf))
                 if done > t["curve"][-1][1]:
                     t["curve"].append([round(el, 1), done])
@@ -334,13 +341,13 @@ class Vara:
                     rate = (done - back[1]) / max(1.0, el - back[0])            # bytes a second, lately
                     ahead = int(max(TEST_CHUNK[0], min(TEST_CHUNK[1], rate * 15)))
                     left = t["sent"] - done
-                    if left < ahead / 2 or t["sent"] == 0:
+                    if t["sent"] == 0 or (fresh and left < ahead / 2):
                         n = max(256, min(ahead - left, TEST_MAX_BYTES - t["sent"]))
                         head = f"TEST {t['seq']} {n}\n".encode()
                         write = head + t["rand"](n)
                         t["sent"] += len(write)
                         t["write_at"] = now
-            if not t["feeding"] and write is None and done >= t["sent"]:
+            if not t["feeding"] and write is None and fresh and done >= t["sent"]:
                 t["ended"], t["end_at"] = True, now
                 write = f"TESTEND {t['seq']}\n".encode()
         if write:
