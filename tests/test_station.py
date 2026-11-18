@@ -725,3 +725,11 @@ def test_the_dashboard_reloads_the_chat_when_a_file_or_link_test_starts():
     for ev in ("file_sending", "file_receiving", "test_started", "test_done", "test_received"):
         assert f'"{ev}"' in full
     assert "function vXfer(" in idx and "data-vstoprx" in idx and 'aria-valuenow="${pc}"' in idx
+
+
+def test_an_open_dashboard_reloads_after_an_update_unless_something_is_typed():
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    i = idx.index("async function pageCheck()")
+    body = idx[i:i + 1600]
+    assert 'String(ae.value||"").trim()!==""' in body and "window._pageRetry=setInterval(pageCheck,5000)" in body

@@ -2034,8 +2034,12 @@ $("netsDlg").addEventListener("cancel",e=>{if(FIX&&FIX.where==="min"){e.preventD
 // reload, or offer Reload while a pop-up is open or something is being typed (owner 2026-11-16: no close at the top)
 let PAGE0=null;
 async function pageCheck(){try{const p=(await api("/api/page")).page;if(!PAGE0){PAGE0=p;return}if(p===PAGE0)return;
-  const busy=[...document.querySelectorAll("dialog")].some(d=>d.open)||(document.activeElement&&/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
+  // busy = a pop-up is open, or something has been typed. A cursor resting in an EMPTY box is not busy (on the air
+  // 2026-11-18 the chat box kept the cursor after Send, so the page never reloaded and showed none of the new build)
+  const ae=document.activeElement,typing=ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)&&!/^(checkbox|radio|button|file|range)$/.test(ae.type||"")&&String(ae.value||"").trim()!==""&&ae.value!==ae.defaultValue;
+  const busy=[...document.querySelectorAll("dialog")].some(d=>d.open)||typing;
   if(!busy){location.reload();return}
+  if(!window._pageRetry)window._pageRetry=setInterval(pageCheck,5000);          // reload by itself once you are done
   if(!$("newBuild")){const b=document.createElement("div");b.id="newBuild";b.className="newbuild";b.innerHTML='A new version of the station is installed. <button class="primary small" onclick="location.reload()">Reload</button>';document.body.prepend(b)}}catch(e){}}
 function connect(){
   const es=new EventSource("/events");
