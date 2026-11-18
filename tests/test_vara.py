@@ -165,6 +165,7 @@ def test_setup_commands_and_status_parsing(pair):
     assert wait(lambda: A.got("cq_heard") and A.v.state()["session"] == "pending")
     s = A.v.state()
     assert s["busy"] and s["sn"] == 12.5 and s["alive_at"] and s["registered"] == "W9XYZ" and s["ptt"]
+    assert s["busy_at"] and s["ptt_at"]        # when VARA last keyed / heard something: shown after an announcement
     assert s["cq_heard"][0]["call"] == "K7ABC" and s["cq_heard"][0]["bw"] == 500
     A.fake.push("CANCELPENDING")
     A.fake.push("MISSING SOUNDCARD")

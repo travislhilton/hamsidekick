@@ -125,7 +125,8 @@ class Vara:
                    "ptt": False, "busy": False, "sn": None, "registered": None, "alive_at": None,
                    "soundcard_ok": True, "last_reply": None, "last_cmd": None, "listening": False,
                    "peer_proto": None, "sending": None, "cq_heard": [], "error": None, "kind": kind,
-                   "mycall": call, "ptt_mode": ptt_mode}
+                   "mycall": call, "ptt_mode": ptt_mode,
+                   "ptt_at": None, "busy_at": None, "cq_at": None}   # last PTT ON / BUSY ON / our CQ frame: did VARA key, hear
         self._reset_session()
 
     # ------------------------------------------------------------------ public ---------------------------------
@@ -211,6 +212,8 @@ class Vara:
             self._cmd(f"CQFRAME {self.mycall} {self.bw or 2300}")
         else:
             self._cmd(f"CQFRAME {self.mycall}" + "".join(" " + str(v).upper() for v in via or ()))
+        with self.lock:
+            self.st["cq_at"] = self.clock()
         self._log({"kind": "cq", "dir": "out"})
 
     def send_chat(self, text: str) -> int:
@@ -440,11 +443,15 @@ class Vara:
             with self.lock:
                 self.st["ptt"] = on
                 self.ptt_on_at = self.clock() if on else None
+                if on:
+                    self.st["ptt_at"] = self.clock()
             self._ptt(on)
             self._emit("ptt", {"on": on})
         elif k == "BUSY" and len(w) > 1:
             with self.lock:
                 self.st["busy"] = w[1].upper() == "ON"
+                if self.st["busy"]:
+                    self.st["busy_at"] = self.clock()
             self._emit("busy", {"on": self.st["busy"]})
         elif k == "SN" and len(w) > 1:
             try:

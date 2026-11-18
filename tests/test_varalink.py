@@ -321,6 +321,35 @@ def test_the_vara_copies_on_this_pc_are_never_suggested_and_name_the_one_not_ans
     assert "is that copy of VARA open?" in st.vara.down_text(c)
 
 
+def test_two_copies_of_vara_keying_one_radio_are_named(tmp_path):
+    """Owner 2026-11-18: VARA FM 2 (its own Digirig) kept VARA FM's RA-Board PTT device after the folder was copied:
+    its announcements keyed the Winlink radio and never went out on the chat frequency."""
+    pc = tmp_path / "C"
+    ra = "RA-Board Device Path=\\\\?\\hid#vid_0d8c&pid_0012&mi_03#8&abc&0&0000#{x}\r\n"
+    for name, port, card, dev in (("VARA FM", 8300, "Digirig Lite (USB Audio Device)", "abc"),
+                                  ("VARA FM 2", 8310, "Digirig Lite 2 (USB Aud", "abc"),
+                                  ("VARA HF", 8400, "Digirig Lite (USB Audio Device)", "abc"),   # same card: fine
+                                  ("VARA FM 3", 8320, "Third (USB Aud", "def")):
+        d = pc / name
+        d.mkdir(parents=True)
+        (d / "VARAFM.ini").write_text(f"[Soundcard]\r\nInput Device Name={card}\r\nOutput Device Name={card}\r\n"
+                                      + ra.replace("abc", dev) + f"[PTT]\r\nTCP Command Port={port}\r\n",
+                                      encoding="latin-1")
+    w = varalink.vara_ptt_clashes([pc])
+    assert set(w) == {8310}                       # two copies on VARA FM's card: VARA FM 2 is the odd one out
+    assert w[8310].startswith("VARA FM 2 keys the radio of VARA FM:") and "Digirig Lite 2" in w[8310]
+    (pc / "VARA HF" / "VARAFM.ini").unlink()
+    w = varalink.vara_ptt_clashes([pc], born=lambda d: {"VARA FM": 2.0, "VARA FM 2": 1.0}.get(d.name, 0.0))
+    assert set(w) == {8300} and w[8300].startswith("VARA FM keys the radio of VARA FM 2")   # a tie: the newer folder is the copy
+    st, a, b = _two(tmp_path / "st")
+    st.vara.scan_clashes = lambda: varalink.vara_ptt_clashes([pc])
+    st.vara.settings({"radio": a, "kind": "fm", "use": "chat", "enabled": True, "cmd_port": 8310})
+    assert "keys the radio of VARA FM" in st.vara.view()["modems"][0]["warn"]
+    st.vara.settings({"radio": a, "cmd_port": 8320})
+    st.vara._clashes_at = -1e9
+    assert st.vara.view()["modems"][0]["warn"] is None
+
+
 def test_each_modem_can_add_an_ssid_to_the_stations_callsign(tmp_path):
     """Owner 2026-11-17: "My call sign is <call>, but I want to use <call>-8 on the -8 station" - per modem, the
     station's own callsign (net logs, Sidekick, IDs) unchanged."""

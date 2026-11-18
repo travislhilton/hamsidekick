@@ -314,6 +314,14 @@ you chose is remembered. Each column shows:
   several stations at once: each message waits its turn (⏳), goes out over a short link when the frequency is clear
   (✓ sent, ✓✓ delivered when VARA confirms it), and the link is let go after 20 s of quiet (**Keep the link open** for a
   back-and-forth). Replies come back the same way. A station that does not answer is called 3 times, then ⚠ **Retry**.
+  The radio's card on the dashboard says **On the VARA channel as W9XYZ-8** and lists the stations heard (grey =
+  quiet, a number = unread); click one to open its chat. After each announcement the window says whether **VARA
+  keyed the transmitter** and when it last heard a signal on the frequency: "⚠ VARA did not say it keyed the
+  transmitter" points at VARA's PTT setting. With two copies of VARA on one PC (Winlink Express's and a second for
+  chat), each copy keys **its own** radio: a copied VARA folder keeps the first copy's RA-Board (PTT) device, so
+  the second copy's tones go to its radio while the first radio is keyed. The window and the card then say "VARA FM 2
+  keys the radio of VARA FM": in VARA FM 2, Settings → PTT → RA-Board, choose the device of its own sound card, then
+  close and reopen it.
   Keep-alives, listening and waiting messages pause when you leave the PC. The old controls (Connect, Call CQ, Answer
   calls, the log) are under **Direct link**. Details: `docs/VARA.md`.
 

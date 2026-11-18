@@ -57,17 +57,13 @@ def _adhoc_summary(p: Path) -> dict | None:
             "skipped": len(rep["skipped"])}
 
 
-def vara_copies(roots=None) -> dict[int, str]:
-    """Every copy of VARA installed on this PC and the command port it is set to: {cmd_port: folder}. A copy is a folder
-    named VARA* (C:\\VARA, C:\\VARA FM, C:\\VARA FM 2 ...) holding VARA's .ini with "TCP Command Port=" (VARA Setup ->
-    TCP port; the data port is that + 1). Owner 2026-11-17: a second VARA FM on 8310 beside Winlink Express's VARA FM on
-    8300 - the suggestion offered 8300 again, and "not answering" could not say which copy was meant."""
+def _vara_inis(roots=None):
+    """(folder, .ini text) for every copy of VARA installed on this PC: folders named VARA* under C:\\ and Program Files."""
     if roots is None:
         import os
         if os.name != "nt":
-            return {}
+            return
         roots = [Path("C:/")] + [Path(os.environ[k]) for k in ("ProgramFiles", "ProgramFiles(x86)") if os.environ.get(k)]
-    out: dict[int, str] = {}
     for root in roots:
         try:
             dirs = [d for d in Path(root).iterdir() if d.is_dir() and d.name.upper().startswith("VARA")]
@@ -76,11 +72,64 @@ def vara_copies(roots=None) -> dict[int, str]:
         for d in sorted(dirs):
             for ini in sorted(d.glob("*.ini")):
                 try:
-                    m = re.search(r"^\s*TCP Command Port\s*=\s*(\d+)", ini.read_text(encoding="latin-1"), re.M | re.I)
+                    yield d, ini.read_text(encoding="latin-1")
                 except OSError:
                     continue
-                if m:
-                    out.setdefault(int(m.group(1)), str(d))
+
+
+def _ini(text: str, key: str) -> str:
+    m = re.search(rf"^\s*{re.escape(key)}\s*=\s*(.*?)\s*$", text, re.M | re.I)
+    return m.group(1) if m else ""
+
+
+def vara_copies(roots=None) -> dict[int, str]:
+    """Every copy of VARA installed on this PC and the command port it is set to: {cmd_port: folder}. A copy is a folder
+    named VARA* (C:\\VARA, C:\\VARA FM, C:\\VARA FM 2 ...) holding VARA's .ini with "TCP Command Port=" (VARA Setup ->
+    TCP port; the data port is that + 1). Owner 2026-11-17: a second VARA FM on 8310 beside Winlink Express's VARA FM on
+    8300 - the suggestion offered 8300 again, and "not answering" could not say which copy was meant."""
+    out: dict[int, str] = {}
+    for d, text in _vara_inis(roots):
+        port = _ini(text, "TCP Command Port")
+        if port.isdigit():
+            out.setdefault(int(port), str(d))
+    return out
+
+
+def vara_ptt_clashes(roots=None, born=None) -> dict[int, str]:
+    """{cmd_port: warning} for copies of VARA that key the radio through ANOTHER copy's PTT device: two copies with the
+    same RA-Board device (VARA's PTT through a Digirig Lite / AIOC / CM108 sound card's own pin) but different sound
+    cards. The copy then sends its tones into its own radio and keys the other one: nothing goes out on its frequency,
+    and the other radio puts a silent carrier on ITS frequency. Owner 2026-11-18: VARA FM 2 on a second Digirig kept
+    the first Digirig's RA-Board after the folder was copied; announcements were never heard."""
+    seen = []
+    for d, text in _vara_inis(roots):
+        port, ra = _ini(text, "TCP Command Port"), _ini(text, "RA-Board Device Path").lower()
+        if port.isdigit() and ra:
+            try:                                  # Windows: when the folder was made (a copy is the newer one)
+                made = born(d) if born else d.stat().st_ctime
+            except OSError:
+                made = 0.0
+            seen.append({"port": int(port), "name": d.name, "ra": ra, "born": made,
+                         "card": (_ini(text, "Input Device Name"), _ini(text, "Output Device Name"))})
+    out: dict[int, str] = {}
+    for ra in {x["ra"] for x in seen}:
+        same = [x for x in seen if x["ra"] == ra]
+        count: dict[tuple, int] = {}
+        for x in same:
+            count[x["card"]] = count.get(x["card"], 0) + 1
+        if len(count) < 2:
+            continue
+        top = max(count.values())                 # the card most of them use; on a tie, the oldest folder's
+        right = next(c for c in count if count[c] == top) if list(count.values()).count(top) == 1 else \
+            min(same, key=lambda x: x["born"])["card"]
+        owner = next(x["name"] for x in sorted(same, key=lambda x: x["born"]) if x["card"] == right)
+        for x in same:
+            if x["card"] != right:
+                out[x["port"]] = (
+                    f"{x['name']} keys the radio of {owner}: both copies of VARA have the same RA-Board (PTT) device "
+                    f"but different sound cards. If {x['name']} keys by RA-Board: in {x['name']}, Settings → PTT → "
+                    f"RA-Board, choose the device of its own sound card ({x['card'][1] or x['card'][0]}), then close "
+                    f"and reopen {x['name']}")
     return out
 
 
@@ -232,7 +281,12 @@ class Modem:
             except Exception:  # noqa: BLE001
                 s = None
         out = {"radio": self.rid, "name": r.get("name") or self.rid, "freq_mhz": r.get("freq_mhz"), "cfg": c,
-               "call": self.call(), "tx_ok": ok, "tx_why": why, "state": s, "last": self.last_event, "status": self._status(c, s)}
+               "call": self.call(), "tx_ok": ok, "tx_why": why, "state": s, "last": self.last_event, "status": self._status(c, s),
+               "warn": self.link.ptt_clashes().get(c["cmd_port"]) if c["host"] in ("127.0.0.1", "localhost") else None}
+        try:                                  # the radio card names who is on the channel (owner 2026-11-18)
+            out["on_channel"] = self.chan.summary() if self.runs() else None
+        except Exception:  # noqa: BLE001
+            out["on_channel"] = None
         if transcript:
             try:
                 out["channel"] = self.chan.view() if self.runs() else None
@@ -387,6 +441,8 @@ class Link:
         self._express_at, self._express_val = 0.0, False
         self.scan_copies = vara_copies                   # tests swap in their own
         self._copies_at, self._copies = -1e9, {}
+        self.scan_clashes = vara_ptt_clashes
+        self._clashes_at, self._clashes = -1e9, {}
 
     # ----- settings (data/vara.json: {"modems": {radio id: modem}}) -----
     def _path(self) -> Path:
@@ -452,6 +508,17 @@ class Link:
                 self._copies = {}
             self._copies_at = now
         return self._copies
+
+    def ptt_clashes(self) -> dict[int, str]:
+        """vara_ptt_clashes(), kept VARA_SCAN_S."""
+        now = time.monotonic()
+        if now - self._clashes_at > VARA_SCAN_S:
+            try:
+                self._clashes = dict(self.scan_clashes() or {})
+            except Exception:  # noqa: BLE001
+                self._clashes = {}
+            self._clashes_at = now
+        return self._clashes
 
     def down_text(self, c: dict) -> str:
         """Why a modem's VARA is not answering, naming the copy of VARA set to its port when there is one."""

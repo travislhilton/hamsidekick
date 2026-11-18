@@ -431,6 +431,18 @@ class Channel:
                 return
 
     # ----- the view -----
+    def summary(self) -> dict:
+        """For the radio card: on the channel or not, who is here or quiet, unread messages (owner 2026-11-18: "I don't
+        see anything on the dashboard ... radio column showing that a station has announced")."""
+        d = self.load()
+        now = self.clock()
+        ros = [{"call": c, "state": self.presence(r, d["every_min"], now), "heard_at": r.get("heard_at"),
+                "unread": r.get("unread", 0)} for c, r in d["roster"].items() if r.get("heard_at")]
+        ros = [r for r in ros if r["state"] != "gone"]
+        ros.sort(key=lambda r: (r["state"] != "here", -(r["heard_at"] or 0)))
+        return {"on": d["on"], "stations": ros[:8], "more": max(0, len(ros) - 8),
+                "unread": sum(r.get("unread", 0) for r in d["roster"].values())}
+
     def view(self) -> dict:
         d = self.load()
         now = self.clock()

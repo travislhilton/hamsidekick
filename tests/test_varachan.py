@@ -96,6 +96,25 @@ def test_stations_heard_are_here_then_grey_then_gone(tmp_path):
     assert m.chan.view()["roster"][0]["state"] == "here"
 
 
+def test_the_radio_card_names_who_is_on_the_channel(tmp_path):
+    """Owner 2026-11-18: "I don't see anything on the dashboard VARA FM 2 radio column showing that a station has
+    announced" - the modem's view (the radio card's) carries the stations here and quiet, and unread messages."""
+    st, m, v, clk = _chan(tmp_path)
+    assert m.view(transcript=False)["on_channel"] == {"on": False, "stations": [], "more": 0, "unread": 0}
+    m.act("join", {})
+    m._event("cq_heard", {"call": "K7ABC"})
+    clk.t += 11 * 60 + 200
+    m._event("cq_heard", {"call": "N0CALL"})
+    _link(m, v, "N0CALL")
+    v.st.update(peer="N0CALL")
+    m._event("chat", {"text": "hello", "peer": "N0CALL"})
+    oc = m.view(transcript=False)["on_channel"]
+    assert oc["on"] and oc["unread"] == 1
+    assert [(x["call"], x["state"]) for x in oc["stations"]] == [("N0CALL", "here"), ("K7ABC", "quiet")]
+    clk.t += 60 * 60                                                      # gone: off the card (the window keeps it)
+    assert m.view(transcript=False)["on_channel"]["stations"] == []
+
+
 def test_one_message_to_two_stations_goes_link_by_link(tmp_path):
     st, m, v, clk = _chan(tmp_path)
     m.act("csend", {"to": ["K7ABC", "N0CALL"], "text": "Net at 1900, all welcome"})
