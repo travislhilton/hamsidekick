@@ -714,6 +714,40 @@ class Link:
         p = Path(self.st.data) / "vara" / "inbox" / name
         return p if p.is_file() else None
 
+    def open_received(self, name: str, how: str = "folder", local: bool = False, run=None) -> dict:
+        """Open a received file, or show it in its folder, on the station PC's own screen (owner 2026-11-18: "the user
+        needs to be able to open the file using the link provided and also the folder where the file was stored").
+        Only for a browser on the station PC itself: from a phone or another PC the link downloads the file instead.
+        A file came over the air from someone else: a program file (kept with a ".blocked" ending) is never opened."""
+        import os
+        import subprocess
+        import sys
+        from .vara import BLOCKED
+        if not local:
+            raise ValueError("this opens on the station PC's own screen: use it in the browser on the station PC "
+                             "(from here, click the file's name to download it)")
+        p = self.inbox_file(str(name or ""))
+        if not p:
+            raise ValueError("that file is no longer in the received-files folder")
+        if how == "file":
+            if p.suffix.lower() == ".blocked" or p.suffix.lower() in BLOCKED:
+                raise ValueError("this is a program file: it is kept but never opened from here")
+            cmd = ("startfile", str(p)) if os.name == "nt" else (("open" if sys.platform == "darwin" else "xdg-open"), str(p))
+        else:
+            cmd = ("explorer", "/select,", str(p)) if os.name == "nt" else \
+                (("open", "-R", str(p)) if sys.platform == "darwin" else ("xdg-open", str(p.parent)))
+        if run is None:
+            def run(c):
+                if c[0] == "startfile":
+                    os.startfile(c[1])  # noqa: S606 - the operator pressed Open on a file that is not a program
+                else:
+                    subprocess.Popen(list(c))  # noqa: S603
+        try:
+            run(cmd)
+        except OSError as e:
+            raise ValueError(f"could not open it: {e}") from None
+        return {"ok": True, "path": str(p), "folder": str(p.parent)}
+
     def act(self, what: str, body: dict) -> dict:
         self.modem(body.get("radio")).act(what, body)
         return self.view()

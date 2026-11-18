@@ -348,7 +348,7 @@ def make_handler(station):
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
                       "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "adhoc", "handoff", "takeback", "join", "leave",
-                      "announce", "csend", "retry", "cancel", "closelink", "channel", "linktest")}
+                      "announce", "csend", "retry", "cancel", "closelink", "channel", "linktest", "open")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
             alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss|unskip)", u.path)        # pre-net alert
             item = re.fullmatch(r"/api/items(?:/(\d+)(/delete)?)?", u.path)                             # minutes items
@@ -434,6 +434,9 @@ def make_handler(station):
                     what = u.path.rsplit("/", 1)[1]
                     if what == "settings":
                         return self._json(station.vara.settings(body))
+                    if what == "open":                           # a received file / its folder, on the station PC's screen
+                        local = self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+                        return self._json(station.vara.open_received(body.get("name"), str(body.get("how") or "folder"), local))
                     return self._json(station.vara.act(what, body))
                 if u.path == "/api/radio":                       # 💾 marks, memory order, the radio (radiochan.py)
                     return self._json(_plans(station).radio_set(body))

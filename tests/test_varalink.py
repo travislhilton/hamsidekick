@@ -385,3 +385,29 @@ def test_the_vara_call_is_typed_whole_and_kept_apart_from_winlink(tmp_path):
             st.vara.settings({"radio": a, "call": bad})
     assert st.vara.settings({"radio": a, "call": ""})["modems"][0]["call"] == "W9XYZ"     # empty = the station's
     assert st.vara.settings({"radio": a, "call": "w9xyz"})["modems"][0]["cfg"]["call"] is None
+
+
+def test_a_received_file_opens_or_shows_in_its_folder_only_on_the_station_pc(tmp_path):
+    """Owner 2026-11-18: "the user needs to be able to open the file using the link provided and also the folder
+    where the file was stored"."""
+    import pytest
+    st, rid = _st(tmp_path, freq=445.525, cls="technician")
+    st._vara = varalink.Link(st, factory=FakeVara)
+    st.vara.settings({"enabled": True, "radio": rid, "kind": "fm"})
+    box = st.vara.modem(rid).dir() / "inbox"
+    box.mkdir(parents=True, exist_ok=True)
+    (box / "20261118-K7ABC-list.pdf").write_bytes(b"%PDF")
+    (box / "20261118-K7ABC-setup.exe.blocked").write_bytes(b"MZ")
+    ran = []
+    r = st.vara.open_received("20261118-K7ABC-list.pdf", "folder", local=True, run=ran.append)
+    assert r["folder"] == str(box) and str(box / "20261118-K7ABC-list.pdf") in ran[-1]
+    st.vara.open_received("20261118-K7ABC-list.pdf", "file", local=True, run=ran.append)
+    assert len(ran) == 2 and ran[-1][-1].endswith("list.pdf")
+    with pytest.raises(ValueError, match="program file"):
+        st.vara.open_received("20261118-K7ABC-setup.exe.blocked", "file", local=True, run=ran.append)
+    st.vara.open_received("20261118-K7ABC-setup.exe.blocked", "folder", local=True, run=ran.append)   # the folder: fine
+    with pytest.raises(ValueError, match="station PC"):
+        st.vara.open_received("20261118-K7ABC-list.pdf", "file", local=False, run=ran.append)        # a phone: no
+    with pytest.raises(ValueError, match="no longer"):
+        st.vara.open_received("../../secrets.env", "file", local=True, run=ran.append)
+    assert len(ran) == 3

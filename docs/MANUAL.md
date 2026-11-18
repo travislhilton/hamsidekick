@@ -328,8 +328,10 @@ you chose is remembered. Each column shows:
   **Send a file:** choose the station, then **📎 Send a file…** beside Send and pick the file (up to 5 MB). You are
   told about how long it should take, and it goes out by itself like a message: ⏳ waiting, ↗ sending, ✓✓ delivered
   (the other station checked it whole) with the time it took. **Receive a file:** nothing to press. It appears in
-  the chat with that station as a 📎 link, and under **Files received**; it is kept in the modem's `inbox` folder,
-  and a program file is given a `.blocked` ending so a double-click cannot run it. The other station needs this
+  the chat with that station as a 📎 link, and under **Files received**; it is kept in the modem's `inbox` folder.
+  In the browser on the station PC, **Open** opens it with its usual program (it asks first: the file came over the
+  air) and **Show in folder** opens the folder with the file selected; from a phone or another PC, click the name to
+  download it. A program file is given a `.blocked` ending and is never opened from the dashboard. The other station needs this
   program for files (a plain VARA terminal gets chat only).
   While a file is on its way, both stations show a progress bar: percent, KB of the size, the transfer rate, the
   time left and the time so far. **Cancel** stops it (VARA can only stop by dropping the link; the part already
