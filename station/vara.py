@@ -975,7 +975,7 @@ class Vara:
             except (OSError, VaraRefused):
                 pass
         self._log({"kind": "receipt", "seq": seq, "ok": ok, "why": why or None, "peer": self.st["peer"]})
-        left = int(self.st["buffer"] or 0)
+        left = int(self.st["buffer"] or 0) if str(why).startswith("cancelled") else 0   # the receiver stopped it part-way
         if not ok and left:
             why = f"{why or 'refused'} ({100 * max(0, f['size'] - left) // max(1, f['size'])}% had gone)"
         self._emit("file_sent" if ok else "file_failed", {"seq": seq, "name": f["name"], "why": why or None})
