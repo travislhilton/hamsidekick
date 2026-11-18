@@ -435,6 +435,24 @@ class Channel:
                 it = self._rx_line(d, peer, data,
                                    status="cancelled" if data.get("why") == "you cancelled it" else "failed")
                 it.update(done=data.get("done"), why=data.get("why"))
+                if it["status"] == "cancelled":                  # tell the sender it was you, not the link: a note
+                    self._thread(d, peer).append({               # that goes over a short link of its own
+                        "id": uuid.uuid4().hex[:12], "dir": "out", "at": self.clock(), "status": "queued", "tries": 0,
+                        "kind": "note", "note": "rxcancel", "name": data.get("name"),
+                        "done": int(data.get("done") or 0), "size": int(data.get("size") or 0)})
+                self.activity_at = self.clock()
+            elif name == "rx_cancelled" and peer:                # ... and at the sender: that file's line says so
+                size, done = int(data.get("size") or 0), int(data.get("done") or 0)
+                why = (f"cancelled by the operator at {peer} after {100 * done // max(1, size)}% had arrived: "
+                       f"not a link failure")
+                it = next((x for x in reversed(d["threads"].get(peer, [])) if x["dir"] == "out" and x.get("kind") == "file"
+                           and x.get("name") == data.get("name") and x["status"] in ("failed", "sending")), None)
+                if it:
+                    it.update(status="failed", why=why, cancelled_by=peer)
+                else:
+                    self._thread(d, peer).append({"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "chat",
+                                                  "at": self.clock(), "status": "received",
+                                                  "text": f"{data.get('name')}: {why}"})
                 self.activity_at = self.clock()
             elif name in ("file_sent", "file_failed") and peer:
                 it = self._find(d, peer, "file", data.get("seq"))
@@ -445,7 +463,7 @@ class Channel:
                 self.activity_at = self.clock()
             elif name == "buffer" and peer and data.get("bytes") == 0:
                 for it in d["threads"].get(peer, []):            # VARA's ARQ: the other modem has every byte
-                    if it["dir"] == "out" and it["kind"] == "chat" and it["status"] == "sent":
+                    if it["dir"] == "out" and it["kind"] in ("chat", "note") and it["status"] == "sent":
                         it["status"] = "delivered"
                 self.activity_at = self.clock()
             elif name == "disconnected":
@@ -454,7 +472,7 @@ class Channel:
                     if it["dir"] == "in" and it["status"] == "receiving":
                         it.update(status="failed", why="the link closed before the file was whole")
                 for it in d["threads"].get(gone or "", []):
-                    if it["dir"] == "out" and it["status"] in ("sending", "sent") and it["kind"] == "chat":
+                    if it["dir"] == "out" and it["status"] in ("sending", "sent") and it["kind"] in ("chat", "note"):
                         it["status"] = "queued"                  # the link went before VARA confirmed it
                     elif it["dir"] == "out" and it["status"] == "sending" and it["kind"] == "test":
                         it.update(status="failed", why="the link closed before the test finished")
@@ -575,6 +593,16 @@ class Channel:
                     seq = v.send_chat(it["text"])
                     it.update(status="sent", link_at=self.clock())
                     self.seq_map[(peer, "chat", seq)] = it["id"]
+                elif it["kind"] == "note":
+                    if s.get("peer_proto") is None:
+                        return                                   # after the handshake
+                    if s.get("peer_proto") == "raw":
+                        it.update(status="cancelled", why="a plain VARA terminal: no note")
+                        continue
+                    import urllib.parse
+                    v.send_note(f"RXCANCEL {urllib.parse.quote(it.get('name') or 'file', safe='')} "
+                                f"{it.get('done', 0)} {it.get('size', 0)}")
+                    it.update(status="sent", link_at=self.clock())
                 elif it["kind"] == "test":
                     if s.get("sending") or s.get("testing") or s.get("peer_proto") is None:
                         return                                   # after the handshake, and nothing else under way

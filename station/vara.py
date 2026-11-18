@@ -72,7 +72,6 @@ CAPS = "+TEST"                      # after our call in the handshake: what this
 TEST_S, TEST_MIN_S, TEST_MAX_S = 60, 15, 180
 TEST_MAX_BYTES = 400_000
 TEST_STALE_S = 6.0
-RX_CANCEL_S = 20.0                  # after the operator stops a receive: the NAK gets this long to reach the sender
 OFFER_WAIT_S = 8.0                  # a file follows its notice when the modem has sent the notice, or after this long
 TEST_CHUNK = (1024, 16384)          # a test keeps this much ahead of the modem: about 15 s of data at the current speed
 CALL_RE = re.compile(r"^[A-Z0-9]{3,7}(-([1-9]|1[0-5]|T|R))?$")
@@ -222,27 +221,29 @@ class Vara:
         self._log({"kind": "abort", "why": why})
         self._emit("abort", {"why": why})
 
-    def cancel_receive(self, why: str = "cancelled by the operator"):
-        """Stop a file that is arriving: tell the sender why (a NAK), then the link is dropped; nothing is kept. The
-        sender drops the link itself when the NAK reaches it (its modem still holds the rest of the file)."""
+    def cancel_receive(self):
+        """Stop a file that is arriving: the link is dropped at once and nothing is kept. Nothing can be said to the
+        sender first: while its file is flowing VARA does not turn the link around (on the air 2026-11-18 a NAK
+        written here never left). The channel tells the sender afterwards, over a short link of its own (RXCANCEL)."""
         with self.lock:
             p, rx = self.pending, self.st["receiving"]
-            if not rx:
-                p = None
-            elif p and p.get("kind") == "file":
-                p["discard"], p["cancelled"] = why, True
-            self.rx_cancel = self.clock() if rx else None
+            if rx and p and p.get("kind") == "file":
+                p["cancelled"] = True
             self.st["receiving"] = None
-        if not rx:
-            return self.abort("operator")
-        try:
-            self._data(f"NAK {rx['seq']} {why} at {self.mycall}\n".encode())
-        except (OSError, VaraRefused):
-            pass
-        info = {"seq": rx["seq"], "name": rx["name"], "size": rx["size"], "done": rx.get("done", 0),
-                "why": "you cancelled it", "peer": self.st["peer"]}
-        self._log({"kind": "file", "dir": "in", "rejected": "cancelled by the operator here", **info})
-        self._emit("file_rejected", info)
+            peer = self.st["peer"]
+        if rx:
+            info = {"seq": rx["seq"], "name": rx["name"], "size": rx["size"], "done": rx.get("done", 0),
+                    "why": "you cancelled it", "peer": peer}
+            self._log({"kind": "file", "dir": "in", "rejected": "cancelled by the operator here", **info})
+            self._emit("file_rejected", info)
+        self.abort("the operator cancelled a receive" if rx else "operator")
+
+    def send_note(self, line: str):
+        """One protocol line of our own to the linked station (RXCANCEL ...)."""
+        self._need_session()
+        if self.st["peer_proto"] != "HSK1":
+            raise VaraRefused("the other station does not run this program")
+        self._data(line.strip().encode() + b"\n")
 
     def cq(self, via=()):
         self._need_link()
@@ -715,7 +716,8 @@ class Vara:
             self._emit("test_done" if res else "test_failed",
                        {"seq": test["seq"], "result": res, "why": "the link closed before the test finished"})
         for f in out:
-            self._emit("file_failed", {"seq": f["seq"], "name": f["name"], "why": "the link closed before the receipt"})
+            self._emit("file_failed", {"seq": f["seq"], "name": f["name"], "why": "the link closed before the receipt: the other operator cancelled it (a note "
+                                              "follows if so), or the link failed"})
         if partial and partial.get("kind") == "file" and not partial.get("cancelled"):
             self._emit("file_rejected", {"seq": partial["seq"], "name": partial["name"], "size": partial["size"],
                                          "done": partial["size"] - partial["need"], "peer": peer,
@@ -738,7 +740,6 @@ class Vara:
         self.seq = 0
         self.session_at = None
         self.ptt_on_at = None
-        self.rx_cancel = None                   # when the operator stopped a file that was arriving
         self.offer = None                       # a file whose notice is on its way: the file follows
         self.test = None                        # a link test we are sending
         self.rx_test = None                     # ... or receiving
@@ -833,6 +834,9 @@ class Vara:
                                             "done": 0, "bps": None, "eta_s": None, "elapsed_s": 0,
                                             "said_at": self.clock()}
                 self._emit("file_receiving", {"seq": int(w[1]), "name": name, "size": size})
+            elif k == "RXCANCEL" and len(w) == 4:                  # the other operator stopped a file of ours part-way
+                self._emit("rx_cancelled", {"name": clean_name(urllib.parse.unquote(w[1])), "done": int(w[2]),
+                                            "size": int(w[3]), "peer": self.st["peer"]})
             elif k == "TESTING" and len(w) == 3:                   # a link test is coming, for this many seconds
                 with self.lock:
                     self.st["test_rx"] = {"bytes": 0, "s": 0, "max_s": int(float(w[2]))}
@@ -1022,9 +1026,7 @@ class Vara:
                 self.watchdog()
                 self._test_feed()
                 self._file_go()
-                if self.rx_cancel and self.clock() - self.rx_cancel > RX_CANCEL_S:
-                    self.rx_cancel = None
-                    self.abort("receive cancelled")
+
             except Exception:  # noqa: BLE001
                 pass
 

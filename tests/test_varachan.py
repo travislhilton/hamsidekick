@@ -342,7 +342,7 @@ def test_a_file_that_did_not_arrive_is_in_the_message_log(tmp_path):
     m._event("file_rejected", {"seq": 1, "name": "big.xlsx", "size": 5000, "done": 2000, "why": "you cancelled it", "peer": "K7ABC"})
     m._event("file_rejected", {"seq": 2, "name": "b.pdf", "size": 900, "done": 100, "peer": "K7ABC",
                                "why": "the link closed before the file was whole (the sender may have cancelled it)"})
-    th = m.chan.view()["threads"]["K7ABC"]
+    th = [it for it in m.chan.view()["threads"]["K7ABC"] if it["kind"] == "file"]
     assert [(it["dir"], it["status"], it["name"], it["done"]) for it in th] == [("in", "cancelled", "big.xlsx", 2000), ("in", "failed", "b.pdf", 100)]
 
 
@@ -363,5 +363,42 @@ def test_a_file_arriving_has_its_own_line_in_the_chat_from_the_start(tmp_path):
     m._event("file_rejected", {"seq": 2, "name": "b.pdf", "size": 900, "done": 300, "why": "you cancelled it", "peer": "K7ABC"})
     m._event("file_receiving", {"seq": 3, "name": "c.pdf", "size": 900})
     _drop(m, v)
-    th = m.chan.view()["threads"]["K7ABC"]
+    th = [it for it in m.chan.view()["threads"]["K7ABC"] if it["kind"] == "file"]
     assert [(it["name"], it["status"]) for it in th[1:]] == [("b.pdf", "cancelled"), ("c.pdf", "failed")]
+
+
+def test_the_sender_is_told_the_receiver_cancelled_so_it_is_not_taken_for_a_link_failure(tmp_path):
+    """Owner 2026-11-18: "the sender says that the link closed before the receipt. We should state that it was
+    cancelled by the receiver (give receiver SSID) so that we know that it wasn't a VARA FM failure." """
+    # the receiver: Cancel logs it and queues a note, which goes over a short link of its own
+    st, m, v, clk = _chan(tmp_path)
+    notes = []
+    v.send_note = notes.append
+    m.act("join", {})
+    _link(m, v, "W9XYZ-8")
+    m._event("file_receiving", {"seq": 1, "name": "big.xlsx", "size": 5000})
+    m._event("file_rejected", {"seq": 1, "name": "big.xlsx", "size": 5000, "done": 3050, "why": "you cancelled it", "peer": "W9XYZ-8"})
+    _drop(m, v)
+    th = m.chan.view()["threads"]["W9XYZ-8"]
+    assert [(it["kind"], it["status"]) for it in th] == [("file", "cancelled"), ("note", "queued")]
+    clk.t += 5
+    m.chan.tick()
+    assert v.calls[-1][:2] == ("connect", "W9XYZ-8")
+    _link(m, v, "W9XYZ-8")
+    m.chan.tick()
+    assert notes == ["RXCANCEL big.xlsx 3050 5000"]
+    m._event("buffer", {"bytes": 0})
+    assert m.chan.view()["threads"]["W9XYZ-8"][-1]["status"] == "delivered"
+    # the sender: its file line says who cancelled, and that the link did not fail
+    st2, m2, v2, clk2 = _chan(tmp_path / "s")
+    m2.act("join", {})
+    m2.act("csend", {"to": ["K7ABC-7"], "name": "big.xlsx", "data": base64.b64encode(b"x" * 5000).decode()})
+    _link(m2, v2, "K7ABC-7")
+    m2.chan.tick()
+    m2._event("file_failed", {"seq": 1, "name": "big.xlsx", "why": "the link closed before the receipt"})
+    _drop(m2, v2)
+    _link(m2, v2, "K7ABC-7")
+    m2._event("rx_cancelled", {"name": "big.xlsx", "done": 3050, "size": 5000, "peer": "K7ABC-7"})
+    it = m2.chan.view()["threads"]["K7ABC-7"][-1]
+    assert it["status"] == "failed" and it["cancelled_by"] == "K7ABC-7"
+    assert it["why"] == "cancelled by the operator at K7ABC-7 after 61% had arrived: not a link failure"
