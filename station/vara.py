@@ -16,6 +16,12 @@ and a plain VARA terminal still gets readable text.
     MSG <seq> <len>\\n<len bytes of UTF-8>          a chat message
     FILE <seq> <name> <size> <sha256>\\n<size bytes>  a file (name percent-encoded, no spaces)
     ACK <seq>\\n | NAK <seq> <reason>\\n              the receiver's answer to a FILE
+    TEST <seq> <len>\\n<len bytes>                  link test data (random bytes: thrown away by the receiver)
+    TESTEND <seq>\\n -> TESTED <seq> <bytes> <ms>\\n  the end of a link test, and the receiver's count and time
+
+A link test (the operator asks for it: "Test link speed") measures what a file would get: VARA starts slow and steps
+its speed up as data flows, so the test feeds random bytes for a set time and records how many the other modem had
+taken, second by second. It is sent only to a station whose handshake ends in "+TEST" (HSK1 <call> +TEST).
 
 A station that never sends "HSK1 " is a plain terminal: its bytes are shown as chat lines and our chat goes to it as
 plain text lines; files are not offered to it. During a file the modem is set to COMPRESSION FILES, otherwise TEXT.
@@ -62,6 +68,10 @@ WATCHDOG_S = 600.0
 RECONNECT_S = 5.0
 BLOCKED = {".exe", ".bat", ".cmd", ".com", ".ps1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".msi", ".msp", ".scr",
            ".lnk", ".dll", ".hta", ".jar", ".reg", ".cpl", ".pif", ".sys"}
+CAPS = "+TEST"                      # after our call in the handshake: what this build understands beyond MSG / FILE
+TEST_S, TEST_MIN_S, TEST_MAX_S = 60, 15, 180
+TEST_MAX_BYTES = 400_000
+TEST_CHUNK = (1024, 16384)          # a test keeps this much ahead of the modem: about 15 s of data at the current speed
 CALL_RE = re.compile(r"^[A-Z0-9]{3,7}(-([1-9]|1[0-5]|T|R))?$")
 
 
@@ -125,6 +135,7 @@ class Vara:
                    "ptt": False, "busy": False, "sn": None, "registered": None, "alive_at": None,
                    "soundcard_ok": True, "last_reply": None, "last_cmd": None, "listening": False,
                    "peer_proto": None, "sending": None, "cq_heard": [], "error": None, "kind": kind,
+                   "peer_caps": [], "bitrate": {}, "testing": None,
                    "mycall": call, "ptt_mode": ptt_mode,
                    "ptt_at": None, "busy_at": None, "cq_at": None}   # last PTT ON / BUSY ON / our CQ frame: did VARA key, hear
         self._reset_session()
@@ -262,6 +273,81 @@ class Vara:
                    "size": len(data), "sha256": sha})
         self._emit("file_sending", {"seq": seq, "name": name, "size": len(data)})
         return seq
+
+    def link_test(self, seconds: float = TEST_S) -> int:
+        """Feed random bytes to the linked station for `seconds`, and time them (see the module's notes)."""
+        import os
+        seconds = max(TEST_MIN_S, min(TEST_MAX_S, float(seconds or TEST_S)))
+        self._need_session()
+        if self.st["peer_proto"] != "HSK1" or "+TEST" not in self.st["peer_caps"]:
+            raise VaraRefused("the other station's program is older than the link test: it needs an update")
+        with self.lock:
+            if self.test or self.st["sending"]:
+                raise VaraRefused("something is being sent on this link already")
+            seq = self._next_seq()
+            now = self.clock()
+            self.test = {"seq": seq, "start": now, "max_s": seconds, "sent": 0, "feeding": True, "ended": False,
+                         "curve": [[0.0, 0]], "write_at": 0.0, "rand": os.urandom, "levels": [], "bps": [],
+                         "end_at": None, "sn": []}
+            self.st["testing"] = {"seq": seq, "s": 0, "bytes": 0, "max_s": seconds}
+        self._cmd("COMPRESSION FILES")
+        self._log({"kind": "test", "dir": "out", "peer": self.st["peer"], "seq": seq, "seconds": seconds})
+        self._emit("test_started", {"seq": seq, "seconds": seconds})
+        self._test_feed()
+        return seq
+
+    def _test_feed(self, from_buffer: bool = False):
+        """Top the modem up while the test runs; when its time is up let the modem empty, then ask for the count."""
+        with self.lock:
+            t = self.test
+            if not t or t["ended"]:
+                return
+            now = self.clock()
+            el = now - t["start"]
+            buf = int(self.st["buffer"] or 0)
+            if now - t["write_at"] >= 0.3:                         # a BUFFER line from before our last write lies
+                done = max(t["curve"][-1][1], min(t["sent"], t["sent"] - buf))
+                if done > t["curve"][-1][1]:
+                    t["curve"].append([round(el, 1), done])
+                self.st["testing"].update(s=round(el), bytes=done)
+            done = t["curve"][-1][1]
+            write = None
+            if t["feeding"]:
+                if el >= t["max_s"] or t["sent"] >= TEST_MAX_BYTES:
+                    t["feeding"] = False
+                else:
+                    back = next((p for p in reversed(t["curve"]) if p[0] <= el - 10), t["curve"][0])
+                    rate = (done - back[1]) / max(1.0, el - back[0])            # bytes a second, lately
+                    ahead = int(max(TEST_CHUNK[0], min(TEST_CHUNK[1], rate * 15)))
+                    left = t["sent"] - done
+                    if left < ahead / 2 or t["sent"] == 0:
+                        n = max(256, min(ahead - left, TEST_MAX_BYTES - t["sent"]))
+                        head = f"TEST {t['seq']} {n}\n".encode()
+                        write = head + t["rand"](n)
+                        t["sent"] += len(write)
+                        t["write_at"] = now
+            if not t["feeding"] and write is None and done >= t["sent"]:
+                t["ended"], t["end_at"] = True, now
+                write = f"TESTEND {t['seq']}\n".encode()
+        if write:
+            try:
+                self._data(write)
+            except (OSError, VaraRefused):
+                pass
+
+    def _test_result(self, t: dict, partial: bool = False, rx_ms: int | None = None) -> dict:
+        """What the test measured: the bytes the other modem took over time, and the speeds VARA named."""
+        curve = t["curve"]
+        total, secs = curve[-1][1], max(0.1, curve[-1][0])
+        if len(curve) > 40:                                         # thin it: the shape, not every BUFFER line
+            step = len(curve) / 40
+            curve = [curve[int(i * step)] for i in range(40)] + [curve[-1]]
+        back = next((p for p in reversed(curve) if p[0] <= secs * 2 / 3), curve[0])
+        late = (total - back[1]) / max(0.1, secs - back[0])         # bytes a second over the last third: the speed reached
+        return {"bytes": total, "s": round(secs, 1), "bps": round(total * 8 / secs), "late_bps": round(late * 8),
+                "curve": curve, "level": max(t["levels"], default=None), "modem_bps": max(t["bps"], default=None),
+                "sn": round(sum(t["sn"]) / len(t["sn"]), 1) if t["sn"] else None, "partial": partial,
+                "rx_ms": rx_ms, "bw": self.st.get("bw"), "kind": self.kind}
 
     # ------------------------------------------------------------------ guards ---------------------------------
     def _need_link(self):
@@ -441,7 +527,7 @@ class Vara:
                        "dir": "out" if out else "in"})
             self._emit("connected", {"peer": peer, "via": via, "bw": bw})
             try:
-                self._data(f"HSK1 {self.mycall}\n".encode())
+                self._data(f"HSK1 {self.mycall} {CAPS}\n".encode())
             except VaraRefused:
                 pass
         elif k == "DISCONNECTED":
@@ -453,6 +539,19 @@ class Vara:
                 if self.st["sending"]:
                     self.st["sending"]["left"] = min(self.st["sending"]["size"], n)
             self._emit("buffer", {"bytes": n, "sending": self.state()["sending"]})
+            self._test_feed(from_buffer=True)
+        elif k == "BITRATE" and len(w) >= 3:                       # "BITRATE (4)  1415 bps TX": VARA's speed level now
+            try:
+                level, bps = int(w[1].strip("()")), int(w[2])
+            except ValueError:
+                return
+            way = "rx" if w[-1].upper() == "RX" else "tx"
+            with self.lock:
+                self.st["bitrate"] = dict(self.st["bitrate"], **{way: bps, way + "_level": level, "at": self.clock()})
+                if self.test and way == "tx":
+                    self.test["levels"].append(level)
+                    self.test["bps"].append(bps)
+            self._emit("bitrate", {"way": way, "bps": bps, "level": level})
         elif k == "PTT" and len(w) > 1:
             on = w[1].upper() == "ON"
             if on and self.ptt_mode == "station":
@@ -480,6 +579,8 @@ class Vara:
                 return
             with self.lock:
                 self.st["sn"] = v
+                if self.test:
+                    self.test["sn"].append(v)
             self._emit("sn", {"sn": v})
         elif k == "IAMALIVE":
             with self.lock:
@@ -524,8 +625,14 @@ class Vara:
             peer = self.st["peer"]
             out = list(self.out_files.values())
             partial = self.pending
+            test = self.test
+            res = self._test_result(test, partial=True) if test and test["curve"][-1][1] >= 2000 else None
             self._reset_session()
-            self.st.update(session="idle", peer=None, via=[], bw=None, peer_proto=None, sending=None, buffer=0)
+            self.st.update(session="idle", peer=None, via=[], bw=None, peer_proto=None, sending=None, buffer=0,
+                           peer_caps=[], bitrate={}, testing=None)
+        if test:
+            self._emit("test_done" if res else "test_failed",
+                       {"seq": test["seq"], "result": res, "why": "the link closed before the test finished"})
         for f in out:
             self._emit("file_failed", {"seq": f["seq"], "name": f["name"], "why": "the link closed before the receipt"})
         if partial and partial.get("kind") == "file":
@@ -547,6 +654,8 @@ class Vara:
         self.seq = 0
         self.session_at = None
         self.ptt_on_at = None
+        self.test = None                        # a link test we are sending
+        self.rx_test = None                     # ... or receiving
 
     def _next_seq(self) -> int:
         self.seq += 1
@@ -568,6 +677,8 @@ class Vara:
                 return False
             if not p.get("discard"):
                 p["body"] += b[:take]
+            elif p["kind"] == "test":
+                p["size_in"] = p.get("size_in", 0) + take
             p["need"] -= take
             del b[:take]
             if p["need"] == 0:
@@ -616,7 +727,43 @@ class Vara:
         k = w[0].upper()
         try:
             if k == "HSK1":
-                self._emit("handshake", {"peer": w[1].upper() if len(w) > 1 else None})
+                with self.lock:
+                    self.st["peer_caps"] = [x.upper() for x in w[2:] if x.startswith("+")][:8]
+                self._emit("handshake", {"peer": w[1].upper() if len(w) > 1 else None, "caps": self.st["peer_caps"]})
+            elif k == "TEST" and len(w) == 3:
+                n = int(w[2])
+                if not 0 < n <= 4 * TEST_CHUNK[1]:
+                    raise ValueError("bad TEST length")
+                if not self.rx_test or self.rx_test["seq"] != int(w[1]):
+                    self.rx_test = {"seq": int(w[1]), "bytes": 0, "at": self.clock()}
+                    self._emit("test_receiving", {"seq": int(w[1])})
+                self.rx_test["bytes"] += len(line) + 1
+                self.pending = {"kind": "test", "seq": int(w[1]), "need": n, "body": bytearray(), "discard": "test"}
+            elif k == "TESTEND" and len(w) == 2:
+                r, self.rx_test = self.rx_test, None
+                if r and r["seq"] == int(w[1]):
+                    ms = int((self.clock() - r["at"]) * 1000)
+                    try:
+                        self._data(f"TESTED {r['seq']} {r['bytes']} {ms}\n".encode())
+                    except VaraRefused:
+                        pass
+                    info = {"seq": r["seq"], "bytes": r["bytes"], "s": round(ms / 1000, 1), "peer": self.st["peer"],
+                            "bps": round(r["bytes"] * 8000 / max(1, ms))}
+                    self._log({"kind": "test", "dir": "in", **info})
+                    self._emit("test_received", info)
+            elif k == "TESTED" and len(w) == 4:
+                with self.lock:
+                    t, self.test = self.test, None
+                    self.st["testing"] = None
+                if t and t["seq"] == int(w[1]):
+                    try:
+                        self._cmd("COMPRESSION TEXT")
+                    except (OSError, VaraRefused):
+                        pass
+                    res = self._test_result(t, rx_ms=int(w[3]))
+                    self._log({"kind": "test", "dir": "out", "peer": self.st["peer"], "seq": t["seq"],
+                               **{k2: v for k2, v in res.items() if k2 != "curve"}})
+                    self._emit("test_done", {"seq": t["seq"], "result": res})
             elif k == "MSG" and len(w) == 3:
                 n = int(w[2])
                 if not 0 <= n <= MAX_CHAT * 4:
@@ -646,6 +793,10 @@ class Vara:
             self._emit("protocol", {"why": f"{e}: {line[:60]}"})
 
     def _finish(self, p: dict):
+        if p["kind"] == "test":
+            if self.rx_test:
+                self.rx_test["bytes"] += p.get("size_in", 0)
+            return
         if p["kind"] == "msg":
             self._chat_in(p["seq"], bytes(p["body"]).decode("utf-8", "replace"))
             return
@@ -726,6 +877,8 @@ class Vara:
                 why = f"the transmitter was on for over {self.watchdog_s:.0f} s"
             elif any(now - f["at"] > self.watchdog_s for f in self.out_files.values()):
                 why = f"a file waited over {self.watchdog_s:.0f} s for its receipt"
+            elif self.test and now - self.test["start"] > self.test["max_s"] + self.watchdog_s:
+                why = "a link test did not finish"
             if why:
                 self.ptt_on_at = None
                 self.st["ptt"] = False
@@ -738,6 +891,7 @@ class Vara:
         while not self.stop_ev.wait(self.tick_s):
             try:
                 self.watchdog()
+                self._test_feed()
             except Exception:  # noqa: BLE001
                 pass
 

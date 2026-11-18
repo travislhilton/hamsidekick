@@ -325,6 +325,19 @@ you chose is remembered. Each column shows:
   several stations at once: each message waits its turn (⏳), goes out over a short link when the frequency is clear
   (✓ sent, ✓✓ delivered when VARA confirms it), and the link is let go after 20 s of quiet (**Keep the link open** for a
   back-and-forth). Replies come back the same way. A station that does not answer is called 3 times, then ⚠ **Retry**.
+  **Send a file:** choose the station, then **📎 Send a file…** beside Send and pick the file (up to 5 MB). You are
+  told about how long it should take, and it goes out by itself like a message: ⏳ waiting, ↗ sending, ✓✓ delivered
+  (the other station checked it whole) with the time it took. **Receive a file:** nothing to press. It appears in
+  the chat with that station as a 📎 link, and under **Files received**; it is kept in the modem's `inbox` folder,
+  and a program file is given a `.blocked` ending so a double-click cannot run it. The other station needs this
+  program for files (a plain VARA terminal gets chat only).
+  **Test link speed** (owner 2026-11-18), under the chat with a station: sends random test data to that station for
+  30, 60 or 120 s (it is thrown away there) and measures the real speed. VARA starts slow and steps its speed up as
+  data flows, so the result gives the average, the speed reached, VARA's speed level and S/N, and a table of **how
+  long a file of 1 KB to 1 MB would take** (calling the station included). The last result is kept per station:
+  it shows beside the station, under the chat, and in the question asked before a file goes. It runs only when you
+  press it, and uses the frequency for that long: check the frequency is clear first. A longer test shows more of
+  the step-up. Text files usually go faster than the table says (VARA compresses them).
   All of this is under the radio on the dashboard (owner 2026-11-18), so the stations on the channel and the chat
   stay in view beside your net radios; a message you are typing is kept while the list updates. The status line
   there shows your call on this modem (click it to change it). After each announcement it says whether **VARA

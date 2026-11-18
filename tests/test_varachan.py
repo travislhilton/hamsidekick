@@ -215,3 +215,56 @@ def test_presets_and_http(tmp_path):
             assert json.loads(h.read())["modems"][0]["channel"]["roster"][0]["call"] == "K7ABC"
     finally:
         srv.shutdown()
+
+
+def test_a_link_test_is_queued_saved_per_station_and_gives_file_times(tmp_path):
+    """Owner 2026-11-18: the link's speed "on demand by the user"; "the user needs to know how long it will take to
+    send various sizes of files". VARA FM starts slow and steps up, so a small file is slower per byte than a big one."""
+    from station.varachan import estimate_s
+    st, m, v, clk = _chan(tmp_path)
+    tests = []
+    v.link_test = lambda seconds=None: tests.append(seconds) or 7
+    m.act("join", {})
+    with pytest.raises(ValueError, match="15 to 180"):
+        m.act("linktest", {"to": "K7ABC", "seconds": 5})
+    m.act("linktest", {"to": "K7ABC", "seconds": 60})
+    assert v.calls[-1][:2] == ("connect", "K7ABC")                       # it goes out like a message: over its own link
+    with pytest.raises(ValueError, match="already"):
+        m.act("linktest", {"to": "K7ABC"})
+    clk.t += 5
+    _link(m, v, "K7ABC")
+    v.st["peer_caps"] = ["+TEST"]
+    m.chan.tick()
+    assert tests == [60]
+    it = m.chan.view()["threads"]["K7ABC"][-1]
+    assert it["kind"] == "test" and it["status"] == "sending"
+    clk.t += 25
+    m.chan.tick()
+    assert ("disconnect",) not in v.calls                                # a test under way keeps the link
+    # slow start, then faster: 1 kB in the first 10 s, 31 kB by 60 s
+    res = {"bytes": 31_000, "s": 60.0, "bps": 4133, "late_bps": 6400, "level": 7, "modem_bps": 7000, "sn": 20.5,
+           "partial": False, "curve": [[0.0, 0], [10.0, 1_000], [40.0, 15_000], [60.0, 31_000]]}
+    m._event("test_done", {"seq": 7, "result": res})
+    ch = m.chan.view()
+    it = ch["threads"]["K7ABC"][-1]
+    assert it["status"] == "delivered" and it["result"]["bps"] == 4133 and it["result"]["level"] == 7
+    r = next(x for x in ch["roster"] if x["call"] == "K7ABC")
+    assert r["speed"]["bps"] == 4133 and r["speed"]["setup_s"] == 8.0    # the call took 5 s (+3 for the handshake)
+    est = dict(map(tuple, r["est"]))
+    assert est[1_000] == 18 and est[10_000] == 8 + 29                    # read off the test's own curve
+    assert est[100_000] == round(8 + 60 + 69_000 / 800)                  # beyond it: at the speed the test reached
+    assert est[1_000_000] > est[500_000] > est[100_000] and it["est"] == r["est"]
+    assert estimate_s(None, 1000) is None and estimate_s({"curve": [[0, 0]], "bytes": 0}, 1000) is None
+    # the other side of a test: named in the thread, nothing kept
+    m._event("test_received", {"seq": 3, "bytes": 20_000, "s": 40.0, "bps": 4000, "peer": "K7ABC"})
+    ch = m.chan.view()
+    assert ch["threads"]["K7ABC"][-1]["dir"] == "in" and ch["threads"]["K7ABC"][-1]["kind"] == "test"
+    assert next(x for x in ch["roster"] if x["call"] == "K7ABC")["speed_rx"]["bps"] == 4000
+    # a station whose program has no link test
+    _drop(m, v)
+    m.act("linktest", {"to": "N0CALL", "seconds": 30})
+    _link(m, v, "N0CALL")
+    v.st["peer_caps"] = []
+    m.chan.tick()
+    it = m.chan.view()["threads"]["N0CALL"][-1]
+    assert it["status"] == "failed" and "update" in it["why"] and tests == [60]

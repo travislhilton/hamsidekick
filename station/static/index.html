@@ -512,6 +512,7 @@ a.btn,label.btn{display:inline-block;padding:4px 10px;border:1px solid var(--lin
 .vthread{max-height:38vh;min-height:120px;overflow:auto;display:flex;flex-direction:column;gap:4px;padding:2px}
 .vb{max-width:85%;padding:5px 9px;border-radius:10px;overflow-wrap:anywhere;font-size:14px;line-height:1.35}.vb.in{align-self:flex-start;background:color-mix(in srgb,var(--ink) 7%,var(--panel))}.vb.out{align-self:flex-end;background:color-mix(in srgb,var(--accent,#1f4fbf) 14%,var(--panel))}
 .vb .meta{display:block;font-size:11px;color:var(--muted);margin-top:2px}.vb.failed{outline:1px solid var(--bad,#b3261e)}.vb.cancelled{opacity:.5;text-decoration:line-through}
+.vest{border-collapse:collapse;margin:3px 0;font-size:12.5px}.vest th,.vest td{border:1px solid var(--line);padding:1px 7px;text-align:center}.vest th{font-weight:600}.vspeed{line-height:1.7}
 .vpre{display:flex;flex-wrap:wrap;gap:4px}.vpre button{font-size:12.5px;padding:2px 9px;min-height:0;border-radius:12px}
 .vcomp{display:flex;gap:6px;align-items:flex-end}.vcomp textarea{flex:1;min-height:2.6em;max-height:9em;resize:vertical;font:inherit;padding:5px 8px}
 #varaDlg{width:min(720px,calc(100vw - 32px))}
@@ -2062,7 +2063,7 @@ function connect(){
     try{if($("bpDlg").open){BP.d=await api("/api/bandplan/area");renderBP()}await plansLoad();if(NV.tab==="plans"&&$("netsDlg").open)renderPlans()}catch(err){}});
   es.addEventListener("vara",e=>{const d=JSON.parse(e.data);
     if(d.modem&&VA.d){const i=VA.d.modems.findIndex(m=>m.radio===d.radio);if(i>=0)VA.d.modems[i]=Object.assign(d.modem,{transcript:VA.d.modems[i].transcript,inbox:VA.d.modems[i].inbox,channel:VA.d.modems[i].channel})}
-    const full=["chat","chat_sent","file_received","file_sent","file_failed","connected","disconnected","abort","cq_heard","listen_off","removed","channel"].includes(d.event)||(d.event==="buffer"&&d.modem&&d.modem.state&&!d.modem.state.buffer);
+    const full=["chat","chat_sent","file_received","file_sent","file_failed","connected","disconnected","abort","cq_heard","listen_off","removed","channel","test_started","test_done","test_failed","test_received"].includes(d.event)||(d.event==="buffer"&&d.modem&&d.modem.state&&!d.modem.state.buffer);
     (full||!VA.d?varaLoad():Promise.resolve()).then(()=>{const m=vModem(d.radio);if(d.event==="listen_off"&&m&&m.last&&VA.rid===d.radio)VA.msg={bad:true,text:"Stopped listening: "+(m.last.why||"")};if($("varaDlg").open)renderVara();renderRadios()})});
   es.addEventListener("pc",e=>{const d=JSON.parse(e.data);S.pc=Object.assign(S.pc||{},"slow" in d?{slow:d.slow}:{},d.awake?{awake:d.awake}:{});renderPCNote();renderEngine();if($("settings").open&&d.checks)renderPC(d)});
   es.addEventListener("schedule",e=>{const d=JSON.parse(e.data);S.schedule=d.schedule;S.net=d.net;if(d.unheard)S.unheard=d.unheard;renderRadios();renderNet();if($("netsDlg").open&&NV.tab==="schedule")renderSchedule(false)});
@@ -2151,6 +2152,22 @@ function vSetupForm(rid,m){const c=m?m.cfg:Object.assign({kind:vKind(rid),use:"c
 // ----- The VARA channel (station/varachan.py; owner 2026-11-16): who is on the frequency, and chat / files with any of
 // them. VARA links one station at a time: messages wait their turn and go out over short links by themselves. -----
 function vAge(s){if(s==null)return"";if(s<60)return"just now";const mn=Math.round(s/60);return mn<90?mn+" min ago":Math.round(mn/60)+" h ago"}
+// ----- link speed (owner 2026-11-18: "the user needs to know how long it will take to send various sizes of files").
+// VARA starts slow and steps up: up to the size the test reached, the time is read off the test's own curve; beyond
+// it, the rest goes at the speed the test had reached (the same sums as station/varachan.py estimate_s) -----
+function vEst(sp,size){if(!sp||!sp.curve||!(sp.bytes>0))return null;const c=sp.curve,setup=+sp.setup_s||8,L=c[c.length-1];
+  if(size<=L[1])for(let i=1;i<c.length;i++)if(size<=c[i][1])return setup+c[i-1][0]+(c[i][0]-c[i-1][0])*(size-c[i-1][1])/Math.max(1,c[i][1]-c[i-1][1]);
+  return setup+L[0]+(size-L[1])/(Math.max(sp.late_bps||0,sp.bps||0,1)/8)}
+function vDur(sec){sec=Math.round(sec);if(sec<90)return sec+" s";const mn=sec/60;if(mn<10)return (Math.round(mn*2)/2)+" min";if(mn<90)return Math.round(mn)+" min";return Math.floor(mn/60)+" h "+Math.round(mn%60)+" min"}
+function vBps(b){return b==null?"":b>=1000?(b/1000).toFixed(b>=10000?0:1)+" kbps":b+" bps"}
+function vKb(n){return n>=1e6?(n/1e6).toFixed(n%1e6?1:0)+" MB":n>=1000?Math.round(n/1000)+" KB":n+" bytes"}
+function vEstTable(est){return est&&est.length?`<table class="vest"><tr>${est.map(e=>`<th>${vKb(e[0])}</th>`).join("")}</tr><tr>${est.map(e=>`<td>${vDur(e[1])}</td>`).join("")}</tr></table>`:""}
+function vTestBubble(it,call,ch){const r=it.result||{};
+  if(it.dir==="in")return `📶 <b>${esc(call)} tested the link to you:</b> ${vKb(r.bytes||0)} in ${vDur(r.s||0)} (${vBps(r.bps)}). Nothing was kept.`;
+  if(it.status==="sending"){const g=ch&&ch.testing;return `📶 <b>Testing the link to ${esc(call)}…</b> ${g?`${vKb(g.bytes||0)} in ${g.s||0} s of ${g.max_s} s${ch.bitrate&&ch.bitrate.tx?" · VARA now at "+vBps(ch.bitrate.tx):""}`:"starting"}<div class="small muted">Random test data goes out for ${it.seconds||60} s; the other station throws it away.</div>`}
+  if(!it.result)return `📶 Link speed test to ${esc(call)} (${it.seconds||60} s)`;
+  return `📶 <b>Link speed to ${esc(call)}</b>${r.partial?" (cut short)":""}: ${vKb(r.bytes)} in ${vDur(r.s)} = <b>${vBps(r.bps)}</b> average${r.late_bps?`, <b>${vBps(r.late_bps)}</b> once VARA had stepped up`:""}${r.level!=null?` (VARA level ${r.level}${r.modem_bps?", "+vBps(r.modem_bps):""})`:""}${r.sn!=null?" · S/N "+r.sn+" dB":""}
+    <div class="small">A file of this size would take about:</div>${vEstTable(it.est)}<div class="small muted">Includes calling the station. Small files are slower per KB: VARA starts slow and steps up. Text usually goes faster (it is compressed).</div>`}
 function vClock(sec){sec=Math.max(0,Math.round(sec));return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0")}
 function vSel(rid){return VA.sel[rid]=VA.sel[rid]||[]}
 function vFill(p,ch,to,m){const r=(ch.roster||[]).find(x=>x.call===to)||{},st=m.state||{};
@@ -2158,20 +2175,20 @@ function vFill(p,ch,to,m){const r=(ch.roster||[]).find(x=>x.call===to)||{},st=m.
   return p.replace(/\{me\}/g,ch.me.call||"").replace(/\{them\}/g,to||"").replace(/\{name\}/g,ch.me.name||"?").replace(/\{grid\}/g,ch.me.grid||"?").replace(/\{sn\}/g,sn!=null?String(sn):"?")}
 function vBubble(it,call){const t=new Date(it.at*1000).toTimeString().slice(0,5);
   const stt={queued:"⏳ waiting for a link",sending:"↗ sending",sent:"✓ sent",delivered:"✓✓ delivered",failed:"⚠ not sent",cancelled:"cancelled",received:""}[it.status]||"";
-  const body=it.kind==="file"?(it.dir==="in"?`📎 <a href="/api/vara/inbox/${enc(it.name)}">${esc(it.name)}</a>${/\.hsadhoc$/i.test(it.name||"")?` <button class="small primary" data-vadinst="${esc(it.name)}">★ Install</button>`:""}`:`📎 ${esc(it.name)}`)+` <span class="muted">${it.size?Math.max(1,Math.round(it.size/1024))+" KB":""}</span>`:esc(it.text||"");
+  const body=it.kind==="test"?vTestBubble(it,call,VA.ch):it.kind==="file"?(it.dir==="in"?`📎 <a href="/api/vara/inbox/${enc(it.name)}">${esc(it.name)}</a>${/\.hsadhoc$/i.test(it.name||"")?` <button class="small primary" data-vadinst="${esc(it.name)}">★ Install</button>`:""}`:`📎 ${esc(it.name)}`)+` <span class="muted">${it.size?Math.max(1,Math.round(it.size/1024))+" KB":""}${it.took_s?" · took "+vDur(it.took_s):""}</span>`:esc(it.text||"");
   const act=it.dir==="out"&&it.status==="failed"?` <button class="linkish small" data-vretry="${it.id}">Retry</button>`:it.dir==="out"&&it.status==="queued"?` <button class="linkish small" data-vcancel="${it.id}">Cancel</button>`:"";
   return `<div class="vb ${it.dir} ${it.status}">${body}<span class="meta">${t}${stt?" · "+stt:""}${it.why&&it.status!=="delivered"?" · "+esc(it.why):""}${act}</span></div>`}
 function vAir(st){   // owner 2026-11-18: announced on both PCs, neither showed the other: say whether VARA keyed, and heard anything
   if(!st||!st.cq_at)return"";const now=Date.now()/1000,keyed=st.ptt_at&&st.ptt_at>=st.cq_at-1,wait=now-st.cq_at<10;
   return `<div class="small" style="flex-basis:100%">Last announced ${vHm(st.cq_at)}: ${keyed?"✓ VARA keyed the transmitter":wait?"sending…":'<b class="bad">⚠ VARA did not say it keyed the transmitter</b> (check VARA Settings → PTT, and the radio\'s TX light)'}
     · ${st.busy_at?`last signal on the frequency ${vHm(st.busy_at)}`:"no signal heard on the frequency yet"}</div>`}
-function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{},rid=m.radio,sel=vSel(rid).filter(c=>(ch.roster||[]).some(r=>r.call===c));VA.sel[rid]=sel;
+function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};VA.ch={testing:st.testing,bitrate:st.bitrate};const rid=m.radio,sel=vSel(rid).filter(c=>(ch.roster||[]).some(r=>r.call===c));VA.sel[rid]=sel;
   const f=m.freq_mhz?bpMhz(m.freq_mhz)+" MHz ":"",kind="VARA "+(m.cfg.kind==="hf"?"HF":"FM");
   const bar=ch.on?`<div class="vbar on" role="status"><span class="pd"></span><b>On the channel</b> <span class="small"><span class="nw">${f}${kind}</span> · <span class="nw">keep-alive every <select data-vevery aria-label="Minutes between keep-alives">${[5,10,15,20,30,60].map(n=>`<option${n===ch.every_min?" selected":""}>${n}</option>`).join("")}</select> min</span> · <span class="nw">next in <span data-vnext="${Date.now()/1000+ch.next_announce_s}">${vClock(ch.next_announce_s)}</span></span></span>
      ${vAir(st)}<span style="flex:1"></span><button class="small" data-vann${ok&&st.session==="idle"?"":" disabled"} title="Send your announcement (a VARA CQ frame) now">Announce now</button><button class="small quiet" data-vleave>Leave</button><button class="small danger" data-vact="abort" title="Drop any link at once and let go of the transmitter">Abort</button></div>`
    :`<div class="vbar"><div style="flex:1;min-width:14em"><b>Join the channel</b>${f?" on "+f:""}<div class="small muted">Announces your call (a VARA CQ frame), answers calls, and says you are still here every ${ch.every_min} min, only while you are at this PC. Stations heard show up on the left.</div></div><button class="primary" data-vjoin${ok?"":" disabled"}>Join the channel</button></div>`;
   const ros=ch.roster||[],grp=k=>ros.filter(r=>k==="gone"?r.state==="gone":r.state!=="gone");
-  const row=r=>{const sub=r.linked?"🔗 linked"+(r.sn!=null?" · S/N "+r.sn+" dB":""):r.state==="here"?"here · "+vAge(r.age_s):r.state==="quiet"?"quiet · last heard "+vAge(r.age_s):r.state==="unheard"?"not heard yet":"last heard "+vAge(r.age_s);
+  const row=r=>{const spd=r.speed?" · "+vBps(r.speed.bps):"";const sub=r.linked?"🔗 linked"+(r.sn!=null?" · S/N "+r.sn+" dB":""):r.state==="here"?"here · "+vAge(r.age_s)+spd:r.state==="quiet"?"quiet · last heard "+vAge(r.age_s):r.state==="unheard"?"not heard yet":"last heard "+vAge(r.age_s);
     return `<div class="vst ${r.state}${sel.includes(r.call)?" sel":""}" data-vpick="${esc(r.call)}" role="button" tabindex="0" aria-pressed="${sel.includes(r.call)}" title="${r.state==="quiet"?"No keep-alive heard: may have left the channel":""}"><input type="checkbox" data-vmulti="${esc(r.call)}"${sel.includes(r.call)?" checked":""} aria-label="Also send to ${esc(r.call)}"><span class="pd ${r.linked?"linked":r.state}"></span><span class="grow"><span class="c">${esc(r.call)}</span><span class="sub">${sub}</span></span>${r.unread?`<span class="vbadge" title="unread">${r.unread}</span>`:""}${r.waiting?`<span class="vbadge w" title="waiting to go">⏳${r.waiting}</span>`:""}${r.failed?`<span class="vbadge f" title="not sent">⚠${r.failed}</span>`:""}</div>`};
   const here=ros.filter(r=>r.state==="here"&&!r.linked||r.linked);
   const roster=`<div class="vros" aria-label="Stations on the channel"><h5>On the channel (${grp("here").filter(r=>r.state==="here"||r.linked).length})</h5>${grp("here").map(row).join("")||'<p class="small muted" style="margin:4px">Nobody heard yet. Join, or wait for a station to announce.</p>'}
@@ -2189,7 +2206,9 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{},
       ${one?`<div class="vthread" id="vThread-${esc(rid)}" aria-live="polite">${th.map(it=>vBubble(it,one)).join("")||'<p class="small muted">No messages yet. A quick message below gets things going.</p>'}</div>`:""}
       <div class="vpre" aria-label="Quick messages">${presets} <button class="small linkish" data-vpedit>Edit</button></div>
       ${VA.pedit?`<div><textarea id="vPresets-${esc(rid)}" rows="6" style="width:100%" aria-label="Quick messages, one per line">${esc((ch.presets||[]).join("\n"))}</textarea><div class="small muted">One per line, up to 12. Fill-ins: {me} {them} {sn} {name} {grid}.</div><button class="small primary" data-vpsave>Save quick messages</button> <button class="small quiet" data-vpedit>Cancel</button></div>`:""}
-      <form class="vcomp" id="vCompose-${esc(rid)}"><textarea id="vMsg-${esc(rid)}" maxlength="4000" placeholder="Message to ${esc(one||sel.join(", "))} · Enter sends, Shift+Enter new line" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer" title="Send a file (up to 5 MB): the other station needs this program">📎<input type="file" id="vCFile-${esc(rid)}" style="display:none"></label></form>
+      <form class="vcomp" id="vCompose-${esc(rid)}"><textarea id="vMsg-${esc(rid)}" maxlength="4000" placeholder="Message to ${esc(one||sel.join(", "))} · Enter sends, Shift+Enter new line" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer;white-space:nowrap" title="Choose a file to send (up to 5 MB). It goes out by itself over a link, checked at the other end; the other station needs this program. You are told how long it should take before it goes.">📎 Send a file…<input type="file" id="vCFile-${esc(rid)}" style="display:none"></label></form>
+      ${one?`<div class="small vspeed">${r&&r.speed?`📶 <b>Speed to ${esc(one)}</b> (tested ${vHm(r.speed.at)}): ${vBps(r.speed.bps)} average${r.speed.late_bps?", "+vBps(r.speed.late_bps)+" once stepped up":""} · a file takes about ${[10000,100000,1000000].map(n=>vKb(n)+" "+vDur(vEst(r.speed,n))).join(" · ")}`:`📶 <span class="muted">Link speed to ${esc(one)} not tested yet: test it to see how long a file will take.</span>`}
+        <span class="nw"><button class="small" data-vtest="${esc(one)}"${ok?"":" disabled"} title="Sends random test data to this station for the time chosen and measures the real speed. VARA starts slow and steps up, so a longer test shows more. It uses the frequency for that long.">Test link speed</button> for <select data-vtests aria-label="Seconds the link test runs">${[30,60,120].map(n=>`<option${n===(VA.tests||60)?" selected":""}>${n}</option>`).join("")}</select> s</span></div>`:""}
       ${one?`<div class="small"><button class="small quiet" data-vsendad title="Your reserved ad hoc channels as a file: their station shows ★ Install">★ Send my ad hoc channels</button> <button class="small linkish" data-vforget="${esc(one)}">Forget ${esc(one)}</button></div>`:""}</div>`}
   return bar+`<div class="vchan">${roster}${conv}</div>`}
 setInterval(()=>{document.querySelectorAll("[data-vnext]").forEach(x=>{x.textContent=vClock(+x.dataset.vnext-Date.now()/1000)})},1000);
@@ -2247,7 +2266,12 @@ function vWire(rid){
   const cf=vI("vCompose",rid);if(cf)cf.onsubmit=async e=>{e.preventDefault();VA.rid=rid;const t=vI("vMsg",rid).value.trim();if(!t)return;const to=vSel(rid).slice();
     if(to.length>1&&!confirm(`Send this to ${to.length} stations? Each gets its own link, one after another.`))return;
     VA.draft[rid]="";await varaAct("csend",{to,text:t});const x=vI("vMsg",rid);if(x)x.focus()};
-  const cfi=vI("vCFile",rid);if(cfi)cfi.onchange=async()=>{const f=cfi.files[0];if(!f)return;VA.rid=rid;const to=vSel(rid).slice();const b64=await new Promise((ok_,no)=>{const r=new FileReader();r.onload=()=>ok_(String(r.result).split(",")[1]);r.onerror=no;r.readAsDataURL(f)});await varaAct("csend",{to,name:f.name,data:b64})};
+  const cfi=vI("vCFile",rid);if(cfi)cfi.onchange=async()=>{const f=cfi.files[0];if(!f)return;VA.rid=rid;const to=vSel(rid).slice();
+    const ros=((vModem(rid)||{}).channel||{}).roster||[];
+    const lines=to.map(c=>{const rr=ros.find(x=>x.call===c),e=rr&&rr.speed?vEst(rr.speed,f.size):null;return c+": "+(e?"about "+vDur(e)+" (link tested "+vHm(rr.speed.at)+")":"time unknown (link speed not tested yet)")});
+    if(f.size>5*1024*1024){alert("A file is at most 5 MB over VARA. This one is "+vKb(f.size)+".");cfi.value="";return}
+    if(!confirm("Send "+f.name+" ("+vKb(f.size)+")?\n\n"+lines.join("\n")+"\n\nThe frequency is in use for that long."+(lines.some(l=>/unknown/.test(l))?" Cancel and press Test link speed first to see the time.":""))){cfi.value="";return}
+    const b64=await new Promise((ok_,no)=>{const r=new FileReader();r.onload=()=>ok_(String(r.result).split(",")[1]);r.onerror=no;r.readAsDataURL(f)});await varaAct("csend",{to,name:f.name,data:b64})};
   const sm=vModem(rid),one=vSel(rid).length===1?vSel(rid)[0]:null;
   if(sm&&sm.channel&&one&&!document.hidden){const rr=(sm.channel.roster||[]).find(x=>x.call===one);if(rr&&rr.unread&&!VA.reading){VA.reading=true;post("/api/vara/channel",{radio:rid,read:one}).then(r=>{VA.d=r;VA.reading=false;renderVaraPanels()}).catch(()=>VA.reading=false)}}}
 function renderVara(){renderVaraDlg();renderVaraPanels()}
@@ -2293,6 +2317,7 @@ document.addEventListener("submit",async e=>{const f=e.target.closest&&e.target.
   const c=(f.querySelector("input").value||"").trim().toUpperCase();if(!/^[A-Z0-9]{3,7}(-([1-9]|1[0-5]))?$/.test(c)){VA.msg={bad:true,text:"That is not a callsign."};renderVara();return}
   VA.sel[VA.rid]=[c];VA.msg=null;const m=vModem(VA.rid);if(m&&m.channel&&!(m.channel.roster||[]).some(r=>r.call===c))m.channel.roster.push({call:c,state:"unheard",unread:0});f.querySelector("input").blur();renderVara();const x=vI("vMsg");if(x)x.focus()});
 document.addEventListener("change",e=>{const t=e.target;if(!t.closest)return;{const vp=t.closest("[data-vpanel]");if(vp)VA.rid=vp.dataset.vpanel;else if(!t.closest("#varaDlg"))return}
+  if(t.matches("[data-vtests]")){VA.tests=+t.value;t.blur();return}
   if(t.matches("[data-vevery]")){varaAct("channel",{every_min:+t.value});return}
   if(t.dataset.vset){const k=t.dataset.vset;let v=t.value;if(k==="cmd_port"||k==="bw")v=v===""?null:Number(v);varaSet({[k]:v});return}
   if(t.dataset.vnew){const s=VA.setup[VA.rid]=VA.setup[VA.rid]||{};s[t.dataset.vnew]=t.dataset.vnew==="cmd_port"?Number(t.value):t.value;renderVara()}});
@@ -2313,6 +2338,8 @@ document.addEventListener("click",async e=>{const t=e.target;if(!t.closest)retur
   if(t.closest("[data-vpsave]")){const v=(vI("vPresets")||{}).value||"";VA.pedit=false;await varaAct("channel",{presets:v.split("\n")});return}
   const rt=t.closest("[data-vretry]");if(rt){await varaAct("retry",{id:rt.dataset.vretry});return}
   const cn=t.closest("[data-vcancel]");if(cn){await varaAct("cancel",{id:cn.dataset.vcancel});return}
+  const vt=t.closest("[data-vtest]");if(vt){const row=vt.closest(".vspeed"),secs=+(row.querySelector("[data-vtests]")||{}).value||60;VA.tests=secs;
+    if(confirm("Test the link speed to "+vt.dataset.vtest+"?\n\nRandom test data goes out for "+secs+" s (plus the call) on this frequency; the other station throws it away. Check the frequency is clear first."))await varaAct("linktest",{to:vt.dataset.vtest,seconds:secs});return}
   const pn=t.closest("[data-vpin]");if(pn){await varaAct("channel",{pin:pn.dataset.vpin});return}
   if(t.closest("[data-vunpin]")){await varaAct("channel",{pin:null});return}
   if(t.closest("[data-vclose]")){await varaAct("closelink",{});return}

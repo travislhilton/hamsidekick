@@ -377,7 +377,7 @@ class Modem:
                 except ValueError:
                     raise ValueError("the file did not arrive whole: try again") from None
                 self._v().send_file(name=str(body.get("name") or "file"), data=data)
-            elif what in ("join", "leave", "announce", "csend", "retry", "cancel", "closelink", "channel"):
+            elif what in ("join", "leave", "announce", "csend", "retry", "cancel", "closelink", "channel", "linktest"):
                 c = self.chan                         # the channel (varachan.py)
                 if what == "join":
                     c.join()
@@ -394,6 +394,8 @@ class Modem:
                         except ValueError:
                             raise ValueError("the file did not arrive whole: try again") from None
                     c.send(body.get("to"), text=body.get("text"), name=body.get("name"), data=data)
+                elif what == "linktest":
+                    c.test(body.get("to"), body.get("seconds"))
                 elif what == "retry":
                     c.retry(str(body.get("id") or ""))
                 elif what == "cancel":

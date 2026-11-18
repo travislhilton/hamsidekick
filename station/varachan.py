@@ -44,6 +44,27 @@ PRESETS = ["{them} de {me}: hello, how copy?", "Copy you fine. S/N {sn} dB here.
            "Any traffic for me?", "Thanks for the contact. 73 de {me}."]
 
 
+EST_SIZES = (1_000, 10_000, 50_000, 100_000, 500_000, 1_000_000)
+SETUP_S = 8.0                      # calling a station and the handshake, before the first byte, when never measured
+
+
+def estimate_s(speed: dict | None, size: int) -> float | None:
+    """Seconds to send `size` bytes to a station, from its last link test (owner 2026-11-18: "the user needs to know
+    how long it will take to send various sizes of files"). VARA starts slow and steps up, so a small file gets the
+    slow start: up to the size the test reached, the time is read off the test's own curve; beyond it, the rest goes
+    at the speed the test had reached. Compression is not counted: text usually goes faster than this."""
+    if not speed or not speed.get("curve") or speed.get("bytes", 0) <= 0:
+        return None
+    setup = float(speed.get("setup_s") or SETUP_S)
+    curve = speed["curve"]
+    if size <= curve[-1][1]:
+        for (t0, b0), (t1, b1) in zip(curve, curve[1:]):
+            if size <= b1:
+                return setup + t0 + (t1 - t0) * (size - b0) / max(1, b1 - b0)
+    late = max(speed.get("late_bps") or 0, speed.get("bps") or 0, 1) / 8
+    return setup + curve[-1][0] + (size - curve[-1][1]) / late
+
+
 class Channel:
     def __init__(self, modem, clock=time.time):
         self.m, self.clock = modem, clock
@@ -207,6 +228,30 @@ class Channel:
         self.tick()
         return self.view()
 
+    def test(self, to, seconds=None) -> dict:
+        """Queue a link speed test to one station: it goes out like a message, over its own link."""
+        from .vara import CALL_RE, TEST_MAX_S, TEST_MIN_S, TEST_S
+        c = str(to or "").strip().upper()
+        if not CALL_RE.match(c):
+            raise ValueError("choose one station to test the link to")
+        try:
+            secs = int(seconds or TEST_S)
+        except (TypeError, ValueError):
+            raise ValueError("how long: a number of seconds") from None
+        if not TEST_MIN_S <= secs <= TEST_MAX_S:
+            raise ValueError(f"a link test runs {TEST_MIN_S} to {TEST_MAX_S} seconds")
+        with self.lock:
+            d = self.load()
+            th = self._thread(d, c)
+            if any(it["dir"] == "out" and it.get("kind") == "test" and it["status"] in ("queued", "sending") for it in th):
+                raise ValueError(f"a link test to {c} is already waiting")
+            th.append({"id": uuid.uuid4().hex[:12], "dir": "out", "at": self.clock(), "status": "queued", "tries": 0,
+                       "kind": "test", "seconds": secs})
+            d["roster"].setdefault(c, {"call": c, "first_at": self.clock(), "unread": 0, "heard_at": None})
+            self.save(d)
+        self.tick()
+        return self.view()
+
     def retry(self, mid: str) -> dict:
         with self.lock:
             d = self.load()
@@ -265,10 +310,37 @@ class Channel:
                 self.linked = True
                 self.last_peer = peer
                 self._heard(d, peer, "link")
+                if self.opened == peer and self.connect_at:      # how long the call took: part of every file's time
+                    d["roster"][peer]["setup_s"] = round(self.clock() - self.connect_at + 3, 1)
                 self.activity_at = self.clock()
                 self.backoff.pop(peer or "", None)
             elif name == "sn" and peer:
                 self._heard(d, peer, "link", sn=data.get("sn"))
+            elif name == "bitrate" and peer:
+                self._heard(d, peer, "link", **{"bps_" + data.get("way", "tx"): data.get("bps")})
+            elif name == "test_started" and peer:
+                self.activity_at = self.clock()
+            elif name in ("test_done", "test_failed") and peer:
+                it = self._find(d, peer, "test", data.get("seq"))
+                res = data.get("result")
+                if res:
+                    res = dict(res, at=self.clock(), setup_s=d["roster"].get(peer, {}).get("setup_s") or SETUP_S)
+                    self._heard(d, peer, "link", speed=res)
+                if it:
+                    it.update(status="delivered" if res else "failed", why=data.get("why") if not res or res.get("partial") else None)
+                    if res:
+                        it["result"] = {k: res.get(k) for k in ("bytes", "s", "bps", "late_bps", "level", "modem_bps",
+                                                                "sn", "partial")}
+                        it["est"] = [[n, round(estimate_s(res, n))] for n in EST_SIZES]
+                self.activity_at = self.clock()
+            elif name == "test_received" and peer:
+                self._heard(d, peer, "link", speed_rx={"bps": data.get("bps"), "bytes": data.get("bytes"),
+                                                       "s": data.get("s"), "at": self.clock()})
+                self._thread(d, peer).append({"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "test",
+                                              "at": self.clock(), "status": "received",
+                                              "result": {"bytes": data.get("bytes"), "s": data.get("s"),
+                                                         "bps": data.get("bps")}})
+                self.activity_at = self.clock()
             elif name == "chat" and peer:
                 self._heard(d, peer, "link")
                 d["roster"][peer]["unread"] = d["roster"][peer].get("unread", 0) + 1
@@ -286,6 +358,8 @@ class Channel:
                 it = self._find(d, peer, "file", data.get("seq"))
                 if it:
                     it.update(status="delivered" if name == "file_sent" else "failed", why=data.get("why"))
+                    if name == "file_sent" and it.get("link_at"):
+                        it["took_s"] = round(self.clock() - it["link_at"], 1)
                 self.activity_at = self.clock()
             elif name == "buffer" and peer and data.get("bytes") == 0:
                 for it in d["threads"].get(peer, []):            # VARA's ARQ: the other modem has every byte
@@ -297,6 +371,8 @@ class Channel:
                 for it in d["threads"].get(gone or "", []):
                     if it["dir"] == "out" and it["status"] in ("sending", "sent") and it["kind"] == "chat":
                         it["status"] = "queued"                  # the link went before VARA confirmed it
+                    elif it["dir"] == "out" and it["status"] == "sending" and it["kind"] == "test":
+                        it.update(status="failed", why="the link closed before the test finished")
                 if gone and gone == self.opened and not self.linked:
                     self._connecting_failed(d, gone)             # our call was never answered
                 self.opened, self.connect_at, self.linked = None, None, False
@@ -413,7 +489,21 @@ class Channel:
                     seq = v.send_chat(it["text"])
                     it.update(status="sent", link_at=self.clock())
                     self.seq_map[(peer, "chat", seq)] = it["id"]
+                elif it["kind"] == "test":
+                    if s.get("sending") or s.get("testing") or s.get("peer_proto") is None:
+                        return                                   # after the handshake, and nothing else under way
+                    if s.get("peer_proto") == "raw" or "+TEST" not in (s.get("peer_caps") or []):
+                        it.update(status="failed", why=f"{peer}'s program has no link test (a plain VARA terminal, "
+                                                       f"or an older HAM Sidekick): it needs an update")
+                        continue
+                    seq = v.link_test(it.get("seconds"))
+                    it.update(status="sending", link_at=self.clock())
+                    self.seq_map[(peer, "test", seq)] = it["id"]
+                    self.activity_at = self.clock()
+                    return
                 else:
+                    if s.get("testing"):
+                        return
                     if s.get("sending") or s.get("peer_proto") is None:
                         return                                   # one file at a time; after the handshake
                     if s.get("peer_proto") == "raw":
@@ -451,6 +541,8 @@ class Channel:
         roster = []
         for c, r in d["roster"].items():
             th = d["threads"].get(c, [])
+            sp = r.get("speed")
+            r = dict(r, est=[[n, round(estimate_s(sp, n))] for n in EST_SIZES] if sp else None)
             roster.append(dict(r, state=self.presence(r, d["every_min"], now) if r.get("heard_at") else "unheard",
                                age_s=round(now - r["heard_at"]) if r.get("heard_at") else None,
                                linked=(s.get("session") == "connected" and (s.get("peer") or "").upper() == c),
@@ -463,7 +555,7 @@ class Channel:
             nxt = max(0, round((d.get("last_announce") or 0) + d["every_min"] * 60 - now))
         op = (getattr(self.m.st, "_saved", lambda: {})() or {}).get("operator") or {}
         return {"on": d["on"], "every_min": d["every_min"], "next_announce_s": nxt, "presets": d["presets"],
-                "pinned": d.get("pinned"), "roster": roster,
+                "pinned": d.get("pinned"), "roster": roster, "testing": s.get("testing"), "bitrate": s.get("bitrate"),
                 "threads": {c: th[-120:] for c, th in d["threads"].items()},
                 "me": {"call": self.m.call(), "name": op.get("name") or "", "grid": op.get("grid") or ""},
                 "linger_s": LINGER_S.get(s.get("kind") or self.m.cfg().get("kind", "fm"), 20)}

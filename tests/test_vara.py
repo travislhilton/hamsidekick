@@ -348,3 +348,47 @@ def test_listening_also_asks_vara_for_the_cq_frames_it_hears(pair):
     A.v.listen(True)
     assert wait(lambda: "LISTEN CQ" in A.fake.cmds)
     assert A.fake.cmds.index("CHAT ON") < A.fake.cmds.index("LISTEN CQ")
+
+
+def test_a_link_test_times_random_bytes_and_the_receiver_throws_them_away(pair, tmp_path, monkeypatch):
+    """Owner 2026-11-18: "we need a way to determine the bps throughput for the connection to another operator ...
+    on demand by the user". VARA starts slow and steps up, so the test feeds data for a set time and records the
+    bytes the other modem took, over time."""
+    monkeypatch.setattr(V, "TEST_MIN_S", 0.5)
+    A, B = pair
+    _link(A, B)
+    assert A.v.state()["peer_caps"] == ["+TEST"]                       # said in the handshake: HSK1 <call> +TEST
+    A.fake.push("BITRATE (1)  566 bps TX")
+    assert wait(lambda: A.v.state()["bitrate"].get("tx") == 566)
+    seq = A.v.link_test(0.5)
+    with pytest.raises(V.VaraRefused, match="already"):
+        A.v.link_test(0.5)
+    A.fake.push("BITRATE (7)  4020 bps TX")
+    assert wait(lambda: A.got("test_done"), 6)
+    r = A.got("test_done")[0]["result"]
+    assert A.got("test_done")[0]["seq"] == seq and not r["partial"]
+    assert r["bytes"] >= 1024 and r["bps"] > 0 and r["curve"][0] == [0.0, 0] and r["curve"][-1][1] == r["bytes"]
+    assert r["level"] == 7 and r["modem_bps"] == 4020 and A.v.state()["testing"] is None
+    got = B.got("test_received")[0]
+    assert got["bytes"] == r["bytes"] and got["peer"] == "W9XYZ"
+    assert not B.got("chat") and not B.got("file_received") and not list((tmp_path / "K7ABC").rglob("inbox/*"))
+    assert A.fake.cmds.count("COMPRESSION FILES") == 1 and A.fake.cmds[-1] == "COMPRESSION TEXT"
+    A.v.send_chat("after the test")                                    # the link is as before
+    assert wait(lambda: B.got("chat"))
+
+
+def test_a_link_test_needs_a_station_that_understands_it_and_reports_a_cut_link(pair, monkeypatch):
+    monkeypatch.setattr(V, "TEST_MIN_S", 30)
+    A, B = pair
+    _link(A, B)
+    with A.v.lock:
+        A.v.st["peer_caps"] = []                                       # an older build: no +TEST in its handshake
+    with pytest.raises(V.VaraRefused, match="older"):
+        A.v.link_test()
+    with A.v.lock:
+        A.v.st["peer_caps"] = ["+TEST"]
+    A.v.link_test(30)
+    assert wait(lambda: (A.v.state()["testing"] or {}).get("bytes", 0) >= 2000, 6)
+    A.v.disconnect()
+    assert wait(lambda: A.got("test_done"))
+    assert A.got("test_done")[0]["result"]["partial"] and A.v.state()["testing"] is None

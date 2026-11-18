@@ -348,7 +348,7 @@ def make_handler(station):
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
                       "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "adhoc", "handoff", "takeback", "join", "leave",
-                      "announce", "csend", "retry", "cancel", "closelink", "channel")}
+                      "announce", "csend", "retry", "cancel", "closelink", "channel", "linktest")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
             alert = re.fullmatch(r"/api/alerts/([\w@.%-]+)/(ready|snooze|skip|dismiss|unskip)", u.path)        # pre-net alert
             item = re.fullmatch(r"/api/items(?:/(\d+)(/delete)?)?", u.path)                             # minutes items

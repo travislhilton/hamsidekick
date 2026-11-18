@@ -25,6 +25,22 @@ The bytes may arrive in any size of piece: a receiver buffers until a header lin
 | `FILE <seq> <name> <size> <sha256>\n` then `<size>` bytes | A file. `<name>` is percent-encoded (no spaces), `<sha256>` the 64-hex-digit SHA-256 of the bytes. |
 | `ACK <seq>\n` | The receiver's answer to a FILE: received whole, the SHA-256 matches, saved. |
 | `NAK <seq> <reason>\n` | The receiver's answer to a FILE: not saved (`checksum mismatch`, `too large (...)`, ...). |
+| `TEST <seq> <len>\n` then `<len>` bytes | Link test data: random bytes, thrown away by the receiver (never saved or shown). Sent in several frames with one `<seq>`. |
+| `TESTEND <seq>\n` | The end of a link test. |
+| `TESTED <seq> <bytes> <ms>\n` | The receiver's answer to TESTEND: the bytes it counted (headers included) and the milliseconds from the first TEST frame. |
+
+**Capabilities.** The handshake may carry words after the call, each starting with `+`: `HSK1 <call> +TEST` says
+"I understand the link test". A link test is sent only to a station that said `+TEST`; a station that did not is
+never sent a TEST frame. Unknown `+` words are ignored.
+
+**The link test** (the operator presses **Test link speed**; it is never sent by itself). VARA starts a link at a
+low speed level and steps up as data flows, so a file's speed depends on its size. The sender switches to
+`COMPRESSION FILES`, feeds random bytes for the chosen time (15 to 180 s), keeping about 15 s of data ahead of the
+modem (1 to 16 KB), and notes from VARA's `BUFFER` lines how many bytes the other modem has taken, second by second.
+When the time is up it lets the modem empty, sends `TESTEND`, and switches back to `COMPRESSION TEXT` on `TESTED`.
+From that curve the station works out how long a file of a given size takes: up to the size the test reached, the
+time is read off the curve; beyond it, the rest goes at the speed of the test's last third. VARA's own `BITRATE`
+lines (speed level and bit rate) and `SN` are recorded beside it.
 
 * `<seq>` counts up from 1 per sender per session; an ACK or NAK names the FILE it answers.
 * A FILE larger than the receiver takes (this station: 5 MB) is still read to its end (so the stream stays in step)
