@@ -3127,7 +3127,10 @@ document.addEventListener("click",async e=>{
   const rs=e.target.closest("[data-rsearch]");if(rs){openSearch("",rs.dataset.rsearch);return}
   const am=e.target.closest("[data-agmode]");if(am){agPost(`/api/agent/radio/${enc(am.dataset.agmode)}`,{mode:am.dataset.v});return}
   const an=e.target.closest("[data-setant]");if(an){netAct(()=>post(`/api/radios/${enc(an.dataset.setant)}/setup`,{antenna:an.dataset.v}));return}
-  const ro=e.target.closest("[data-setrole]");if(ro){if(ro.dataset.v==="winlink"&&!confirm("Make this a data radio (Winlink / VARA)? Its nets are not recorded on it until you move them or switch back."))return;
+  // Used for: the one already chosen is not asked again (owner 2026-11-17: "Make this a data radio?" on every click of an
+  // already-data radio, and the window never came); Data on a data radio opens its VARA window
+  const ro=e.target.closest("[data-setrole]");if(ro){if(ro.getAttribute("aria-pressed")==="true"){if(ro.dataset.v==="winlink")varaOpen(ro.dataset.setrole);return}
+    if(ro.dataset.v==="winlink"&&!confirm("Make this a data radio (Winlink / VARA)? Its nets are not recorded on it until you move them or switch back."))return;
     netAct(()=>post(`/api/radios/${enc(ro.dataset.setrole)}/setup`,{role:ro.dataset.v}));return}
   const nk=e.target.closest("[data-nkind]");if(nk){NV.kind=nk.dataset.nkind||null;renderSchedule(true);return}
   const nvw=e.target.closest("[data-nview]");if(nvw){NV.view=nvw.dataset.nview;try{localStorage.setItem("hamsidekick.netsView",NV.view)}catch(x){}renderSchedule(true);return}
