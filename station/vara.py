@@ -296,6 +296,7 @@ class Vara:
             raise VaraRefused("VARA is not running")
         with self.wlock:
             s.sendall((line + "\r").encode("ascii", "replace"))
+        self._raw(">", line)
         with self.lock:
             self.st["last_cmd"] = line
 
@@ -404,7 +405,23 @@ class Vara:
             if line:
                 self._on_status(line)
 
+    def _raw(self, way: str, line: str):
+        """VARA's command port, word for word (raw.log in the modem's folder, last ~200 KB): what VARA really says
+        when something on the air does not show up here. IAMALIVE is left out."""
+        if line.upper().startswith("IAMALIVE"):
+            return
+        try:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            p = self.dir / "raw.log"
+            if p.exists() and p.stat().st_size > 200_000:
+                p.replace(self.dir / "raw.1.log")
+            with open(p, "a", encoding="utf-8") as fh:
+                fh.write(f"{datetime.fromtimestamp(self.clock()):%Y-%m-%d %H:%M:%S} {way} {line}\n")
+        except OSError:
+            pass
+
     def _on_status(self, line: str):
+        self._raw("<", line)
         w = line.split()
         k = w[0].upper()
         if k == "CONNECTED" and len(w) >= 3:
