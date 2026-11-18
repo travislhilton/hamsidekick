@@ -714,3 +714,14 @@ def test_a_radio_card_has_a_settings_button_that_opens_that_radio():
     assert 'closest("[data-rset]");if(b)openRadios(b.dataset.rset)' in idx
     assert "async function openRadios(rid)" in idx and '<details class="rad" data-i="${i}"' in idx   # one folded row a radio
     assert ".rcol.data .cardbtns [data-rset]" not in idx                                        # a data radio keeps it
+
+
+def test_the_dashboard_reloads_the_chat_when_a_file_or_link_test_starts():
+    """On the air 2026-11-18: a file went out and no progress showed: the chat was only re-read when the file ended,
+    so its line still said "waiting for a link"."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    full = idx[idx.index('const full=['):idx.index('].includes(d.event)')]
+    for ev in ("file_sending", "file_receiving", "test_started", "test_done", "test_received"):
+        assert f'"{ev}"' in full
+    assert "function vXfer(" in idx and "data-vstoprx" in idx and 'aria-valuenow="${pc}"' in idx
