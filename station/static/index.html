@@ -2152,7 +2152,7 @@ function renderVara(){
   const msg=VA.msg?`<p class="${VA.msg.bad?"bad":"ok"}">${esc(VA.msg.text)}</p>`:"";
   if(!m){box.innerHTML=head+tabs+`<h4>Set up a VARA modem on ${esc(r.name)}</h4><p class="small muted">One copy of VARA per radio, each with its own sound card and its own ports. The first copy usually keeps VARA's own 8300 (Winlink Express's default); a second copy in its own folder gets the next free pair.</p>${vSetupForm(r.id,null)}${msg}<div class="row"><button class="primary" data-vadd>Add this modem</button></div>`;return}
   const c=m.cfg,st=m.state||{},runs=c.enabled&&!c.handed_off&&c.use!=="winlink",conn=st.session==="connected",ok=m.tx_ok;
-  const status=`<p><b>${esc(m.status.text)}</b>${conn&&st.peer_proto==="raw"?' <span class="muted">(plain terminal: chat only)</span>':""}${conn&&st.bw?` · ${st.bw} Hz`:""}${st.sn!=null&&conn?` <span class="muted small">S/N ${esc(String(st.sn))} dB</span>`:""}${st.ptt?' <span class="badge emergency">ON AIR</span>':""}${st.busy?' <span class="badge">channel busy</span>':""} <span class="muted small">${m.freq_mhz?bpMhz(m.freq_mhz)+" MHz · ":""}VARA ${c.kind==="hf"?"HF":"FM"} · ${esc(c.host)}:${c.cmd_port}</span></p>`;
+  const status=`<p><b>${esc(m.status.text)}</b>${conn&&st.peer_proto==="raw"?' <span class="muted">(plain terminal: chat only)</span>':""}${conn&&st.bw?` · ${st.bw} Hz`:""}${st.sn!=null&&conn?` <span class="muted small">S/N ${esc(String(st.sn))} dB</span>`:""}${st.ptt?' <span class="badge emergency">ON AIR</span>':""}${st.busy?' <span class="badge" title="VARA says it hears something on this radio\'s audio (a signal, or noise with the radio\'s squelch open). It waits for a clear channel before it transmits.">channel busy</span>':""} <span class="muted small">${m.freq_mhz?bpMhz(m.freq_mhz)+" MHz · ":""}VARA ${c.kind==="hf"?"HF":"FM"} · ${esc(c.host)}:${c.cmd_port}</span></p>`;
   const turn=c.use==="shared"?`<p class="small">${esc(VUSE.shared[1])} ${c.handed_off?`<button class="small" data-vact="takeback">Take it back</button>`:c.enabled?`<button class="small" data-vact="handoff" title="Winlink Express's turn now">Hand to Winlink Express now</button>`:""}</p>`
     :c.use==="winlink"?`<p class="small">${esc(VUSE.winlink[1])} To chat on this radio choose <b>Shared</b> or <b>Chat &amp; files</b> under Modem setup.</p>`:"";
   const onoff=c.use==="winlink"?"":c.enabled?`<button class="quiet small" data-voff>Switch this modem off</button>`:`<button class="primary" data-von>Switch this modem on</button>`;
@@ -3433,11 +3433,15 @@ const agStop=()=>fetch("/api/agent/stop/all",{method:"POST",headers:{"Content-Ty
 // the control operator's hand on the switch: Esc, Stop or ANY click on the page while Sidekick is sending drops it
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&agLive()){e.preventDefault();agStop()}},true);
 document.addEventListener("pointerdown",()=>{if(agLive())agStop()},true);
-// presence: the dashboard in use at this PC (keyboard, mouse, touch) lets Send work; a quiet heartbeat, every 30 s at most
-let agSeen=0;const agHere=()=>{const now=Date.now();if(now-agSeen<30000)return;
-  if(!Object.values(((AG||{}).settings||{}).radios||{}).includes("send"))return;agSeen=now;
-  fetch("/api/agent/presence",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).then(()=>{if(AG&&AG.send&&!AG.send.present){AG.send.present=true;for(const rid of Object.keys(((AG||{}).settings||{}).radios||{}))renderEcho(rid)}}).catch(()=>{})};
+// presence: the dashboard in use at this PC (keyboard, mouse, touch) = the control operator is here; Sidekick's Send and
+// VARA (chat, the channel's keep-alives) transmit only then. A quiet heartbeat, every 30 s at most, whatever Sidekick is
+// set to (owner 2026-11-17: in front of both PCs, VARA said "you are not at the dashboard" - the heartbeat had gone out
+// only while a radio's Sidekick was on Send, and Sidekick was Off). An open VARA window is refreshed when it lands.
+let agSeen=0;const agHere=()=>{const now=Date.now();if(now-agSeen<30000)return;agSeen=now;
+  fetch("/api/agent/presence",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).then(()=>{if(AG&&AG.send&&!AG.send.present){AG.send.present=true;for(const rid of Object.keys(((AG||{}).settings||{}).radios||{}))renderEcho(rid)}
+    const vm=((VA.d||{}).modems||[]).find(m=>m.radio===VA.rid);if($("varaDlg").open&&vm&&/not at the dashboard/.test(vm.tx_why||""))varaLoad().then(()=>{renderVara();renderRadios()})}).catch(()=>{})};
 for(const ev of ["pointermove","pointerdown","keydown","wheel","touchstart"])document.addEventListener(ev,agHere,{passive:true});
+if(document.visibilityState==="visible")agHere();
 setInterval(()=>{for(const el of document.querySelectorAll(".sendband .cd")){const left=Math.max(0,Number(el.dataset.s)-(Date.now()-Number(el.dataset.t||(el.dataset.t=Date.now())))/1000);el.textContent=Math.ceil(left)}},200);
 document.addEventListener("click",e=>{
   const st=e.target.closest("[data-agstop]");if(st){agStop();return}
