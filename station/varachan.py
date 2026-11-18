@@ -606,7 +606,7 @@ class Channel:
             roster.append(dict(r, state=self.presence(r, d["every_min"], now) if r.get("heard_at") else "unheard",
                                age_s=round(now - r["heard_at"]) if r.get("heard_at") else None,
                                linked=(s.get("session") == "connected" and (s.get("peer") or "").upper() == c),
-                               waiting=sum(1 for it in th if it["dir"] == "out" and it["status"] == "queued"),
+                               waiting=sum(1 for it in th if it["dir"] == "out" and it["status"] in ("queued", "sent")),
                                failed=sum(1 for it in th if it["dir"] == "out" and it["status"] == "failed")))
         order = {"here": 0, "quiet": 1, "unheard": 2, "gone": 3}
         roster.sort(key=lambda r: (not r["linked"], order[r["state"]], -(r.get("heard_at") or 0), r["call"]))
