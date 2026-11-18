@@ -337,6 +337,18 @@ class Channel:
             del th[:len(th) - KEEP]
         return th
 
+    def _rx_line(self, d: dict, peer: str, data: dict, status: str) -> dict:
+        """The chat line of a file that is arriving from `peer`: the one still "receiving" with this name, or a new one."""
+        th = self._thread(d, peer)
+        it = next((x for x in reversed(th) if x["dir"] == "in" and x.get("kind") == "file"
+                   and x["status"] == "receiving" and x.get("name") == data.get("name")), None)
+        if it is None:
+            it = {"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "file", "name": data.get("name"),
+                  "size": data.get("size"), "at": self.clock()}
+            th.append(it)
+        it.update(status=status, size=data.get("size") or it.get("size"))
+        return it
+
     def _find(self, d: dict, peer: str, kind: str, seq) -> dict | None:
         mid = self.seq_map.get((peer, kind, seq))
         for it in d["threads"].get(peer, []):
@@ -375,7 +387,7 @@ class Channel:
                 self._heard(d, peer, "link", sn=data.get("sn"))
             elif name == "bitrate" and peer:
                 self._heard(d, peer, "link", **{"bps_" + data.get("way", "tx"): data.get("bps")})
-            elif name in ("test_started", "file_receiving", "file_progress") and peer:
+            elif name in ("test_started", "file_progress") and peer:
                 self.activity_at = self.clock()
             elif name in ("test_done", "test_failed") and peer:
                 it = self._find(d, peer, "test", data.get("seq"))
@@ -406,20 +418,23 @@ class Channel:
                 self._thread(d, peer).append({"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "chat",
                                               "text": data.get("text"), "at": self.clock(), "status": "received"})
                 self.activity_at = self.clock()
+            elif name == "file_receiving" and peer:              # a file is arriving: its line in the chat, with progress
+                self._heard(d, peer, "link")
+                self._rx_line(d, peer, data, status="receiving")
+                self.activity_at = self.clock()
             elif name == "file_received" and peer:
                 self._heard(d, peer, "link")
                 d["roster"][peer]["unread"] = d["roster"][peer].get("unread", 0) + 1
-                self._thread(d, peer).append({"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "file",
-                                              "name": Path(data["path"]).name if data.get("path") else data.get("name"),
-                                              "size": data.get("size"), "at": self.clock(), "status": "received"})
+                it = self._rx_line(d, peer, data, status="received")
+                it["name"] = Path(data["path"]).name if data.get("path") else data.get("name")
+                if it.get("at"):
+                    it["took_s"] = round(self.clock() - it["at"], 1)
                 self.activity_at = self.clock()
             elif name == "file_rejected" and peer:               # a file that was arriving and did not: say so in the log
                 self._heard(d, peer, "link")
-                self._thread(d, peer).append({"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "file",
-                                              "name": data.get("name"), "size": data.get("size"),
-                                              "done": data.get("done"), "at": self.clock(),
-                                              "status": "cancelled" if data.get("why") == "you cancelled it" else "failed",
-                                              "why": data.get("why")})
+                it = self._rx_line(d, peer, data,
+                                   status="cancelled" if data.get("why") == "you cancelled it" else "failed")
+                it.update(done=data.get("done"), why=data.get("why"))
                 self.activity_at = self.clock()
             elif name in ("file_sent", "file_failed") and peer:
                 it = self._find(d, peer, "file", data.get("seq"))
@@ -435,6 +450,9 @@ class Channel:
                 self.activity_at = self.clock()
             elif name == "disconnected":
                 gone = (data.get("peer") or "").upper() or self.opened
+                for it in d["threads"].get(gone or "", []):      # a line still "receiving": the link went
+                    if it["dir"] == "in" and it["status"] == "receiving":
+                        it.update(status="failed", why="the link closed before the file was whole")
                 for it in d["threads"].get(gone or "", []):
                     if it["dir"] == "out" and it["status"] in ("sending", "sent") and it["kind"] == "chat":
                         it["status"] = "queued"                  # the link went before VARA confirmed it

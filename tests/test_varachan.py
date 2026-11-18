@@ -344,3 +344,24 @@ def test_a_file_that_did_not_arrive_is_in_the_message_log(tmp_path):
                                "why": "the link closed before the file was whole (the sender may have cancelled it)"})
     th = m.chan.view()["threads"]["K7ABC"]
     assert [(it["dir"], it["status"], it["name"], it["done"]) for it in th] == [("in", "cancelled", "big.xlsx", 2000), ("in", "failed", "b.pdf", 100)]
+
+
+def test_a_file_arriving_has_its_own_line_in_the_chat_from_the_start(tmp_path):
+    """Owner 2026-11-18: "Can we put the file transfer inline in the message log like we do with the sender?" """
+    st, m, v, clk = _chan(tmp_path)
+    m.act("join", {})
+    _link(m, v, "K7ABC")
+    m._event("file_receiving", {"seq": 1, "name": "big.xlsx", "size": 5000})
+    m._event("file_receiving", {"seq": 1, "name": "big.xlsx", "size": 5000})        # the notice, then the header: one line
+    th = m.chan.view()["threads"]["K7ABC"]
+    assert [(it["dir"], it["status"], it["name"], it["size"]) for it in th] == [("in", "receiving", "big.xlsx", 5000)]
+    clk.t += 40
+    m._event("file_received", {"seq": 1, "name": "big.xlsx", "size": 5000, "path": "/x/inbox/20261118-K7ABC-big.xlsx", "peer": "K7ABC"})
+    th = m.chan.view()["threads"]["K7ABC"]
+    assert len(th) == 1 and th[0]["status"] == "received" and th[0]["name"] == "20261118-K7ABC-big.xlsx" and th[0]["took_s"] == 40
+    m._event("file_receiving", {"seq": 2, "name": "b.pdf", "size": 900})
+    m._event("file_rejected", {"seq": 2, "name": "b.pdf", "size": 900, "done": 300, "why": "you cancelled it", "peer": "K7ABC"})
+    m._event("file_receiving", {"seq": 3, "name": "c.pdf", "size": 900})
+    _drop(m, v)
+    th = m.chan.view()["threads"]["K7ABC"]
+    assert [(it["name"], it["status"]) for it in th[1:]] == [("b.pdf", "cancelled"), ("c.pdf", "failed")]
