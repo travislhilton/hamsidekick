@@ -208,6 +208,14 @@ def outputs(devices: list[dict] | None = None, hostapis: list[dict] | None = Non
     return [n for n in names if not any(o != n and o.startswith(n) and len(n) >= 31 for o in names)]
 
 
+def fresh_outputs(timeout: float = 30) -> list[str] | None:
+    """outputs() as Windows has them NOW (see radios.fresh_inputs): an interface moved to another USB port, re-plugged
+    or renamed after the station started was missing from Radios… → Transmit → audio out while the old name stayed
+    (two stations, 2026-11-18). None when it could not be read."""
+    from .radios import _fresh
+    return _fresh("station.ptt", "outputs", timeout)
+
+
 def cm108_report(pin: int, on: bool) -> bytes:
     """The HID output report that sets one CM108 GPIO (as Direwolf's cm108.c): report id 0, 0, direction mask, state
     mask, 0."""

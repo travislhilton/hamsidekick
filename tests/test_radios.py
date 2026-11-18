@@ -134,3 +134,8 @@ def test_a_virtual_com_port_only_in_the_registry_is_offered(monkeypatch):
     ports = rmod.serial_ports()
     assert [p["port"] for p in ports if p["port"] in ("COM4", "COM11")] == ["COM4", "COM11"]
     assert any(p["port"] == "COM11" and "Virtual" in p["desc"] for p in ports)
+
+
+def test_fresh_outputs_reads_a_new_list_in_a_child_process():
+    from station.ptt import fresh_outputs
+    assert isinstance(fresh_outputs(), list)                # [] on a machine with no audio outputs, never None

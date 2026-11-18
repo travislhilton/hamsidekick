@@ -669,7 +669,7 @@ class Station:
                 nets.setdefault(n["radio"], []).append(n.get("name"))
         from . import ptt
         return {"radios": cur, "inputs": rmod.fresh_inputs() or rmod.inputs(), "nets": nets, "ports": rmod.serial_ports(),
-                "outputs": ptt.outputs(), "hids": ptt.hid_devices(),
+                "outputs": ptt.fresh_outputs() or ptt.outputs(), "hids": ptt.hid_devices(),
                 "from": "dashboard" if (self.data / "radios.json").exists() else "station.yaml",
                 "restart": os.name == "nt"}
 

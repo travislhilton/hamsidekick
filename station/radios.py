@@ -82,11 +82,17 @@ def fresh_inputs(timeout: float = 30) -> list[str] | None:
     station an input renamed, re-plugged or added after it started stays invisible (a laptop station, 2026-11-07:
     the operator renamed a Digirig's input and the radio kept saying "not found"). A child process gets a fresh
     list. None when it could not be read."""
+    return _fresh("station.radios", "inputs", timeout)
+
+
+def _fresh(module: str, func: str, timeout: float = 30) -> list[str] | None:
+    """`module.func()` run in a child process (a fresh PortAudio device list). None when it could not be read."""
     import subprocess
     import sys
-    code = "import json,sys; sys.path.insert(0, sys.argv[1]); from station.radios import inputs; print(json.dumps(inputs()))"
+    code = ("import json,sys,importlib; sys.path.insert(0, sys.argv[1]); "
+            "print(json.dumps(getattr(importlib.import_module(sys.argv[2]), sys.argv[3])()))")
     try:
-        p = subprocess.run([sys.executable, "-c", code, str(Path(__file__).resolve().parent.parent)],
+        p = subprocess.run([sys.executable, "-c", code, str(Path(__file__).resolve().parent.parent), module, func],
                            capture_output=True, text=True, timeout=timeout,
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         return json.loads(p.stdout.strip().splitlines()[-1]) if p.returncode == 0 else None

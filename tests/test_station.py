@@ -692,3 +692,16 @@ def test_settings_sections_fold_and_a_link_to_a_setting_opens_its_section():
     titles = set(re.findall(r'<h4 class="sec">([^<]+?) <span', idx))
     hints = idx.split("const SSEC_HINT={")[1].split("};")[0]
     assert len(titles) >= 12 and not [t for t in titles if f'"{t}"' not in hints and t not in ("Storage", "AI costs", "Share settings with another station")]
+
+
+def test_radios_lists_the_audio_outputs_windows_has_now(tmp_path, monkeypatch):
+    """An interface moved to another USB port after the station started must show in Transmit → audio out."""
+    from station import ptt, radios as rmod
+    monkeypatch.setattr(rmod, "fresh_inputs", lambda: ["Digirig Lite"])
+    monkeypatch.setattr(ptt, "outputs", lambda: ["Digirig Lite VARA FM 2", "Speakers"])     # the stale in-process list
+    monkeypatch.setattr(ptt, "fresh_outputs", lambda: ["Digirig Lite", "Speakers"])
+    monkeypatch.setattr(ptt, "hid_devices", lambda: [])
+    st = Station(copy.deepcopy(CFG), lambda: engine.FakeEngine(), data_dir=tmp_path)
+    assert st.radio_list()["outputs"] == ["Digirig Lite", "Speakers"]
+    monkeypatch.setattr(ptt, "fresh_outputs", lambda: None)                                 # unreadable: the old list
+    assert st.radio_list()["outputs"] == ["Digirig Lite VARA FM 2", "Speakers"]
