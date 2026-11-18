@@ -337,3 +337,22 @@ def test_each_modem_can_add_an_ssid_to_the_stations_callsign(tmp_path):
         with pytest.raises(ValueError, match="SSID"):
             st.vara.settings({"radio": a, "ssid": bad})
     assert st.vara.settings({"radio": a, "ssid": ""})["modems"][0]["call"] == "W9XYZ"
+
+
+def test_the_vara_call_is_typed_whole_and_kept_apart_from_winlink(tmp_path):
+    """Owner 2026-11-17: "I want to be able to specify it like I do for Winlink" (the whole call, W9XYZ-8), and "keep
+    the SSID configuration separate for Winlink and VARA chat"."""
+    FakeVara.made.clear()
+    st, a, b = _two(tmp_path)
+    st.me = "W9XYZ"
+    st.vara.settings({"radio": a, "kind": "fm", "use": "chat", "enabled": True, "ssid": 7})
+    assert st.vara.modem(a).call() == "W9XYZ-7"                       # the first form (an SSID alone) still counts
+    v = st.vara.settings({"radio": a, "call": " w9xyz-8 "})
+    m = v["modems"][0]
+    assert m["call"] == "W9XYZ-8" and m["cfg"]["call"] == "W9XYZ-8" and m["cfg"]["ssid"] is None
+    assert FakeVara.made[-1].kw["mycall"] == "W9XYZ-8" and st.me == "W9XYZ" and "calls" not in v
+    for bad in ("W9XYZ-16", "W9 XYZ!", "X"):
+        with pytest.raises(ValueError, match="not a callsign VARA takes"):
+            st.vara.settings({"radio": a, "call": bad})
+    assert st.vara.settings({"radio": a, "call": ""})["modems"][0]["call"] == "W9XYZ"     # empty = the station's
+    assert st.vara.settings({"radio": a, "call": "w9xyz"})["modems"][0]["cfg"]["call"] is None

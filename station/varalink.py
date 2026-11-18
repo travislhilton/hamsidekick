@@ -35,7 +35,7 @@ from . import bandplan
 
 USES = ("chat", "shared", "winlink")
 MODEM = {"radio": None, "kind": "hf", "host": "127.0.0.1", "cmd_port": 8300, "data_port": 8301, "bw": None,
-         "use": "shared", "enabled": False, "handed_off": False, "fm_width": "narrow", "ssid": None}
+         "use": "shared", "enabled": False, "handed_off": False, "fm_width": "narrow", "ssid": None, "call": None}
 PORTS = (8300, 8310, 8320, 8330, 8340, 8350)       # suggested pairs: cmd, cmd + 1
 CHECK_S = 5
 
@@ -103,11 +103,15 @@ class Modem:
         return self.link.modem_cfg(self.rid)
 
     def call(self) -> str:
-        """The call this modem's VARA uses: the station's callsign, with this modem's SSID when one is set (owner
-        2026-11-17: W9XYZ-8 on one station, W9XYZ-7 on another; the station's own callsign stays W9XYZ)."""
+        """The call this modem's VARA uses: the one typed for it (with its SSID, as in Winlink Express), else the
+        station's callsign (owner 2026-11-17: W9XYZ-8 on one station, W9XYZ-7 on another, "specify it like I do for
+        Winlink", and "keep the SSID configuration separate for Winlink and VARA chat": never taken from the Winlink
+        account; the station's own callsign stays W9XYZ). An SSID saved alone (the first form) still counts."""
         me = str(getattr(self.st, "me", "") or "").upper().strip()
-        ssid = self.cfg().get("ssid")
-        return f"{me.split('-')[0]}-{ssid}" if me and ssid else me
+        c = self.cfg()
+        if c.get("call"):
+            return c["call"]
+        return f"{me.split('-')[0]}-{c['ssid']}" if me and c.get("ssid") else me
 
     def dir(self) -> Path:
         c = self.cfg()
@@ -535,7 +539,7 @@ class Link:
             if body["fm_width"] not in ("narrow", "wide"):
                 raise ValueError("VARA FM is narrow or wide")
             c["fm_width"] = body["fm_width"]
-        if "ssid" in body:                                   # VARA's call = the station's callsign + this SSID
+        if "ssid" in body:                                   # the station's callsign + this SSID (the first form)
             v = body["ssid"]
             try:
                 v = int(v) if v not in (None, "", 0, "0") else None
@@ -543,7 +547,15 @@ class Link:
                 raise ValueError("an SSID is 1 to 15") from None
             if v is not None and not 1 <= v <= 15:
                 raise ValueError("an SSID is 1 to 15")
-            c["ssid"] = v
+            c["ssid"], c["call"] = v, None
+        if "call" in body:                                   # typed whole, as in Winlink Express: W9XYZ-8
+            from .vara import CALL_RE
+            v = re.sub(r"\s+", "", str(body["call"] or "")).upper()
+            if v and not CALL_RE.match(v):
+                raise ValueError(f"{v} is not a callsign VARA takes (3-7 letters and digits, then -1 to -15 if you "
+                                 "use an SSID: W9XYZ-8)")
+            me = str(getattr(self.st, "me", "") or "").upper().strip()
+            c["call"], c["ssid"] = (v if v and v != me else None), None
         if "enabled" in body:
             c["enabled"] = bool(body["enabled"])
         for orid, o in mods.items():                         # two modems never share a port on one host
