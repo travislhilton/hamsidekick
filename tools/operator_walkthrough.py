@@ -274,7 +274,15 @@ class Walk:
         self.p.wait_for_selector("#settings[open]")
         if self.p.locator("#settings [data-stab=ai]").count():          # Settings in tabs since 2026-11-16 (e4736db)
             self.p.click("#settings [data-stab=ai]")
+        self._open_section("Station agent")                              # sections fold since 2026-11-18: the card names it
         self.p.wait_for_selector("#agName", timeout=15000)
+
+    def _open_section(self, title):
+        """Open a folded Settings section by the name the card gives it, as an operator would (click its row)."""
+        row = self.p.locator("#settings details.ssec", has=self.p.locator("summary", has_text=title)).first
+        if row.count() and not row.evaluate("d => d.open"):
+            row.locator("summary h4").first.click()
+            self.p.wait_for_timeout(200)
 
     def _key_box(self):
         self._settings()

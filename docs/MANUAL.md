@@ -290,6 +290,11 @@ you chose is remembered. Each column shows:
   **Move to Not heard** / **Keep it**. **Find nets** lists a found net that matches a Not heard one (same frequency and
   start, or same name) apart, under "not heard here", and adds it only with **Add anyway** (it then leaves Not heard).
   Kept in `data/nets_unheard.json`.
+- **Settings** (header → Settings; on a phone ☰ Menu → Settings) has seven tabs: Station, Nets, Winlink, Sidekick & AI,
+  AI costs, This PC, Share. A tab with several sections shows them as rows: the first is open, the others are closed
+  with a line saying what is inside; click a row to open it, and it stays open in that browser. Each section says how
+  it saves ("Save below", "own Save button", "changes at once"). Every reference card (Help) has a QR code to the
+  project page on its front ("New here? Get the station") and one to its own PDF on its back ("Share this card").
 - **VARA chat and files** (owner 2026-11-15; several modems 2026-11-16): on a radio's card set **Used for** to
   **Data (Winlink / VARA)**. The radio's column then becomes its **VARA workspace**: instead of the nets strip, the
   Coach / Net board tabs and the voice log, **VARA chat and files** sits under the radio's card (the stations on the
@@ -405,7 +410,7 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   VARA chat) to the middle of a range that fits its modem (VARA HF or VARA FM): a CAT radio is tuned, otherwise its
   card is set and you set the radio. Both lists run from the highest band down, as the table does. Listen first.
 - **Plans** (Nets → Plans, owner 2026-11-15): the **band plan** is built in (your privileges for phone, data and CW
-  by license class, set in Settings → Station agent, and what the ARRL band plan sets each segment aside for) and
+  by license class, set in Settings → Sidekick & AI → Station agent, and what the ARRL band plan sets each segment aside for) and
   works with no internet. **Find local plans** searches for the clubs and EMCOMM groups within the distance you set,
   your state coordinator's band plan, and the public ARES, RACES and ICS-205 plans, and lists the frequencies they
   assign with a link to each source. Tick the ones that are right and **Keep** them: a kept channel names a radio's
@@ -463,17 +468,17 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   hour (night 80/40/160 m, morning 40/80/20, midday 20/17/15/40/12/10, late afternoon 20/40/17/15, evening 40/80/160/20)
   among the bands the antenna works on (**Inverted V…** on the card: its name and bands), tries frequencies
   remembered for this hour first, then sweeps the band's phone segment — cut to your license class's phone
-  privileges (Settings → Station agent → license class; a General scans 3.800–4.000, 7.175–7.300, 14.225–14.350,
+  privileges (Settings → Sidekick & AI → Station agent → license class; a General scans 3.800–4.000, 7.175–7.300, 14.225–14.350,
   21.275–21.450, and all of 160/17/12 m and 28.300–28.850) — in 3 kHz steps reading the S-meter, parks on
   anything about 2 S-units over the noise for 30 s, and stays while speech is transcribed there (until 2 minutes
   quiet). Frequencies with conversations are **remembered** (hours, days, count, calls heard; Pin or Hide them) in
   `data\scan_spots.json`. Turning the dial yourself pauses the scan for 30 minutes; when it stops, the radio goes
   back to where it was. Receive only: the only CAT commands are frequency, mode and the S-meter read.
-- **Sidekick, the station agent (Draft mode)**: an optional AI operator's assistant. Its own two-sided card (using it; its card, sending, set up) opens from **Help → Sidekick, the AI assistant**, **Settings → Station agent → Sidekick card**, from **Card** on Sidekick's card, or at `/help/sidekick`; the PDF is `docs/HAM_Sidekick_Assistant_Quick_Reference_Card.pdf`. Its on-air name is yours to
-  choose (**Settings → Station agent → On-air name**, default **Sidekick**); a name that is a phonetic-alphabet word
+- **Sidekick, the station agent (Draft mode)**: an optional AI operator's assistant. Its own two-sided card (using it; its card, sending, set up) opens from **Help → Sidekick, the AI assistant**, **Settings → Sidekick & AI → Station agent → Sidekick card**, from **Card** on Sidekick's card, or at `/help/sidekick`; the PDF is `docs/HAM_Sidekick_Assistant_Quick_Reference_Card.pdf`. Its on-air name is yours to
+  choose (**Settings → Sidekick & AI → Station agent → On-air name**, default **Sidekick**); a name that is a phonetic-alphabet word
   (Echo, Victor…), a number or a procedure word (Portable, Mobile, Break, Over) is refused, because it is said right
   after the call and listeners would hear it as part of the call. **Off by default**: the operator turns it on in
-  **Settings → Station agent → Enable the station agent**; then each radio's card has an Off / Draft switch, also Off
+  **Settings → Sidekick & AI → Station agent → Enable the station agent**; then each radio's card has an Off / Draft switch, also Off
   until chosen. Switch it to **Draft** on a radio's card: after each transmission (once the frequency has been quiet
   1.2 s) it decides whether your station should speak and drafts exactly what it would say and how long it would
   wait, shown at the top of that radio's column; **What would you say now?** asks on demand, 👍/👎 rates a draft,
@@ -518,7 +523,7 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
     station ("Any station holding traffic, traffic only. Check in now."; maritime or mobiles only; members; EOCs),
     when net control says check-ins come later ("Before I start taking check-ins…"), or when only "Please call now."
     was heard and the start of the call was lost. **Roll calls by place** ("Stations Colorado, check in now"): it
-    checks in only when the place is in **Settings → Station agent → Your region**; with no region set it never
+    checks in only when the place is in **Settings → Sidekick & AI → Station agent → Your region**; with no region set it never
     answers one. A net named after its state is not a roll call. **Emergency or priority traffic** ("break break",
     "emergency traffic") silences it on every net, flagged or not. In the net's own settings (Nets → the net →
     **Sidekick on this net**) a members-, mobiles- or traffic-only net can be set to **never check in**.
@@ -564,7 +569,7 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
     (97.113(a)(2),(3)); no relayed messages (97.115); silent during emergency or priority traffic unless net control
     calls it, and while anyone transmits (97.101); under about 30 seconds; inside your license class's phone
     privileges (97.301/97.305); and the answer steps (no "response ready" without one, the prepared words only). A
-    draft that fails any check is shown struck through, **Would not send**, with the rule. Settings → Station agent
+    draft that fails any check is shown struck through, **Would not send**, with the rule. Settings → Sidekick & AI → Station agent
     holds the name, your first name, your check-in line, license class, the model, the thinking model and up to two
     models to compare on the same traffic. Drafts are kept in `data\agent_drafts.jsonl` (never committed).
   - **Replay a real net**: `python -m tools.sidekick_replay 20261110 --radio net --from 19:30 --to 20:30` (on the

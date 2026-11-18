@@ -39,4 +39,7 @@ def test_every_card_has_a_share_qr_to_its_own_pdf_on_github():
         out = phone.card_with_download(html, None)
         assert "CARD_QR" not in out and out.count("<svg") >= 1
         assert (build_ref_card.OUT / f"{name}.pdf").exists()
+        # owner 2026-11-18: and one back to the project page, "so a new user just needs to see the QR code to get started"
+        assert html.count("<!--DOWNLOAD_QR-->") == 1 and html.index("<!--DOWNLOAD_QR-->") < html.index('class="card card-back"'), src.name
+        assert phone.card_with_download(html, None).count("<svg") >= 2
     assert phone.card_pdf_url("X") == phone.REPO_URL + "/blob/master/docs/X.pdf"

@@ -105,9 +105,11 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 
 <!-- ===================== FRONT ===================== -->
 <div class="card card-front">
+  <div class="card-head"><div>
   <p class="card-role">HAM Sidekick Station · Sidekick, the AI assistant</p>
   <span class="card-side">Front · side 1 of 2</span>
   <h2 class="card-title">Use Sidekick</h2>
+  </div><div class="card-qr share"><!--DOWNLOAD_QR--><span>New here? Get the station</span></div></div>
   <p class="lead">Sidekick listens to the radio with you. After each transmission it decides whether <b>your station</b> should speak, and writes exactly what it would say: a check-in, a reply, an answer. <b>You are always the control operator.</b> It only writes drafts until you switch a radio to <b>Send</b>. Not set up yet? See <b>Set up once</b> on side 2.</p>
 
   <p class="card-part">A · Switch it on for a radio <span>(the Sidekick switch on each radio's card)</span></p>
@@ -161,15 +163,15 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 
   <p class="card-part">Set up once</p>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><div class="step-text"><b>An xAI key</b> (optional): <span class="mono">console.x.ai</span> → API Keys → Create; add a little credit. <span class="k">Settings</span> → <b>Station agent</b> → paste → Save<small>Without one: offline rules (no answers). Well under a cent a turn. Kept on this PC only.</small></div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text"><span class="k">Settings</span> → <b>Station agent</b> → tick <b>Enable the station agent</b>; fill in <b>On-air name</b>, <b>your first name</b>, <b>check-in line</b>, <b>license class</b>, <b>your region</b><small>Region = your state (and county): it answers a roll call by place only there.</small></div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text"><b>An xAI key</b> (optional): <span class="mono">console.x.ai</span> → API Keys → Create; add a little credit. <span class="k">Settings</span> → <b>Sidekick &amp; AI</b> → <b>xAI key</b> → paste → <span class="k">Save key</span><small>Without one: offline rules (no answers). Well under a cent a turn. Kept on this PC only.</small></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><span class="k">Settings</span> → <b>Sidekick &amp; AI</b> → open <b>Station agent (Sidekick)</b> → tick <b>Enable the station agent</b>; fill in <b>On-air name</b>, <b>your first name</b>, <b>check-in line</b>, <b>license class</b>, <b>your region</b><small>Region = your state (and county): it answers a roll call by place only there.</small></div></div>
     <div class="step"><div class="step-num">3</div><div class="step-text"><b>Its voice</b>: <span class="k">Settings</span> → <b>Sidekick's voice</b> → ▶ to try, pick one · Nets it must not join: <span class="k">Nets</span> → the net → <b>Never checks in</b></div></div>
     <div class="step"><div class="step-num">4</div><div class="step-text"><b>Before the first Send, into a dummy load:</b> <span class="k">Radios…</span> → <b>Transmit</b> (how it keys, Audio out, tick <b>Allow transmitting</b>) → <b>Transmit test</b>: tick <i>a dummy load is connected</i>, <b>Tone + ID</b>, set <b>Drive level</b> (about 3 kHz FM deviation; SSB ALC just touching), then <b>Phrase + ID</b></div></div>
   </div>
 
   <p class="card-part">When something looks wrong</p>
   <table class="tier-table">
-    <tr><td>No Sidekick on a radio</td><td>Settings → Enable the station agent; then <b>Draft</b> on that radio's card</td></tr>
+    <tr><td>No Sidekick on a radio</td><td>Settings → Sidekick &amp; AI → Station agent → Enable the station agent; then <b>Draft</b> on that radio's card</td></tr>
     <tr><td>No <span class="k">Send</span> position</td><td>That radio is not allowed to transmit: Radios… → Transmit</td></tr>
     <tr><td>"You are not at the station"</td><td>Move the mouse on the dashboard: Send waits for you</td></tr>
     <tr><td>Amber <b>Offline rules</b></td><td>No key or no internet: it checks in and acknowledges, no answers</td></tr>

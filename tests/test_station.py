@@ -680,3 +680,15 @@ def test_a_data_radio_column_is_its_vara_workspace_and_the_header_is_grouped():
     for b in ("openReadout", "openRadios", "openSettings", "nightBtn", "openPhone", "helpbtn"):
         assert b in more
     assert 'id="openNets"' in idx.split('id="hMenu"')[0] and 'id="openBandplan"' in idx.split('id="hMenu"')[0]
+
+
+def test_settings_sections_fold_and_a_link_to_a_setting_opens_its_section():
+    """Owner 2026-11-18: "sections are collapsed by default so that users don't have to scroll through long lists"."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'd.className="ssec"' in idx and "let open=i===0" in idx and "if(heads.length<2)return" in idx
+    assert "Element.prototype.scrollIntoView=function" in idx and "HTMLElement.prototype.focus=function" in idx
+    import re
+    titles = set(re.findall(r'<h4 class="sec">([^<]+?) <span', idx))
+    hints = idx.split("const SSEC_HINT={")[1].split("};")[0]
+    assert len(titles) >= 12 and not [t for t in titles if f'"{t}"' not in hints and t not in ("Storage", "AI costs", "Share settings with another station")]

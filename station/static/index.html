@@ -567,6 +567,14 @@ button:disabled{cursor:not-allowed}
 }
 details.unheard{margin:12px 0;padding:8px 10px;border:1px dashed var(--line,#999);border-radius:8px}details.unheard ul{margin:6px 0 0;padding-left:18px}details.unheard li{margin:4px 0}
 .msum{border-left:3px solid var(--accent);padding-left:10px}.msum .msumai{margin:4px 0;line-height:1.45}.msum .msumlines{margin:6px 0;padding-left:18px}.msum .mjumps{margin-top:4px}
+#settings details.ssec{border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:0 12px;background:var(--panel)}
+#settings details.ssec[open]{padding-bottom:10px}
+#settings details.ssec>summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;cursor:pointer;padding:9px 0;list-style:none}
+#settings details.ssec>summary::-webkit-details-marker{display:none}
+#settings details.ssec>summary::before{content:"▸";color:var(--muted);width:14px;flex:none;font-size:15px}#settings details.ssec[open]>summary::before{content:"▾"}
+#settings details.ssec>summary h4.sec{margin:0!important;border:0;padding:0;display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:6px}
+#settings details.ssec>summary .shintline{color:var(--muted);font-size:12.5px;flex:1 1 12em}#settings details.ssec[open]>summary .shintline{visibility:hidden}
+#settings details.ssec>summary:hover h4.sec{color:var(--accent)}
 /* 2026-11-18 UX pass: grouped header, the VARA workspace under a data radio, a slimmer radio card */
 header .hmore{display:contents}header #hMenu{display:none}header .hgrow{flex:1 1 0;min-width:0}header .hsep{width:1px;align-self:stretch;background:rgba(255,255,255,.25);margin:2px 0}
 header button.hq{background:transparent;border-color:rgba(255,255,255,.18);font-weight:500}header button.hq[aria-pressed=true]{background:rgba(255,255,255,.3)}
@@ -2177,6 +2185,29 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{},
       ${one?`<div class="small"><button class="small quiet" data-vsendad title="Your reserved ad hoc channels as a file: their station shows ★ Install">★ Send my ad hoc channels</button> <button class="small linkish" data-vforget="${esc(one)}">Forget ${esc(one)}</button></div>`:""}</div>`}
   return bar+`<div class="vchan">${roster}${conv}</div>`}
 setInterval(()=>{document.querySelectorAll("[data-vnext]").forEach(x=>{x.textContent=vClock(+x.dataset.vnext-Date.now()/1000)})},1000);
+// ----- Settings sections fold (owner 2026-11-18: "sections are collapsed by default so that users don't have to scroll
+// through long lists"). Each tab with several sections is a short list of rows: the first is open, the rest closed,
+// each with a line saying what is inside; what you open stays open in this browser. -----
+const SSEC_HINT={"You and your station":"callsign, name, grid square","Display":"colours, clock","Net alerts":"reminders before each net",
+  "Logging nets":"VHF/UHF reach, AI net summary","Learned fixes":"corrections the station has learned","Local names":"names and places for the transcription",
+  "Winlink Express on this PC":"folder, Send as","Winlink gateway lists":"gateways from Winlink Express","xAI key":"the key for Sidekick, net summaries and Find nets",
+  "Station agent (Sidekick)":"enable it, on-air name, check-in line, license class","Sidekick's voice":"how Sidekick sounds on the air",
+  "Grok speech-to-text (compared)":"a second transcription to compare","Power and speed":"full speed and screen on during nets","This PC":"what the station changes on this PC"};
+(()=>{const dlg=$("settings");if(!dlg)return;
+  dlg.querySelectorAll("section.spanel").forEach(pan=>{const heads=[...pan.querySelectorAll("h4.sec")];if(heads.length<2)return;
+    heads.forEach((h,i)=>{const title=(h.childNodes[0]&&h.childNodes[0].textContent||"").trim(),key="hamsidekick.ssec."+pan.dataset.spanel+"."+title;
+      const d=document.createElement("details");d.className="ssec";d.dataset.ssec=title;
+      const sm=document.createElement("summary");h.parentNode.insertBefore(d,h);sm.appendChild(h);
+      if(SSEC_HINT[title]){const x=document.createElement("span");x.className="shintline";x.textContent=SSEC_HINT[title];sm.appendChild(x)}
+      d.appendChild(sm);
+      for(let n=d.nextSibling;n&&!(n.nodeType===1&&(n.matches("h4.sec")||n.querySelector("h4.sec")));){const nx=n.nextSibling;d.appendChild(n);n=nx}
+      let open=i===0;try{const v=localStorage.getItem(key);if(v!==null)open=v==="1"}catch(e){}
+      d.open=open;d.addEventListener("toggle",()=>{try{localStorage.setItem(key,d.open?"1":"0")}catch(e){}})})});
+  const openUp=el=>{for(let d=el&&el.closest&&el.closest("details.ssec");d;d=d.parentElement&&d.parentElement.closest("details.ssec"))d.open=true};
+  const siv=Element.prototype.scrollIntoView;Element.prototype.scrollIntoView=function(...a){openUp(this);return siv.apply(this,a)};   // a link to a setting opens its section
+  const foc=HTMLElement.prototype.focus;HTMLElement.prototype.focus=function(...a){openUp(this);return foc.apply(this,a)};
+  dlg.addEventListener("click",e=>{if(e.target.closest("summary a"))e.stopPropagation();
+    if(e.target.closest("button"))setTimeout(()=>dlg.querySelectorAll("details.ssec:not([open]) input.bad, details.ssec:not([open]) select.bad, details.ssec:not([open]) textarea.bad").forEach(openUp),400)},true)})();
 // ----- The VARA workspace under a data radio (owner 2026-11-18: "the station list as well as the chats ... and file
 // xfer ... shown under the radio, not on a pop up window"). The pop-up keeps the modem's setup and the by-hand link. -----
 const vI=(n,rid)=>$(n+"-"+(rid||VA.rid));
@@ -2412,7 +2443,7 @@ function renderBP(){
   const bands=`<option value="all">All bands</option><option value="hf"${BP.band==="hf"?" selected":""}>HF</option><option value="vu"${BP.band==="vu"?" selected":""}>VHF / UHF</option>${d.bands.slice().reverse().map(b=>`<option${BP.band===b.band?" selected":""}>${esc(b.band)}</option>`).join("")}`;
   const nflags=d.bands.reduce((n,b)=>n+b.flags,0);
   box.innerHTML=`<h3><a class="small noprint" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;float:right">Card (printable)</a>Band plan${d.location?` <span class="muted small">near ${esc(d.location)}</span>`:""}</h3>
-   <p class="small muted"${BP.view==="table"?"":" hidden"}>One table from every plan: the FCC rules (what is legal${cls?` for a ${esc(cls)}`:""}), the ARRL band plan, your state coordinator's plan and the local ARES / RACES / club plans. Where plans say different things the row is marked ⚠, with each plan's words. The state coordinator's words come first, then local plans, then the ARRL's.${cls?"":' <span class="warnc">Set your license class (Settings → Station agent) to see your privileges.</span>'}</p>
+   <p class="small muted"${BP.view==="table"?"":" hidden"}>One table from every plan: the FCC rules (what is legal${cls?` for a ${esc(cls)}`:""}), the ARRL band plan, your state coordinator's plan and the local ARES / RACES / club plans. Where plans say different things the row is marked ⚠, with each plan's words. The state coordinator's words come first, then local plans, then the ARRL's.${cls?"":' <span class="warnc">Set your license class (Settings → Sidekick & AI → Station agent) to see your privileges.</span>'}</p>
    <nav class="ntabs noprint" role="tablist" aria-label="View" style="margin:6px 0;flex-wrap:wrap">${[["table","Band plan"],["all","Full spectrum"],["voice","Ad hoc voice"],["data","Ad hoc VARA"],["radio","💾 Radio channels"]].map(([v,l])=>`<button role="tab" class="${BP.view===v?"on":""}" aria-selected="${BP.view===v}" data-bpview="${v}">${l}</button>`).join("")}</nav>
    <div class="row nfrow small noprint"><label>Show <select data-bpband>${bands}</select></label>
      ${BP.view!=="table"?"":cls?`<label class="chk"><input type="checkbox" data-bpmine${BP.mine?" checked":""}> Only where I may transmit</label>`:""}
@@ -2494,9 +2525,9 @@ async function renderPlans(full){
   const newIds=new Set((d.changes||{}).new||[]),goneIds=new Set((d.changes||{}).gone||[]);
   const found=(d.frequencies||[]).filter(f=>!f.kept);
   for(const id of [...PL.sel])if(!found.some(f=>f.id===id))PL.sel.delete(id);
-  const head=`<h4>Plans <a class="small" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;text-transform:none;letter-spacing:0">Card (printable)</a> <button class="linkish small" data-bpfromplans style="text-transform:none;letter-spacing:0">Open the band plan</button></h4><p class="small muted">The band plan below is built in and works offline. Local plans come from a web search (or a file you add): nothing is used until you keep it, and every frequency links to where it was found.${d.license_class?"":' <span class="warnc">Set your license class (Settings → Station agent) to see your privileges.</span>'}</p>`;
+  const head=`<h4>Plans <a class="small" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;text-transform:none;letter-spacing:0">Card (printable)</a> <button class="linkish small" data-bpfromplans style="text-transform:none;letter-spacing:0">Open the band plan</button></h4><p class="small muted">The band plan below is built in and works offline. Local plans come from a web search (or a file you add): nothing is used until you keep it, and every frequency links to where it was found.${d.license_class?"":' <span class="warnc">Set your license class (Settings → Sidekick & AI → Station agent) to see your privileges.</span>'}</p>`;
   const busy=PL.busy||d.busy;
-  const search=!d.key?'<p>Searching needs the xAI key (Settings → Station agent). You can still add a plan file once the key is set, and the band plan works without it.</p>'
+  const search=!d.key?'<p>Searching needs the xAI key (Settings → Sidekick & AI → Station agent). You can still add a plan file once the key is set, and the band plan works without it.</p>'
     :`<div class="row nfrow"><span>${d.location?`Near <b>${esc(d.location.label)}</b>`:'<span class="bad">Set the station\'s location first (Nets → Find nets).</span>'}</span>
       <label>Within <input id="plKm" type="number" min="5" max="400" value="${d.km}" style="width:5em"> km</label>
       <button class="primary" data-plgo${busy||!d.location?" disabled":""}>${busy?"Searching… clubs, the coordinator's band plan, ARES / RACES plans (up to two minutes)":d.at?"Search again":"Find local plans"}</button></div>
@@ -2679,7 +2710,7 @@ async function renderFind(){
   let d=NF.d;
   if(!d.location&&!NF.geoTried){box.innerHTML='<p class="muted">Finding this PC\'s location… (your browser may ask)</p>';await nfGeo();d=NF.d}
   const back='<p><button type="button" class="linkish" data-nfback>← Back to the schedule</button></p>';
-  if(!d.key){box.innerHTML=back+`<h4>Find nets near you</h4><p>This needs the xAI key: Settings → Station agent → xAI API key. One search costs about $0.10–0.30 and takes up to a minute.</p>`;return}
+  if(!d.key){box.innerHTML=back+`<h4>Find nets near you</h4><p>This needs the xAI key: Settings → Sidekick & AI → xAI key. One search costs about $0.10–0.30 and takes up to a minute.</p>`;return}
   const R=d.reach,both=R.HF&&R.VU,bands=NF.bands||(both?"":R.HF?"HF":"VU");
   const loc=d.location;
   const where=loc?`Near <b>${esc(loc.label)}</b>${loc.source==="grid"?"":""}. <span class="small muted">Only a rounded position (about 10 km) is sent, never a street address.</span>
@@ -3351,7 +3382,7 @@ async function openScan(rid,v){
    <p class="small muted">Between nets the station sweeps the HF phone bands open at this hour (on the bands your antenna works on), parks on signals above the noise, and keeps listening while there's a conversation. A net always comes first; turning the dial yourself pauses the scan for 30 minutes. Receive only.</p>
    <label>Antenna <input id="scAnt" value="${esc(ant.name||"")}" maxlength="40" placeholder="Inverted V"></label>
    <div class="bands small">Works on: ${Object.keys(v.bands).map(b=>`<label><input type="checkbox" data-scb="${b}"${(ant.bands||[]).includes(b)?" checked":""}>${b} m</label>`).join("")}</div>
-   <p class="small">${v.license_class?`Scans ${esc(v.license_class[0].toUpperCase()+v.license_class.slice(1))} phone only: ${Object.entries(v.bands).map(([b,x])=>`${b} m ${Number(x.from).toFixed(3)}–${Number(x.to).toFixed(3)}`).join(" · ")}`:"License class not set (Settings → Station agent): scans the whole phone segment of each band."}</p>
+   <p class="small">${v.license_class?`Scans ${esc(v.license_class[0].toUpperCase()+v.license_class.slice(1))} phone only: ${Object.entries(v.bands).map(([b,x])=>`${b} m ${Number(x.from).toFixed(3)}–${Number(x.to).toFixed(3)}`).join(" · ")}`:"License class not set (Settings → Sidekick & AI → Station agent): scans the whole phone segment of each band."}</p>
    <p class="small">Open now (by the hour): <b>${esc((v.now||[]).map(b=>b+" m").join(", "))}</b></p>
    <h4>Remembered frequencies</h4>${(v.spots||[]).length?`<table><tr><th>Frequency</th><th>Heard</th><th>Best hours</th><th>Calls</th><th></th></tr>${v.spots.map(s=>`<tr><td><b>${Number(s.freq_mhz).toFixed(3)}</b> ${esc(s.mode)}${s.pinned?" 📌":""}</td><td>${s.hits}× · ${esc((s.last||"").slice(5,16).replace("T"," "))}</td><td>${esc(Object.entries(s.hours||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]+":00").join(", "))}</td><td>${esc((s.calls||[]).slice(0,4).join(" "))}</td><td><button data-spot="${esc(s.key)}" data-do="${s.pinned?"unpin":"pin"}">${s.pinned?"Unpin":"Pin"}</button><button data-spot="${esc(s.key)}" data-do="hide">Hide</button></td></tr>`).join("")}</table>`:'<p class="small muted">None yet: frequencies with conversations are remembered here, by hour and day, and tried first next time.</p>'}
    <div class="row"><button id="scSave">Save</button> <button id="scClose">Close</button></div>`;
