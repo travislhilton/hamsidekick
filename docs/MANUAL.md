@@ -336,6 +336,19 @@ you chose is remembered. Each column shows:
   While a file is on its way, both stations show a progress bar: percent, KB of the size, the transfer rate, the
   time left and the time so far. **Cancel** stops it (VARA can only stop by dropping the link; the part already
   sent is thrown away); a cancelled file is not sent again unless you press Retry.
+  **Digipeaters (VARA FM only, owner 2026-11-18).** When two stations cannot hear each other directly, a VARA FM
+  digipeater in between relays the link. A digipeater is simply another station's VARA FM with its digipeater call
+  set: in VARA FM, **Settings → VARA Setup → Digipeater**, a callsign with its own SSID (for example W9XYZ-4,
+  different from the call that station chats with); VARA FM needs its licence key for this. Nothing is set in HAM
+  Sidekick on the digipeater itself: VARA FM relays by itself while it is running on the frequency.
+  To use one: choose the station, and under the chat fill **🛰 Path to …** with the digipeater's call (two calls for
+  two hops, the one nearest to you first; VARA FM allows at most two) and **Save path**. Every message, file and
+  link test to that station then goes `CONNECT … via …`, and the station waits longer for the answer (each hop
+  adds time). Empty = direct. **Announce via** (on the channel bar) sends your announcements through a digipeater
+  too, so stations beyond it see you. When another station's announcement arrives through digipeaters, its path is
+  filled in for you, backwards ("the way its announcement came"), and cleared again if it is later heard direct; a
+  path you saved yourself is never changed. A link through a digipeater is about half as fast per hop: run **Test
+  link speed** after changing the path (the old result is dropped).
   **Test link speed** (owner 2026-11-18), under the chat with a station: sends random test data to that station for
   30, 60 or 120 s (it is thrown away there) and measures the real speed. VARA starts slow and steps its speed up as
   data flows, so the result gives the average, the speed reached, VARA's speed level and S/N, and a table of **how

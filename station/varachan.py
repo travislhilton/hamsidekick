@@ -25,6 +25,7 @@ State (roster, threads, settings) is kept in the modem's folder as channel.json.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import uuid
@@ -42,6 +43,30 @@ KEEP = 300                         # messages kept per station
 PRESETS = ["{them} de {me}: hello, how copy?", "Copy you fine. S/N {sn} dB here.", "Roger, QSL.",
            "Stand by, back in a few minutes.", "Please say again.", "Name {name}, grid {grid}.",
            "Any traffic for me?", "Thanks for the contact. 73 de {me}."]
+
+
+MAX_DIGIS = 2                      # VARA FM relays a link, or an announcement, through at most two digipeaters
+
+
+def clean_via(v, kind: str = "fm", me: str = "", to: str = "") -> list[str]:
+    """A digipeater path as the operator typed it ("K7ABC-4, N0CALL-8"): callsigns, at most two, VARA FM only."""
+    from .vara import CALL_RE
+    words = [w for w in re.split(r"[\s,>]+", " ".join(v) if isinstance(v, (list, tuple)) else str(v or "")) if w]
+    words = [w.upper() for w in words if w.lower() != "via"]
+    if not words:
+        return []
+    if kind != "fm":
+        raise ValueError("digipeaters are VARA FM only")
+    if len(words) > MAX_DIGIS:
+        raise ValueError(f"VARA FM goes through at most {MAX_DIGIS} digipeaters")
+    for w in words:
+        if not CALL_RE.match(w):
+            raise ValueError(f"{w} is not a callsign")
+        if w in (me.upper(), to.upper()):
+            raise ValueError(f"{w} is one end of the link, not a digipeater on the way")
+    if len(set(words)) != len(words):
+        raise ValueError("the same digipeater twice")
+    return words
 
 
 EST_SIZES = (1_000, 10_000, 50_000, 100_000, 500_000, 1_000_000)
@@ -156,7 +181,7 @@ class Channel:
         s = v.state()
         if s.get("session") != "idle":
             raise ValueError("in a link now: the keep-alive goes when it ends")
-        v.cq()
+        v.cq(self.load().get("announce_via") or ())
         with self.lock:
             d = self.load()
             d["last_announce"] = self.clock()
@@ -184,6 +209,19 @@ class Channel:
                 r = d["roster"].get(str(body["read"]).upper())
                 if r:
                     r["unread"] = 0
+            kind = self.m.cfg().get("kind", "fm")
+            if "via_for" in body:                                # the digipeaters on the way to one station
+                c = str(body["via_for"] or "").upper()
+                from .vara import CALL_RE
+                if not CALL_RE.match(c):
+                    raise ValueError("choose a station first")
+                r = d["roster"].setdefault(c, {"call": c, "first_at": self.clock(), "unread": 0, "heard_at": None})
+                via = clean_via(body.get("via"), kind, self.m.call(), c)
+                if via != (r.get("via") or []):
+                    r["speed"] = None                            # measured over the old path
+                r.update(via=via, via_by="you" if via or body.get("direct") else None)
+            if "announce_via" in body:                           # ... and for your own announcements
+                d["announce_via"] = clean_via(body["announce_via"], kind, self.m.call())
             if "pin" in body:
                 d["pinned"] = str(body["pin"]).upper() if body["pin"] else None
             self.save(d)
@@ -315,10 +353,20 @@ class Channel:
             changed = True
             if name == "cq_heard":
                 self._heard(d, data.get("call"), "announce")
+                r = d["roster"].get((data.get("call") or "").upper())
+                back = [x for x in reversed(data.get("via") or []) if x][:MAX_DIGIS]
+                if r is not None:                                # the way its announcement came is the way back to it
+                    r["heard_via"] = back
+                    if r.get("via_by") != "you" and (r.get("via") or []) != back:
+                        r.update(via=back, via_by="heard" if back else None, speed=None)
             elif name == "connected":
                 self.linked = True
                 self.last_peer = peer
                 self._heard(d, peer, "link")
+                if self.opened != peer and data.get("via") is not None:      # it called us: its path, backwards, is ours
+                    r, back = d["roster"][peer], [x for x in reversed(data.get("via") or []) if x][:MAX_DIGIS]
+                    if r.get("via_by") != "you" and (r.get("via") or []) != back:
+                        r.update(via=back, via_by="heard" if back else None, speed=None)
                 if self.opened == peer and self.connect_at:      # how long the call took: part of every file's time
                     d["roster"][peer]["setup_s"] = round(self.clock() - self.connect_at + 3, 1)
                 self.activity_at = self.clock()
@@ -448,7 +496,8 @@ class Channel:
                 self.save(d)
                 return
             if session == "connecting":
-                if self.connect_at and now - self.connect_at > CONNECT_TIMEOUT_S:
+                hops = len((d["roster"].get(self.opened or "") or {}).get("via") or [])
+                if self.connect_at and now - self.connect_at > CONNECT_TIMEOUT_S * (1 + hops):
                     try:
                         v.abort("no answer")
                     except Exception:  # noqa: BLE001
@@ -463,7 +512,7 @@ class Channel:
             nxt = self._next(d, now)
             if nxt:
                 try:
-                    v.connect(nxt)
+                    v.connect(nxt, (d["roster"].get(nxt) or {}).get("via") or ())
                     self.opened, self.connect_at = nxt, now
                 except Exception as e:  # noqa: BLE001
                     for it in d["threads"].get(nxt, []):
@@ -566,7 +615,8 @@ class Channel:
             nxt = max(0, round((d.get("last_announce") or 0) + d["every_min"] * 60 - now))
         op = (getattr(self.m.st, "_saved", lambda: {})() or {}).get("operator") or {}
         return {"on": d["on"], "every_min": d["every_min"], "next_announce_s": nxt, "presets": d["presets"],
-                "pinned": d.get("pinned"), "roster": roster, "testing": s.get("testing"), "bitrate": s.get("bitrate"),
+                "pinned": d.get("pinned"), "roster": roster, "announce_via": d.get("announce_via") or [],
+                "testing": s.get("testing"), "bitrate": s.get("bitrate"),
                 "threads": {c: th[-120:] for c, th in d["threads"].items()},
                 "me": {"call": self.m.call(), "name": op.get("name") or "", "grid": op.get("grid") or ""},
                 "linger_s": LINGER_S.get(s.get("kind") or self.m.cfg().get("kind", "fm"), 20)}

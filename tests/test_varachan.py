@@ -288,3 +288,48 @@ def test_a_file_or_test_on_its_way_can_be_cancelled(tmp_path):
     clk.t += 120
     m.chan.tick()
     assert [c for c in v.calls if c[0] == "connect"] == [v.calls[[c[0] for c in v.calls].index("connect")]]
+
+
+def test_a_station_is_reached_through_vara_fm_digipeaters(tmp_path):
+    """Owner 2026-11-18: "we need to be able to support routing through VARA FM digipeaters ... with proper
+    configuration". A path per station (at most two digipeaters), learnt from the way its announcement came, and one
+    for your own announcements."""
+    from station.varachan import clean_via
+    assert clean_via("k7abc-4, n0call-8") == ["K7ABC-4", "N0CALL-8"] and clean_via("") == [] and clean_via("via K7ABC-4") == ["K7ABC-4"]
+    for bad, why in (("K7ABC-4 N0CALL-8 W9XYZ-3", "at most 2"), ("NOT!", "not a callsign"), ("K7ABC-4 K7ABC-4", "twice")):
+        with pytest.raises(ValueError, match=why):
+            clean_via(bad)
+    with pytest.raises(ValueError, match="one end"):
+        clean_via("K7ABC", me="W9XYZ", to="K7ABC")
+    with pytest.raises(ValueError, match="VARA FM only"):
+        clean_via("K7ABC-4", kind="hf")
+    st, m, v, clk = _chan(tmp_path)
+    cqs = []
+    v.cq = lambda via=(): cqs.append(list(via))
+    m.act("join", {})
+    assert cqs == [[]]
+    m.act("channel", {"announce_via": "n0call-4"})                       # your announcements go through it too
+    m.act("announce", {})
+    assert cqs[-1] == ["N0CALL-4"] and m.chan.view()["announce_via"] == ["N0CALL-4"]
+    # set by hand: the link is called through it, and waits longer for the answer
+    m.act("channel", {"via_for": "K7ABC", "via": "N0CALL-4 N0CALL-8"})
+    m.act("csend", {"to": ["K7ABC"], "text": "through the hill"})
+    assert v.calls[-1] == ("connect", "K7ABC", ["N0CALL-4", "N0CALL-8"])
+    clk.t += 400                                                         # 150 s a hop: 3 x 150 = 450 s here
+    m.chan.tick()
+    assert not any(c[0] == "abort" for c in v.calls)
+    clk.t += 60
+    m.chan.tick()
+    assert any(c[0] == "abort" for c in v.calls)
+    r = next(x for x in m.chan.view()["roster"] if x["call"] == "K7ABC")
+    assert r["via"] == ["N0CALL-4", "N0CALL-8"] and r["via_by"] == "you"
+    # learnt: an announcement that came through digipeaters gives the way back (reversed); heard direct clears it
+    m._event("cq_heard", {"call": "W9XYZ-3", "via": ["N0CALL-8", "N0CALL-4"]})
+    r = next(x for x in m.chan.view()["roster"] if x["call"] == "W9XYZ-3")
+    assert r["via"] == ["N0CALL-4", "N0CALL-8"] and r["via_by"] == "heard"
+    m._event("cq_heard", {"call": "W9XYZ-3", "via": []})
+    assert next(x for x in m.chan.view()["roster"] if x["call"] == "W9XYZ-3")["via"] == []
+    m._event("cq_heard", {"call": "K7ABC", "via": []})                   # the one you set by hand stays
+    assert next(x for x in m.chan.view()["roster"] if x["call"] == "K7ABC")["via"] == ["N0CALL-4", "N0CALL-8"]
+    m.act("channel", {"via_for": "K7ABC", "via": ""})                    # empty: direct again
+    assert next(x for x in m.chan.view()["roster"] if x["call"] == "K7ABC")["via"] == []

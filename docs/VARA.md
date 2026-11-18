@@ -29,6 +29,11 @@ The bytes may arrive in any size of piece: a receiver buffers until a header lin
 | `TESTEND <seq>\n` | The end of a link test. |
 | `TESTED <seq> <bytes> <ms>\n` | The receiver's answer to TESTEND: the bytes it counted (headers included) and the milliseconds from the first TEST frame. |
 
+**Digipeaters (VARA FM).** `CONNECT <me> <them> via <digi1> [<digi2>]` and `CQFRAME <me> <digi1> [<digi2>]` relay
+a link or an announcement through at most two VARA FM digipeaters (a VARA FM whose Digipeater call is set in its
+own VARA Setup). A CQ frame heard through digipeaters is reported with them after the call; the station keeps that
+path, reversed, as the way back. HSK1 itself is unchanged over a relayed link.
+
 **Capabilities.** The handshake may carry words after the call, each starting with `+`: `HSK1 <call> +TEST` says
 "I understand the link test". A link test is sent only to a station that said `+TEST`; a station that did not is
 never sent a TEST frame. Unknown `+` words are ignored.
