@@ -265,13 +265,22 @@ class Channel:
         return self.view()
 
     def cancel(self, mid: str) -> dict:
+        drop = False
         with self.lock:
             d = self.load()
             for th in d["threads"].values():
                 for it in th:
                     if it["id"] == mid and it["status"] in ("queued", "failed"):
                         it.update(status="cancelled")
+                    elif it["id"] == mid and it["status"] == "sending" and it["dir"] == "out":
+                        it.update(status="cancelled", why="you cancelled it")     # a file or a link test on its way:
+                        drop = True                                               # VARA can only stop it by dropping the link
             self.save(d)
+        if drop:
+            try:
+                self._vara().abort("the operator cancelled the transfer")
+            except Exception:  # noqa: BLE001
+                pass
         return self.view()
 
     def close_link(self) -> dict:
@@ -318,7 +327,7 @@ class Channel:
                 self._heard(d, peer, "link", sn=data.get("sn"))
             elif name == "bitrate" and peer:
                 self._heard(d, peer, "link", **{"bps_" + data.get("way", "tx"): data.get("bps")})
-            elif name == "test_started" and peer:
+            elif name in ("test_started", "file_receiving", "file_progress") and peer:
                 self.activity_at = self.clock()
             elif name in ("test_done", "test_failed") and peer:
                 it = self._find(d, peer, "test", data.get("seq"))
@@ -326,6 +335,8 @@ class Channel:
                 if res:
                     res = dict(res, at=self.clock(), setup_s=d["roster"].get(peer, {}).get("setup_s") or SETUP_S)
                     self._heard(d, peer, "link", speed=res)
+                if it and it["status"] == "cancelled":
+                    it = None
                 if it:
                     it.update(status="delivered" if res else "failed", why=data.get("why") if not res or res.get("partial") else None)
                     if res:
@@ -356,7 +367,7 @@ class Channel:
                 self.activity_at = self.clock()
             elif name in ("file_sent", "file_failed", "file_rejected") and peer:
                 it = self._find(d, peer, "file", data.get("seq"))
-                if it:
+                if it and it["status"] != "cancelled":
                     it.update(status="delivered" if name == "file_sent" else "failed", why=data.get("why"))
                     if name == "file_sent" and it.get("link_at"):
                         it["took_s"] = round(self.clock() - it["link_at"], 1)

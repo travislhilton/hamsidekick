@@ -331,6 +331,9 @@ you chose is remembered. Each column shows:
   the chat with that station as a 📎 link, and under **Files received**; it is kept in the modem's `inbox` folder,
   and a program file is given a `.blocked` ending so a double-click cannot run it. The other station needs this
   program for files (a plain VARA terminal gets chat only).
+  While a file is on its way, both stations show a progress bar: percent, KB of the size, the transfer rate, the
+  time left and the time so far. **Cancel** stops it (VARA can only stop by dropping the link; the part already
+  sent is thrown away); a cancelled file is not sent again unless you press Retry.
   **Test link speed** (owner 2026-11-18), under the chat with a station: sends random test data to that station for
   30, 60 or 120 s (it is thrown away there) and measures the real speed. VARA starts slow and steps its speed up as
   data flows, so the result gives the average, the speed reached, VARA's speed level and S/N, and a table of **how

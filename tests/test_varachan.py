@@ -268,3 +268,23 @@ def test_a_link_test_is_queued_saved_per_station_and_gives_file_times(tmp_path):
     m.chan.tick()
     it = m.chan.view()["threads"]["N0CALL"][-1]
     assert it["status"] == "failed" and "update" in it["why"] and tests == [60]
+
+
+def test_a_file_or_test_on_its_way_can_be_cancelled(tmp_path):
+    """Owner 2026-11-18: "also need a way to cancel". VARA can only stop what it holds by dropping the link."""
+    st, m, v, clk = _chan(tmp_path)
+    m.act("join", {})
+    m.act("csend", {"to": ["K7ABC"], "name": "big.bin", "data": base64.b64encode(b"x" * 5000).decode()})
+    _link(m, v, "K7ABC")
+    m.chan.tick()
+    it = m.chan.view()["threads"]["K7ABC"][-1]
+    assert it["status"] == "sending"
+    m.act("cancel", {"id": it["id"]})
+    assert v.calls[-1][0] == "abort"
+    m._event("file_failed", {"seq": 1, "name": "big.bin", "why": "the link closed before the receipt"})
+    _drop(m, v)
+    it = m.chan.view()["threads"]["K7ABC"][-1]
+    assert it["status"] == "cancelled" and it["why"] == "you cancelled it"      # not "failed", and not sent again
+    clk.t += 120
+    m.chan.tick()
+    assert [c for c in v.calls if c[0] == "connect"] == [v.calls[[c[0] for c in v.calls].index("connect")]]

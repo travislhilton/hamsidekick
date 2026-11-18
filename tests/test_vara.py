@@ -392,3 +392,39 @@ def test_a_link_test_needs_a_station_that_understands_it_and_reports_a_cut_link(
     A.v.disconnect()
     assert wait(lambda: A.got("test_done"))
     assert A.got("test_done")[0]["result"]["partial"] and A.v.state()["testing"] is None
+
+
+def test_the_handshake_counts_only_when_its_whole_line_has_arrived(tmp_path):
+    """On the air 2026-11-18: at 566 bps the handshake came in pieces, "HSK1" was believed after its first 5 bytes,
+    and a link test was refused ("no link test") before "+TEST" had arrived."""
+    v = V.Vara(tmp_path, "W9XYZ", winlink_open=lambda: False)
+    v._on_data(b"HSK1 K7A")
+    assert v.state()["peer_proto"] is None and v.state()["peer_caps"] == []
+    v._on_data(b"BC +TEST\n")
+    assert v.state()["peer_proto"] == "HSK1" and v.state()["peer_caps"] == ["+TEST"]
+
+
+def test_a_file_on_its_way_shows_progress_speed_and_time_left(tmp_path):
+    """Owner 2026-11-18: "progress percentage, size of file being sent, transfer rate, expected time that it will
+    complete"."""
+    t = [1000.0]
+    v = V.Vara(tmp_path, "W9XYZ", winlink_open=lambda: False, clock=lambda: t[0])
+    with v.lock:
+        v.st.update(session="connected", peer="K7ABC")
+        v.st["sending"] = {"seq": 1, "name": "a.pdf", "size": 10_000, "left": 10_000, "at": 1000.0, "done": 0,
+                           "bps": None, "eta_s": None, "elapsed_s": 0}
+    for dt, left in ((2, 9_000), (4, 8_000), (10, 5_000)):
+        t[0] = 1000.0 + dt
+        v._on_status(f"BUFFER {left}")
+    x = v.state()["sending"]
+    assert x["done"] == 5_000 and x["bps"] == 4_000 and x["eta_s"] == 10 and x["elapsed_s"] == 10
+    # receiving: the same numbers from the bytes that arrive
+    v._on_data(b"HSK1 K7ABC +TEST\nFILE 1 b.bin 4000 " + b"0" * 64 + b"\n")
+    assert v.state()["receiving"]["size"] == 4000 and v.state()["receiving"]["done"] == 0
+    t[0] += 4
+    v._on_data(b"x" * 1000)
+    r = v.state()["receiving"]
+    assert r["done"] == 1000 and r["bps"] == 2000 and r["eta_s"] == 12
+    t[0] += 4
+    v._on_data(b"x" * 3000)                                             # whole (the checksum is wrong: refused)
+    assert v.state()["receiving"] is None

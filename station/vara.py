@@ -135,7 +135,7 @@ class Vara:
                    "ptt": False, "busy": False, "sn": None, "registered": None, "alive_at": None,
                    "soundcard_ok": True, "last_reply": None, "last_cmd": None, "listening": False,
                    "peer_proto": None, "sending": None, "cq_heard": [], "error": None, "kind": kind,
-                   "peer_caps": [], "bitrate": {}, "testing": None,
+                   "peer_caps": [], "bitrate": {}, "testing": None, "receiving": None,
                    "mycall": call, "ptt_mode": ptt_mode,
                    "ptt_at": None, "busy_at": None, "cq_at": None}   # last PTT ON / BUSY ON / our CQ frame: did VARA key, hear
         self._reset_session()
@@ -266,13 +266,27 @@ class Vara:
         with self.lock:
             seq = self._next_seq()
             self.out_files[seq] = {"seq": seq, "name": name, "size": len(data), "sha256": sha, "at": self.clock()}
-            self.st["sending"] = {"seq": seq, "name": name, "size": len(data), "left": len(data)}
+            self.st["sending"] = {"seq": seq, "name": name, "size": len(data), "left": len(data), "at": self.clock(),
+                                  "done": 0, "bps": None, "eta_s": None, "elapsed_s": 0}
         self._cmd("COMPRESSION FILES")
         self._data(f"FILE {seq} {urllib.parse.quote(name, safe='')} {len(data)} {sha}\n".encode() + data)
         self._log({"kind": "file", "dir": "out", "peer": self.st["peer"], "seq": seq, "name": name,
                    "size": len(data), "sha256": sha})
         self._emit("file_sending", {"seq": seq, "name": name, "size": len(data)})
         return seq
+
+    @staticmethod
+    def _progress(x: dict, done: int, now: float):
+        """A transfer's numbers for the operator: bytes done, the speed over the last 15 s or so, the time left."""
+        h = x.setdefault("hist", [[x.get("at", now), 0]])
+        if done > h[-1][1]:
+            h.append([now, done])
+        while len(h) > 2 and h[1][0] <= now - 15:
+            h.pop(0)
+        span = now - h[0][0]
+        rate = (done - h[0][1]) / span if span >= 2 and done > h[0][1] else None      # bytes a second
+        x.update(done=done, bps=round(rate * 8) if rate else None,
+                 eta_s=round((x["size"] - done) / rate) if rate else None, elapsed_s=round(now - x.get("at", now)))
 
     def link_test(self, seconds: float = TEST_S) -> int:
         """Feed random bytes to the linked station for `seconds`, and time them (see the module's notes)."""
@@ -537,7 +551,10 @@ class Vara:
             with self.lock:
                 self.st["buffer"] = n
                 if self.st["sending"]:
-                    self.st["sending"]["left"] = min(self.st["sending"]["size"], n)
+                    x = self.st["sending"]
+                    x["left"] = min(x["size"], n)
+                    if self.clock() - x["at"] >= 0.3:              # a BUFFER line from before the file was written lies
+                        self._progress(x, x["size"] - x["left"], self.clock())
             self._emit("buffer", {"bytes": n, "sending": self.state()["sending"]})
             self._test_feed(from_buffer=True)
         elif k == "BITRATE" and len(w) >= 3:                       # "BITRATE (4)  1415 bps TX": VARA's speed level now
@@ -629,7 +646,7 @@ class Vara:
             res = self._test_result(test, partial=True) if test and test["curve"][-1][1] >= 2000 else None
             self._reset_session()
             self.st.update(session="idle", peer=None, via=[], bw=None, peer_proto=None, sending=None, buffer=0,
-                           peer_caps=[], bitrate={}, testing=None)
+                           peer_caps=[], bitrate={}, testing=None, receiving=None)
         if test:
             self._emit("test_done" if res else "test_failed",
                        {"seq": test["seq"], "result": res, "why": "the link closed before the test finished"})
@@ -681,6 +698,14 @@ class Vara:
                 p["size_in"] = p.get("size_in", 0) + take
             p["need"] -= take
             del b[:take]
+            rx = self.st["receiving"] if p["kind"] == "file" else None
+            if rx:
+                now = self.clock()
+                with self.lock:
+                    self._progress(rx, p["size"] - p["need"], now)
+                if p["need"] and now - rx["said_at"] >= 1:        # tell the dashboard about once a second
+                    rx["said_at"] = now
+                    self._emit("file_progress", {"seq": p["seq"], "done": rx["done"], "size": p["size"]})
             if p["need"] == 0:
                 self.pending = None
                 self._finish(p)
@@ -692,8 +717,9 @@ class Vara:
             if head == b"HSK1 "[:len(head)] and len(head) < 5:
                 return False
             self.mode = "hsk" if head == b"HSK1 " else "raw"
-            with self.lock:
-                self.st["peer_proto"] = "HSK1" if self.mode == "hsk" else "raw"
+            if self.mode == "raw":                  # "HSK1" is said once its whole line is here (it names what the
+                with self.lock:                     # other program can do): over a slow link the line comes in pieces
+                    self.st["peer_proto"] = "raw"
             return True
         if self.mode == "raw":
             m = re.search(rb"[\r\n]", b)
@@ -729,6 +755,7 @@ class Vara:
             if k == "HSK1":
                 with self.lock:
                     self.st["peer_caps"] = [x.upper() for x in w[2:] if x.startswith("+")][:8]
+                    self.st["peer_proto"] = "HSK1"
                 self._emit("handshake", {"peer": w[1].upper() if len(w) > 1 else None, "caps": self.st["peer_caps"]})
             elif k == "TEST" and len(w) == 3:
                 n = int(w[2])
@@ -782,6 +809,10 @@ class Vara:
                 if size > self.max_file:
                     p["discard"] = f"too large ({size} bytes; this station takes up to {self.max_file})"
                 self.pending = p
+                with self.lock:
+                    self.st["receiving"] = {"seq": seq, "name": name, "size": size, "at": self.clock(), "done": 0,
+                                            "bps": None, "eta_s": None, "elapsed_s": 0, "said_at": self.clock()}
+                self._emit("file_receiving", {"seq": seq, "name": name, "size": size})
                 if size == 0:
                     self.pending = None
                     self._finish(p)
@@ -800,6 +831,8 @@ class Vara:
         if p["kind"] == "msg":
             self._chat_in(p["seq"], bytes(p["body"]).decode("utf-8", "replace"))
             return
+        with self.lock:
+            self.st["receiving"] = None
         if p.get("discard"):
             return self._reject(p, p["discard"])
         body = bytes(p["body"])
