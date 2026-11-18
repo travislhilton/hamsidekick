@@ -70,7 +70,7 @@ class FakeVara:
         w = line.split()
         self.push("OK")
         k = w[0]
-        if line in ("CHAT ON", "LISTEN ON"):
+        if line in ("CHAT ON", "LISTEN ON", "LISTEN CQ"):
             self.listening = True
         elif line == "LISTEN OFF":
             self.listening = False
@@ -338,3 +338,13 @@ def test_two_ssids_of_one_callsign_are_two_stations(tmp_path):
     import json
     log = next((tmp_path / "vara").glob("*.jsonl")).read_text().splitlines()
     assert [json.loads(x)["dir"] for x in log if json.loads(x)["kind"] == "connected"] == ["in", "out"]
+
+
+def test_listening_also_asks_vara_for_the_cq_frames_it_hears(pair):
+    """2026-11-18 on the air: two stations announced on one frequency and neither saw the other, because VARA
+    reports the CQ frames it hears only after LISTEN CQ."""
+    A, _ = pair
+    assert wait(lambda: "CWID ON" in A.fake.cmds)
+    A.v.listen(True)
+    assert wait(lambda: "LISTEN CQ" in A.fake.cmds)
+    assert A.fake.cmds.index("CHAT ON") < A.fake.cmds.index("LISTEN CQ")

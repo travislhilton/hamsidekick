@@ -167,6 +167,9 @@ class Vara:
         if on:
             self._need_tx()
             self._cmd("CHAT ON")                         # CHAT ON includes LISTEN ON (VARA's own spec)
+            self._cmd("LISTEN CQ")                       # ... and report the CQ frames heard (CQFRAME <call>): with plain
+            # LISTEN ON VARA answers calls but says nothing of announcements (2026-11-18: two stations announced on
+            # one frequency, VARA's own ping worked both ways, neither roster showed the other)
         else:
             self._cmd("LISTEN OFF")
         with self.lock:
