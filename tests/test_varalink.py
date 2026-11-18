@@ -287,3 +287,35 @@ def test_ad_hoc_channels_go_over_vara_and_install_with_one_click(tmp_path):
             _post(base, "/api/adhoc/install", {"name": "../vara.json"})
     finally:
         srv.shutdown()
+
+
+def _vara_folder(root, name, port, ini="VARAFM.ini"):
+    d = root / name
+    d.mkdir(parents=True)
+    (d / ini).write_text(f"[Setup]\r\nPTTPort=COM1\r\nTCP Command Port={port}\r\nKISS Port=8100\r\n", encoding="latin-1")
+    return d
+
+
+def test_the_vara_copies_on_this_pc_are_never_suggested_and_name_the_one_not_answering(tmp_path):
+    """Owner 2026-11-17: Winlink Express on a VARA FM at 8300, a second VARA FM (C:\\VARA FM 2) on 8310 for chat. The
+    suggestion offered 8300/8301 again, and "not answering on 127.0.0.1:8310" could not say which copy was meant."""
+    pc = tmp_path / "C"
+    _vara_folder(pc, "VARA", 8400, "VARA.ini")
+    _vara_folder(pc, "VARA FM", 8300)
+    two = _vara_folder(pc, "VARA FM 2", 8310)
+    (pc / "Other").mkdir()
+    assert varalink.vara_copies([pc, tmp_path / "missing"]) == {8400: str(pc / "VARA"), 8300: str(pc / "VARA FM"),
+                                                                  8310: str(two)}
+    st, a, b = _two(tmp_path / "st")
+    st.vara.scan_copies = lambda: varalink.vara_copies([pc])
+    assert st.vara.suggest_ports() == (8320, 8321)              # Express's 8300 and the second copy's 8310 are taken
+    v = st.vara.settings({"radio": a, "kind": "fm", "use": "chat", "enabled": True})
+    assert v["modems"][0]["cfg"]["cmd_port"] == 8320
+    c = dict(st.vara.modem_cfg(a), cmd_port=8310)
+    t = st.vara.down_text(c)
+    assert "is " + str(two) + " open?" in t and "close VARA and open it again" in t
+    t = st.vara.down_text(dict(c, cmd_port=8330))
+    assert "no copy of VARA on this PC is set to 8330" in t and "VARA FM 2 8310" in t and "TCP port 8330" in t
+    assert "that PC" in st.vara.down_text(dict(c, host="192.168.1.20"))
+    st.vara.scan_copies, st.vara._copies_at = (lambda: {}), -1e9  # none found (not Windows): the old plain sentence
+    assert "is that copy of VARA open?" in st.vara.down_text(c)

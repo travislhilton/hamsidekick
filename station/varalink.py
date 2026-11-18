@@ -40,6 +40,7 @@ PORTS = (8300, 8310, 8320, 8330, 8340, 8350)       # suggested pairs: cmd, cmd +
 CHECK_S = 5
 
 
+VARA_SCAN_S = 60.0            # how long the scan of VARA copies on this PC (vara_copies) is kept
 ADHOC_SUFFIX = ".hsadhoc"     # a HAM Sidekick ad hoc channels file (adhoc.export), sent over VARA (owner 2026-11-16)
 
 
@@ -54,6 +55,33 @@ def _adhoc_summary(p: Path) -> dict | None:
     return {"from": str(obj.get("from") or "")[:12] or None, "channels": len(rows),
             "voice": sum(r["kind"] == "voice" for r in rows), "data": sum(r["kind"] == "data" for r in rows),
             "skipped": len(rep["skipped"])}
+
+
+def vara_copies(roots=None) -> dict[int, str]:
+    """Every copy of VARA installed on this PC and the command port it is set to: {cmd_port: folder}. A copy is a folder
+    named VARA* (C:\\VARA, C:\\VARA FM, C:\\VARA FM 2 ...) holding VARA's .ini with "TCP Command Port=" (VARA Setup ->
+    TCP port; the data port is that + 1). Owner 2026-11-17: a second VARA FM on 8310 beside Winlink Express's VARA FM on
+    8300 - the suggestion offered 8300 again, and "not answering" could not say which copy was meant."""
+    if roots is None:
+        import os
+        if os.name != "nt":
+            return {}
+        roots = [Path("C:/")] + [Path(os.environ[k]) for k in ("ProgramFiles", "ProgramFiles(x86)") if os.environ.get(k)]
+    out: dict[int, str] = {}
+    for root in roots:
+        try:
+            dirs = [d for d in Path(root).iterdir() if d.is_dir() and d.name.upper().startswith("VARA")]
+        except OSError:
+            continue
+        for d in sorted(dirs):
+            for ini in sorted(d.glob("*.ini")):
+                try:
+                    m = re.search(r"^\s*TCP Command Port\s*=\s*(\d+)", ini.read_text(encoding="latin-1"), re.M | re.I)
+                except OSError:
+                    continue
+                if m:
+                    out.setdefault(int(m.group(1)), str(d))
+    return out
 
 
 class Modem:
@@ -217,8 +245,7 @@ class Modem:
             if c["use"] == "shared" and self.link._express():
                 return {"key": "express", "text": "Winlink Express's turn: it is open (this station takes VARA "
                                                   "back when it closes)"}
-            return {"key": "down", "text": f"VARA is not answering on {c['host']}:{c['cmd_port']}: is that copy of "
-                                           "VARA running? Another program (Winlink Express?) may be using it"}
+            return {"key": "down", "text": self.link.down_text(c)}
         if s.get("session") == "connected":
             return {"key": "connected", "text": f"Connected to {s.get('peer')}"}
         if s.get("session") == "connecting":
@@ -347,6 +374,8 @@ class Link:
         self.stop_ev = threading.Event()
         self._checker = None
         self._express_at, self._express_val = 0.0, False
+        self.scan_copies = vara_copies                   # tests swap in their own
+        self._copies_at, self._copies = -1e9, {}
 
     # ----- settings (data/vara.json: {"modems": {radio id: modem}}) -----
     def _path(self) -> Path:
@@ -402,9 +431,38 @@ class Link:
     def any_enabled(self) -> bool:
         return any(m.get("enabled") for m in self._load()["modems"].values())
 
+    def copies(self) -> dict[int, str]:
+        """vara_copies(), kept VARA_SCAN_S."""
+        now = time.monotonic()
+        if now - self._copies_at > VARA_SCAN_S:
+            try:
+                self._copies = dict(self.scan_copies() or {})
+            except Exception:  # noqa: BLE001
+                self._copies = {}
+            self._copies_at = now
+        return self._copies
+
+    def down_text(self, c: dict) -> str:
+        """Why a modem's VARA is not answering, naming the copy of VARA set to its port when there is one."""
+        port = c["cmd_port"]
+        head = f"VARA is not answering on {c['host']}:{port}"
+        if c["host"] not in ("127.0.0.1", "localhost"):
+            return f"{head}: is VARA open on that PC, set to TCP port {port}?"
+        copies = self.copies()
+        if not copies:
+            return f"{head}: is that copy of VARA open? Another program (Winlink Express?) may be using it"
+        if port in copies:
+            return (f"{head}: is {copies[port]} open? After changing VARA's TCP port, close VARA and open it again. "
+                    "Only one program at a time can use a copy of VARA")
+        have = ", ".join(f"{Path(f).name} {p}" for p, f in sorted(copies.items()))
+        return (f"{head}: no copy of VARA on this PC is set to {port} ({have}). In the copy for this radio: "
+                f"VARA Setup → TCP port {port}, then close and reopen VARA")
+
     def suggest_ports(self) -> tuple[int, int]:
         used = {m.get("cmd_port") for m in self._load()["modems"].values()} | \
                {m.get("data_port") for m in self._load()["modems"].values()}
+        for p in self.copies():               # another copy of VARA on this PC (Winlink Express's 8300) is not free
+            used |= {p, p + 1}
         for p in PORTS:
             if p not in used and p + 1 not in used:
                 return p, p + 1
