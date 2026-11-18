@@ -320,3 +320,20 @@ def test_a_plain_vara_terminal_gets_text_and_no_files(pair):
     assert c["raw"] and c["text"] == "hello from a plain terminal" and A.v.state()["peer_proto"] == "raw"
     with pytest.raises(V.VaraRefused, match="handshake"):
         A.v.send_file(name="x.txt", data=b"x")
+
+
+def test_two_ssids_of_one_callsign_are_two_stations(tmp_path):
+    """Owner 2026-11-17: W9XYZ-8 on one station, W9XYZ-7 on the other. A call from W9XYZ-7 to W9XYZ-8 is from the
+    other station: the peer is W9XYZ-7 and it came in (it was once taken for our own outgoing call: same base call)."""
+    assert V._same_call("W9XYZ", "W9XYZ-0") and not V._same_call("W9XYZ-7", "W9XYZ-8")
+    v = V.Vara(tmp_path, "W9XYZ-8", winlink_open=lambda: False)
+    got = []
+    v.on_event = lambda name, data: got.append((name, data))
+    v._on_status("CONNECTED W9XYZ-7 W9XYZ-8 2300")
+    assert v.state()["peer"] == "W9XYZ-7" and ("connected", {"peer": "W9XYZ-7", "via": [], "bw": 2300}) in got
+    v._on_status("DISCONNECTED")
+    v._on_status("CONNECTED W9XYZ-8 W9XYZ-7 2300")             # our own call out
+    assert v.state()["peer"] == "W9XYZ-7"
+    import json
+    log = next((tmp_path / "vara").glob("*.jsonl")).read_text().splitlines()
+    assert [json.loads(x)["dir"] for x in log if json.loads(x)["kind"] == "connected"] == ["in", "out"]

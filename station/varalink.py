@@ -35,7 +35,7 @@ from . import bandplan
 
 USES = ("chat", "shared", "winlink")
 MODEM = {"radio": None, "kind": "hf", "host": "127.0.0.1", "cmd_port": 8300, "data_port": 8301, "bw": None,
-         "use": "shared", "enabled": False, "handed_off": False, "fm_width": "narrow"}
+         "use": "shared", "enabled": False, "handed_off": False, "fm_width": "narrow", "ssid": None}
 PORTS = (8300, 8310, 8320, 8330, 8340, 8350)       # suggested pairs: cmd, cmd + 1
 CHECK_S = 5
 
@@ -102,6 +102,13 @@ class Modem:
     def cfg(self) -> dict:
         return self.link.modem_cfg(self.rid)
 
+    def call(self) -> str:
+        """The call this modem's VARA uses: the station's callsign, with this modem's SSID when one is set (owner
+        2026-11-17: W9XYZ-8 on one station, W9XYZ-7 on another; the station's own callsign stays W9XYZ)."""
+        me = str(getattr(self.st, "me", "") or "").upper().strip()
+        ssid = self.cfg().get("ssid")
+        return f"{me.split('-')[0]}-{ssid}" if me and ssid else me
+
     def dir(self) -> Path:
         c = self.cfg()
         base = Path(self.st.data) / "vara"
@@ -154,7 +161,7 @@ class Modem:
             from .vara import Vara as mk
         shared = c["use"] == "shared"
         try:
-            v = mk(data_dir=self.st.data, log_dir=self.dir(), mycall=getattr(self.st, "me", ""), kind=c["kind"],
+            v = mk(data_dir=self.st.data, log_dir=self.dir(), mycall=self.call(), kind=c["kind"],
                    host=c["host"], cmd_port=c["cmd_port"], data_port=c["data_port"], tx_allowed=self.tx_allowed,
                    bw=c["bw"] if c["kind"] == "hf" else None, on_event=self._event,
                    winlink_open=(lambda: self.link._express()) if shared else (lambda: False))
@@ -221,7 +228,7 @@ class Modem:
             except Exception:  # noqa: BLE001
                 s = None
         out = {"radio": self.rid, "name": r.get("name") or self.rid, "freq_mhz": r.get("freq_mhz"), "cfg": c,
-               "tx_ok": ok, "tx_why": why, "state": s, "last": self.last_event, "status": self._status(c, s)}
+               "call": self.call(), "tx_ok": ok, "tx_why": why, "state": s, "last": self.last_event, "status": self._status(c, s)}
         if transcript:
             try:
                 out["channel"] = self.chan.view() if self.runs() else None
@@ -528,6 +535,15 @@ class Link:
             if body["fm_width"] not in ("narrow", "wide"):
                 raise ValueError("VARA FM is narrow or wide")
             c["fm_width"] = body["fm_width"]
+        if "ssid" in body:                                   # VARA's call = the station's callsign + this SSID
+            v = body["ssid"]
+            try:
+                v = int(v) if v not in (None, "", 0, "0") else None
+            except (TypeError, ValueError):
+                raise ValueError("an SSID is 1 to 15") from None
+            if v is not None and not 1 <= v <= 15:
+                raise ValueError("an SSID is 1 to 15")
+            c["ssid"] = v
         if "enabled" in body:
             c["enabled"] = bool(body["enabled"])
         for orid, o in mods.items():                         # two modems never share a port on one host
@@ -604,7 +620,8 @@ class Link:
         data = self.data_radios()
         out = [self.modem(rid).view(transcript) for rid in mods if rid in {r["id"] for r in data}]
         return {"modems": out, "radios": [r | {"modem": r["id"] in mods} for r in data],
-                "express_running": self._express(), "suggest_ports": list(self.suggest_ports())}
+                "express_running": self._express(), "suggest_ports": list(self.suggest_ports()),
+                "mycall": str(getattr(self.st, "me", "") or "").upper().split("-")[0]}
 
     def inbox_file(self, name: str) -> Path | None:
         if not re.fullmatch(r"[\w .@()+,=-]{1,200}", name or "") or name.startswith("."):

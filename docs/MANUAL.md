@@ -298,6 +298,10 @@ you chose is remembered. Each column shows:
     lets go of the modem; it takes it back when Express closes. **Hand to Winlink Express now** / **Take it back** do
     the same by hand.
   - **Winlink Express only**: the station never connects to it; listed so the station's plan is complete.
+  - **Call** (2026-11-17): the call this VARA uses on the air is your station's callsign, or that callsign with an
+    **SSID** (W9XYZ-7 at one station, W9XYZ-8 at another) so your own stations can reach each other. The station gives
+    VARA this call (MYCALL) each time it connects. The station's callsign in Settings (net logs, Sidekick, spoken IDs) does not change. The VARA
+    window shows the call in use ("VARA FM as W9XYZ-8").
 
   **The channel** (owner 2026-11-16; Help → VARA chat and files, side 2): **Join the channel** announces your call (a
   VARA CQ frame), answers calls, and repeats the announcement every **10 min** (VARA HF 15; choose 5–60) while you are

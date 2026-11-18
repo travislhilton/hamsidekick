@@ -65,6 +65,14 @@ BLOCKED = {".exe", ".bat", ".cmd", ".com", ".ps1", ".vbs", ".vbe", ".js", ".jse"
 CALL_RE = re.compile(r"^[A-Z0-9]{3,7}(-([1-9]|1[0-5]|T|R))?$")
 
 
+def _same_call(a: str, b: str) -> bool:
+    """One station: the same call and SSID (no SSID = -0). Two SSIDs of one callsign are two stations."""
+    def n(c):
+        c = str(c or "").upper().strip()
+        return c[:-2] if c.endswith("-0") else c
+    return n(a) == n(b)
+
+
 class VaraRefused(RuntimeError):
     """An action refused before anything was sent (no transmit permission, not connected, a bad argument)."""
 
@@ -400,13 +408,14 @@ class Vara:
             if rest and rest[0].lower() == "via":
                 via = [x.upper() for x in rest[1:] if not x.isdigit()]
             bw = next((int(x) for x in reversed(rest) if x.isdigit()), None)
-            peer = dst if src.split("-")[0] == self.mycall.split("-")[0] else src
+            out = _same_call(src, self.mycall)        # W9XYZ-7 calling W9XYZ-8: different stations, same base call
+            peer = dst if out else src
             with self.lock:                          # bytes may already be here (two sockets): keep the buffer;
                 self.st.update(session="connected", peer=peer, via=via, bw=bw,   # the last session's end cleared it
                                peer_proto=self.st["peer_proto"])
                 self.session_at = self.clock()
             self._log({"kind": "connected", "peer": peer, "via": via, "bw": bw,
-                       "dir": "out" if src.split("-")[0] == self.mycall.split("-")[0] else "in"})
+                       "dir": "out" if out else "in"})
             self._emit("connected", {"peer": peer, "via": via, "bw": bw})
             try:
                 self._data(f"HSK1 {self.mycall}\n".encode())

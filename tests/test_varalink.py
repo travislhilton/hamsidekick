@@ -319,3 +319,21 @@ def test_the_vara_copies_on_this_pc_are_never_suggested_and_name_the_one_not_ans
     assert "that PC" in st.vara.down_text(dict(c, host="192.168.1.20"))
     st.vara.scan_copies, st.vara._copies_at = (lambda: {}), -1e9  # none found (not Windows): the old plain sentence
     assert "is that copy of VARA open?" in st.vara.down_text(c)
+
+
+def test_each_modem_can_add_an_ssid_to_the_stations_callsign(tmp_path):
+    """Owner 2026-11-17: "My call sign is <call>, but I want to use <call>-8 on the -8 station" - per modem, the
+    station's own callsign (net logs, Sidekick, IDs) unchanged."""
+    FakeVara.made.clear()
+    st, a, b = _two(tmp_path)
+    st.me = "W9XYZ"
+    v = st.vara.settings({"radio": a, "kind": "fm", "use": "chat", "enabled": True})
+    assert v["modems"][0]["call"] == "W9XYZ" and v["mycall"] == "W9XYZ" and FakeVara.made[-1].kw["mycall"] == "W9XYZ"
+    v = st.vara.settings({"radio": a, "ssid": "8"})
+    assert v["modems"][0]["cfg"]["ssid"] == 8 and v["modems"][0]["call"] == "W9XYZ-8"
+    assert FakeVara.made[-1].kw["mycall"] == "W9XYZ-8"                 # VARA restarted with the new MYCALL
+    assert st.vara.modem(a).chan.view()["me"]["call"] == "W9XYZ-8" and st.me == "W9XYZ"
+    for bad in ("16", "x", -1):
+        with pytest.raises(ValueError, match="SSID"):
+            st.vara.settings({"radio": a, "ssid": bad})
+    assert st.vara.settings({"radio": a, "ssid": ""})["modems"][0]["call"] == "W9XYZ"

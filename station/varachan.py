@@ -453,5 +453,5 @@ class Channel:
         return {"on": d["on"], "every_min": d["every_min"], "next_announce_s": nxt, "presets": d["presets"],
                 "pinned": d.get("pinned"), "roster": roster,
                 "threads": {c: th[-120:] for c, th in d["threads"].items()},
-                "me": {"call": getattr(self.m.st, "me", ""), "name": op.get("name") or "", "grid": op.get("grid") or ""},
+                "me": {"call": self.m.call(), "name": op.get("name") or "", "grid": op.get("grid") or ""},
                 "linger_s": LINGER_S.get(s.get("kind") or self.m.cfg().get("kind", "fm"), 20)}
