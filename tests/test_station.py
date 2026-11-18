@@ -659,3 +659,24 @@ def test_band_plan_has_a_full_spectrum_view_and_vara_fm_width():
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     assert '["all","Full spectrum"]' in html and "<th>Ad hoc voice</th><th>Ad hoc VARA</th>" in html
     assert 'x.mode==="VARA FM"&&(m.cfg.fm_width!=="wide"||x.wide)' in html and '="fm_width"' in html
+
+
+def test_a_data_radio_column_is_its_vara_workspace_and_the_header_is_grouped():
+    """Owner 2026-11-18: "the management of the station list as well as the chats ... and file xfer ... shown under the
+    radio, not on a pop up window", and a full UX pass: the pop-up keeps Modem setup and the by-hand link only; a data
+    radio shows no nets strip, Coach / Net board or voice log; header tools are grouped and fold behind Menu on a phone."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'vp.dataset.vpanel=r.id' in idx and "function renderVaraPanels()" in idx and "function vPanelHtml(r)" in idx
+    assert "vChannel(m,ok)" in idx.split("function vPanelHtml(r)")[1].split("function renderVaraPanels()")[0]
+    dlg = idx.split("function renderVaraDlg(){")[1].split("\nasync function varaAct")[0]
+    assert "vChannel(" not in dlg and "data-vgopanel" in dlg                  # the chat is not drawn twice
+    for one in ('$("vMsg")', '$("vCompose")', '$("vThread")', '$("vPresets")'):   # ids are per radio: two chat modems
+        assert one not in idx
+    assert ".rcol.data>.logbox,.rcol.data>.rnets" in idx and ".rcol.data .toptabs [data-tab=guide]" in idx
+    assert ".vpanel[hidden]{display:none!important}" in idx                    # never under a net radio
+    assert 'id="hMenu"' in idx and "header.open .hmore{display:contents}" in idx
+    more = idx.split('<span class="hmore" id="hMore">')[1].split("</header>")[0]
+    for b in ("openReadout", "openRadios", "openSettings", "nightBtn", "openPhone", "helpbtn"):
+        assert b in more
+    assert 'id="openNets"' in idx.split('id="hMenu"')[0] and 'id="openBandplan"' in idx.split('id="hMenu"')[0]

@@ -567,6 +567,20 @@ button:disabled{cursor:not-allowed}
 }
 details.unheard{margin:12px 0;padding:8px 10px;border:1px dashed var(--line,#999);border-radius:8px}details.unheard ul{margin:6px 0 0;padding-left:18px}details.unheard li{margin:4px 0}
 .msum{border-left:3px solid var(--accent);padding-left:10px}.msum .msumai{margin:4px 0;line-height:1.45}.msum .msumlines{margin:6px 0;padding-left:18px}.msum .mjumps{margin-top:4px}
+/* 2026-11-18 UX pass: grouped header, the VARA workspace under a data radio, a slimmer radio card */
+header .hmore{display:contents}header #hMenu{display:none}header .hgrow{flex:1 1 0;min-width:0}header .hsep{width:1px;align-self:stretch;background:rgba(255,255,255,.25);margin:2px 0}
+header button.hq{background:transparent;border-color:rgba(255,255,255,.18);font-weight:500}header button.hq[aria-pressed=true]{background:rgba(255,255,255,.3)}
+@media (max-width:900px){header #hMenu{display:inline-block;margin-left:auto}header .hmore{display:none}header.open .hmore{display:contents}header .hsep,header .hgrow{display:none}}
+.wf{height:84px}
+.rcol.data>.logbox,.rcol.data>.rnets,.rcol.data>.split,.rcol.data>.abox,.rcol.data>.echo{display:none!important}
+.rcol.data .toptabs [data-tab=guide],.rcol.data .toptabs [data-tab=board],.rcol.data .toptabs [data-tab=heard],.rcol.data .cardbtns [data-nets],.rcol.data .cardbtns [data-clear],.rcol.data .cardbtns [data-test],.rcol.data [data-rsearch]{display:none}
+.vpanel[hidden]{display:none!important}.vpanel{container-type:inline-size;display:flex;flex-direction:column;gap:2px;min-width:0}.vpanel>p{margin:4px 0}
+.vphead{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.vphead h3{margin:0;font-size:15px}
+.vpstat{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.vpanel .vchan{flex:1 0 auto;grid-template-columns:minmax(150px,210px) 1fr}.vpanel .vros{max-height:none}.vpanel .vthread{max-height:46vh;flex:1 0 auto;min-height:160px}
+@container (max-width:520px){.vpanel .vchan{grid-template-columns:1fr}.vpanel .vros{max-height:170px}}
+@media (min-width:901px) and (min-height:820px){.rcol>.vpanel{flex:1 0 auto;min-height:min(460px,60dvh)}}
+@media (max-width:900px){.rcol>.vpanel{flex:1 0 auto;min-height:50dvh}}
 .vcardros{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center;flex-basis:100%;font-size:13px}
 .vcardros.bad{color:var(--bad,#b3261e)}
 .vcs.quiet{opacity:.55}
@@ -596,16 +610,21 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   </div>
   <div class="hrow">
   <form id="searchForm" class="hsearch" role="search"><input id="q" type="search" placeholder="Search everything" aria-label="Search every transmission, callsign, net and the minutes" autocomplete="off"> <button>Search</button></form>
-  <label class="small" title="Explain Q-codes, prowords and abbreviations (Roger, QSO, QSY…) under each transmission"><input type="checkbox" id="explain" checked style="width:auto"> <span class="xl">Explain radio terms</span><span class="xs">Explain terms</span></label>
   <button id="openNets" title="Schedule, history, who takes part, minutes and what is still open">Nets</button>
   <button id="openBandplan" title="The band plan for your area: FCC privileges, the ARRL plan, your state coordinator's plan and the local ARES / RACES plans, in one table">Band plan</button>
+  <button id="hMenu" type="button" aria-expanded="false" aria-controls="hMore" onclick="const h=this.closest('header').classList.toggle('open');this.setAttribute('aria-expanded',h)">☰ Menu</button>
+  <span class="hmore" id="hMore">
+  <button id="openReadout" title="The EOC's situation report: approve it, then read it on the net from a large-type card" onclick="window.open('/readout','_blank')">Read-out</button>
+  <span class="hsep" aria-hidden="true"></span>
   <button id="openRadios" title="Add, replace or remove a radio and choose its sound input">Radios…</button>
   <button id="openSettings" title="Your station, nets, Winlink, Sidekick and AI, AI costs, this PC">Settings</button>
-  <button id="openPhone" title="Show a QR code: point a phone's camera at it to open this dashboard on the phone">Open on phone</button>
-  <button id="fullScr" type="button" aria-pressed="false" title="Fill the whole screen with the dashboard (Esc or this button again to leave)" hidden>Full screen</button>
-  <button id="openReadout" title="The EOC's situation report: approve it, then read it on the net from a large-type card" onclick="window.open('/readout','_blank')">Read-out</button>
-  <button id="nightBtn" aria-pressed="false" title="Night colours: all red on black, to keep your night vision (again for normal colours)" onclick="setDisplay('theme',DISP.theme==='night'?(DISP.prevTheme||'auto'):(DISP.prevTheme=DISP.theme,'night'))">☾ Night</button>
+  <span class="hgrow" aria-hidden="true"></span>
+  <label class="small hq" title="Explain Q-codes, prowords and abbreviations (Roger, QSO, QSY…) under each transmission"><input type="checkbox" id="explain" checked style="width:auto"> <span class="xl">Explain radio terms</span><span class="xs">Explain terms</span></label>
+  <button id="nightBtn" class="hq" aria-pressed="false" title="Night colours: all red on black, to keep your night vision (again for normal colours)" onclick="setDisplay('theme',DISP.theme==='night'?(DISP.prevTheme||'auto'):(DISP.prevTheme=DISP.theme,'night'))">☾ Night</button>
+  <button id="fullScr" class="hq" type="button" aria-pressed="false" title="Fill the whole screen with the dashboard (Esc or this button again to leave)" hidden>Full screen</button>
+  <button id="openPhone" class="hq" title="Show a QR code: point a phone's camera at it to open this dashboard on the phone">Open on phone</button>
   <a class="helpbtn" href="/help" target="_blank" rel="noopener" title="How to use the station: the reference cards (the station, Sidekick, recording a conversation, VARA chat and files, the band plan; printable)">Help</a>
+  </span>
   </div>
 </header>
 <nav id="today" class="today" aria-label="Nets today"></nav>
@@ -1393,7 +1412,7 @@ function axis(r){const m=r.meter||{},sp=m.span_hz||[0,8000],ticks=[];const step=
   for(let f=Math.ceil(sp[0]/step)*step;f<=sp[1];f+=step)ticks.push(`<span style="left:${(f-sp[0])/(sp[1]-sp[0])*100}%">${f/1000}k</span>`);
   return ticks.join("")}
 function wfCaption(r){const m=r.meter||{},sp=m.span_hz||[0,8000];
-  const hint=r.gate==="carrier"?" · bright = open-squelch hiss; a station's carrier quiets it and its voice shows as traces":"";
+  const hint="";   // the long explanation is the waterfall's tooltip (2026-11-18: the card gives its room to the log)
   return `Receiver audio, ${sp[0]/1000}–${sp[1]/1000} kHz${r.freq_mhz?` · ${Number(r.freq_mhz).toFixed(3)} MHz ${esc(r.mode||"")}`:""}${r.mode==="USB"?" · RF = frequency + audio":r.mode==="LSB"?" · RF = frequency − audio":""}${hint}`}
 function ensureCard(r){
   let el=document.getElementById("r-"+r.id);if(el)return el;
@@ -1422,7 +1441,8 @@ function ensureCard(r){
   const rn=document.createElement("div");rn.className="rnets";rn.id="rn-"+r.id;rn.setAttribute("aria-label","Nets on "+r.name);
   const dv=document.createElement("div");dv.className="dropv";dv.id="dv-"+r.id;dv.hidden=true;
   const ec=document.createElement("div");ec.className="echo";ec.id="echo-"+r.id;ec.hidden=true;
-  col.append(dv,rn,ec,ab,top,sp,sec);if(r.id===SEL)col.classList.add("sel");$("radios").appendChild(col);renderFeed(r.id);renderGuide(r.id);renderHeard(r.id);return el}
+  const vp=document.createElement("section");vp.className="vpanel";vp.id="vp-"+r.id;vp.dataset.vpanel=r.id;vp.hidden=true;vp.setAttribute("aria-label","VARA chat and files on "+r.name);
+  col.append(dv,rn,ec,ab,top,sp,sec,vp);if(r.id===SEL)col.classList.add("sel");$("radios").appendChild(col);renderFeed(r.id);renderGuide(r.id);renderHeard(r.id);return el}
 // ---------- splitter (guidance / stations tabs) ----------
 const splitKey=rid=>"hamsidekick.split."+rid;
 function setFold(rid,f){$("col-"+rid).classList.toggle("folded",f);try{localStorage.setItem("hamsidekick.fold."+rid,f?"1":"")}catch(e){}}
@@ -1491,13 +1511,15 @@ function renderRadios(){
         ${rec.length?`<div class="fqpicks" role="group" aria-label="Frequencies used before">${rec.map(x=>`<button type="button" class="np" data-fqpick="${Number(x.f).toFixed(4)}" data-m="${esc(x.m)}" title="Fill in ${Number(x.f).toFixed(3)} MHz ${esc(x.m)}, then Save">${Number(x.f).toFixed(3)} <span class="muted">${esc(x.m)}</span></button>`).join("")}</div>`:""}
         <div class="muted small">Set this to what you tuned the radio to. Every transmission is logged with it.${rec.length?" Tap a frequency used before to fill it in.":""}</div></form>`:"";
     }
-    el.querySelector(".cap").textContent=wfCaption(r);
+    el.querySelector(".cap").textContent=wfCaption(r);el.querySelector(".wf").title=r.gate==="carrier"?"Bright = open-squelch hiss; a station's carrier quiets it and its voice shows as traces":"";
+    {const col=$("col-"+r.id),data=r.role==="winlink",was=col.classList.contains("data");col.classList.toggle("data",data);$("vp-"+r.id).hidden=!data;
+     if(data&&!was){const on=col.querySelector(".toptabs .tabs .on");if(on&&on.dataset.tab!=="radio")col.querySelector('.toptabs [data-tab="radio"]').click()}}
     renderRadioNets(r);
     const seg=(k,v,l,on)=>`<button data-${k}="${esc(r.id)}" data-v="${v}" class="${on?"on":""}" aria-pressed="${on}">${l}</button>`;
     el.querySelector(".rsetup").innerHTML=(r.antenna?`<span>Antenna <span class="rseg" role="group" aria-label="Antenna on ${esc(r.name)}">${seg("setant","hf","HF",r.antenna==="hf")}${seg("setant","vu","VHF/UHF",r.antenna==="vu")}</span></span>`:"")
       +`<span><button class="linkish small" data-rsearch="${esc(r.id)}" title="Search everything heard on ${esc(r.name)}: words, callsigns, names (press / anywhere for all radios)">Search this log</button></span>`
       +`<span>Used for <span class="rseg" role="group" aria-label="${esc(r.name)} is used for">${seg("setrole","nets","Nets",r.role!=="winlink")}${seg("setrole","winlink","Data (Winlink / VARA)",r.role==="winlink")}</span></span>`
-      +(r.role==="winlink"?(()=>{const m=vModem(r.id),s=m&&m.state;return `<span>${vChip(m)} <button class="small" data-varaopen="${esc(r.id)}" title="${m?esc(m.status.text):"Set up the VARA modem on this radio: chat and files, shared with Winlink Express, or Winlink Express only"}">${!m?"VARA…":m.cfg.use==="winlink"?"VARA modem…":"VARA chat"+(s&&s.session==="connected"?` · with ${esc(s.peer)}`:"")}</button></span>${vCardRoster(m)}`})():"")
+      +(r.role==="winlink"?(()=>{const m=vModem(r.id),s=m&&m.state;return `<span>${vChip(m)}</span>${vCardRoster(m)}`})():"")
       +(r.scan&&!r.scan.can?`<span title="Scan HF for conversations between nets. A net always comes first.">Scan <span class="rseg" role="group" aria-label="Scan on ${esc(r.name)}">${seg("scanmode","off","Off",r.scan.mode==="off")}${seg("scanmode","on","On",r.scan.mode==="on")}${seg("scanmode","auto","Auto",r.scan.mode==="auto")}</span> <button class="linkish small" data-scanset="${esc(r.id)}" title="Antenna, bands and remembered frequencies">${esc((r.scan.antenna||{}).name||"Antenna")}…</button></span>`:"")
       +(r.role!=="winlink"&&AG&&(AG.settings||{}).enabled?`<span title="${esc(agName())}: Draft = shows what it would say, never transmits. Send = says it on the air after a 3 s countdown, only while you are at this PC (Esc stops it); offered when this radio's Transmit switch is on (Radios…).">${esc(agName())} <span class="rseg" role="group" aria-label="${esc(agName())} on ${esc(r.name)}">${seg("agmode","off","Off",agMode(r.id)==="off")}${seg("agmode","draft","Draft",agMode(r.id)==="draft")}${((AG||{}).tx_ready||{})[r.id]||agMode(r.id)==="send"?seg("agmode","send","Send",agMode(r.id)==="send"):""}</span></span>`:"");
     renderEcho(r.id);
@@ -1518,6 +1540,7 @@ function renderRadios(){
     renderWhy(el,r);   // schedule
     renderEndNet(el,r);   // End net / closed by net control
   }
+  renderVaraPanels();
 }
 function onMeter(d){
   levelMeter(d);
@@ -2096,10 +2119,7 @@ const vModem=rid=>((VA.d||{}).modems||[]).find(m=>m.radio===rid);
 function vChip(m){if(!m)return"";const k=m.status.key,cls={connected:"k-ready",listening:"k-ready",ready:"k-ready",connecting:"k-tune",express:"k-tune",winlink:"",off:"",down:"k-cant"}[k]||"";
   return `<span class="np ${cls}" style="padding:0 6px" title="${esc(m.status.text)}">VARA ${m.cfg.kind==="hf"?"HF":"FM"} · ${esc({chat:"chat",shared:"shared",winlink:"Winlink Express"}[m.cfg.use])}${m.state&&m.state.ptt?" · ON AIR":""}</span>`}
 function vHm(t){return t?new Date(t*1000).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):""}
-function vCardRoster(m){if(!m)return"";const w=m.warn?`<span class="vcardros bad" title="${esc(m.warn)}">⚠ ${esc(m.warn.split(":")[0])} <button class="linkish small" data-varaopen="${esc(m.radio)}">Why</button></span>`:"";
-  const oc=m.on_channel;if(!oc)return w;
-  const sts=oc.stations||[],calls=sts.map(x=>`<button class="linkish small vcs ${x.state}" data-vcardpick="${esc(m.radio)}" data-c="${esc(x.call)}" title="${x.state==="here"?"Heard":"Quiet: last heard"} ${vHm(x.heard_at)}${x.unread?" · "+x.unread+" unread":""}">${esc(x.call)}${x.unread?` <span class="vbadge">${x.unread}</span>`:""}</button>`).join(" ");
-  return w+`<span class="vcardros">${oc.on?`<b>On the VARA channel</b>${m.call?` as <span class="mono">${esc(m.call)}</span>`:""} · ${sts.length?calls+(oc.more?` +${oc.more}`:""):'<span class="muted">nobody heard yet</span>'}`:`<span class="muted">Not on the VARA channel${sts.length?" · heard: ":""}</span>${calls}`}</span>`}
+function vCardRoster(m){return m&&m.warn?`<span class="vcardros bad" title="${esc(m.warn)}">⚠ ${esc(m.warn.split(":")[0])} <button class="linkish small" data-varaopen="${esc(m.radio)}">Why</button></span>`:""}
 async function varaLoad(){try{VA.d=await api("/api/vara")}catch(e){}}
 async function varaOpen(rid){VA.msg=null;await varaLoad();const ms=(VA.d||{}).modems||[];VA.rid=rid||(ms[0]||{}).radio||(((VA.d||{}).radios||[])[0]||{}).id||null;renderVara();if(!$("varaDlg").open)$("varaDlg").showModal()}
 function vKind(rid){const r=(S.radios||[]).find(x=>x.id===rid)||{};return (r.freq_mhz&&r.freq_mhz<30)||(!r.freq_mhz&&r.antenna==="hf")?"hf":"fm"}
@@ -2150,17 +2170,52 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{},
       :`<div class="small"><b>To ${sel.length} stations:</b> ${sel.map(esc).join(", ")} <span class="muted">· each gets its own link, one after another</span></div>`;
     const presets=(ch.presets||[]).map((p,i)=>(/\{name\}/.test(p)&&!ch.me.name)||(/\{grid\}/.test(p)&&!ch.me.grid)?`<button class="small" disabled title="Set your name and grid square in Settings → Station to use this one">${esc(p.replace(/\{\w+\}/g,"…").slice(0,34))}</button>`:`<button class="small" data-vpreset="${i}" title="${esc(vFill(p,ch,one||"",m))}">${esc(vFill(p,ch,one||"ALL",m).slice(0,34))}${vFill(p,ch,one||"",m).length>34?"…":""}</button>`).join("");
     conv=`<div class="vconv"><div><b class="mono" style="font-size:16px">${one?esc(one):"Several stations"}</b></div>${lk}
-      ${one?`<div class="vthread" id="vThread" aria-live="polite">${th.map(it=>vBubble(it,one)).join("")||'<p class="small muted">No messages yet. A quick message below gets things going.</p>'}</div>`:""}
+      ${one?`<div class="vthread" id="vThread-${esc(rid)}" aria-live="polite">${th.map(it=>vBubble(it,one)).join("")||'<p class="small muted">No messages yet. A quick message below gets things going.</p>'}</div>`:""}
       <div class="vpre" aria-label="Quick messages">${presets} <button class="small linkish" data-vpedit>Edit</button></div>
-      ${VA.pedit?`<div><textarea id="vPresets" rows="6" style="width:100%" aria-label="Quick messages, one per line">${esc((ch.presets||[]).join("\n"))}</textarea><div class="small muted">One per line, up to 12. Fill-ins: {me} {them} {sn} {name} {grid}.</div><button class="small primary" data-vpsave>Save quick messages</button> <button class="small quiet" data-vpedit>Cancel</button></div>`:""}
-      <form class="vcomp" id="vCompose"><textarea id="vMsg" maxlength="4000" placeholder="Message to ${esc(one||sel.join(", "))} · Enter sends, Shift+Enter new line" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer" title="Send a file (up to 5 MB): the other station needs this program">📎<input type="file" id="vCFile" style="display:none"></label></form>
+      ${VA.pedit?`<div><textarea id="vPresets-${esc(rid)}" rows="6" style="width:100%" aria-label="Quick messages, one per line">${esc((ch.presets||[]).join("\n"))}</textarea><div class="small muted">One per line, up to 12. Fill-ins: {me} {them} {sn} {name} {grid}.</div><button class="small primary" data-vpsave>Save quick messages</button> <button class="small quiet" data-vpedit>Cancel</button></div>`:""}
+      <form class="vcomp" id="vCompose-${esc(rid)}"><textarea id="vMsg-${esc(rid)}" maxlength="4000" placeholder="Message to ${esc(one||sel.join(", "))} · Enter sends, Shift+Enter new line" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer" title="Send a file (up to 5 MB): the other station needs this program">📎<input type="file" id="vCFile-${esc(rid)}" style="display:none"></label></form>
       ${one?`<div class="small"><button class="small quiet" data-vsendad title="Your reserved ad hoc channels as a file: their station shows ★ Install">★ Send my ad hoc channels</button> <button class="small linkish" data-vforget="${esc(one)}">Forget ${esc(one)}</button></div>`:""}</div>`}
   return bar+`<div class="vchan">${roster}${conv}</div>`}
-setInterval(()=>{document.querySelectorAll("#varaDlg [data-vnext]").forEach(x=>{x.textContent=vClock(+x.dataset.vnext-Date.now()/1000)})},1000);
-function renderVara(){
+setInterval(()=>{document.querySelectorAll("[data-vnext]").forEach(x=>{x.textContent=vClock(+x.dataset.vnext-Date.now()/1000)})},1000);
+// ----- The VARA workspace under a data radio (owner 2026-11-18: "the station list as well as the chats ... and file
+// xfer ... shown under the radio, not on a pop up window"). The pop-up keeps the modem's setup and the by-hand link. -----
+const vI=(n,rid)=>$(n+"-"+(rid||VA.rid));
+function vPanelHtml(r){const d=VA.d,rid=esc(r.id);
+  const head=x=>`<div class="vphead"><h3>VARA chat and files</h3>${x||""}<span style="flex:1"></span><button class="small" data-varaopen="${rid}" title="This radio's VARA modem: ports, your call, shared with Winlink Express, a link by hand">Modem setup…</button><a class="small" href="/help/vara" target="_blank" rel="noopener">Card</a></div>`;
+  if(!d)return head()+'<p class="muted">Loading…</p>';
+  const m=vModem(r.id);
+  if(!m)return head()+`<p>No VARA modem on this radio yet. One copy of VARA per data radio, each with its own sound card and ports.</p><p><button class="primary" data-varaopen="${rid}">Set up the VARA modem…</button></p>`;
+  const c=m.cfg,st=m.state||{},ok=m.tx_ok,conn=st.session==="connected";
+  if(c.use==="winlink")return head(vChip(m))+`<p class="small">${esc(VUSE.winlink[1])} To chat on this radio choose <b>Shared</b> or <b>Chat &amp; files</b> in Modem setup.</p>`;
+  if(!c.enabled)return head(vChip(m))+`<p>This VARA modem is switched off.</p><p><button class="primary" data-von>Switch this modem on</button></p>`;
+  if(c.handed_off)return head(vChip(m))+`<p><b>${esc(m.status.text)}</b></p><p><button data-vact="takeback">Take it back</button></p>`;
+  const msg=VA.msg&&VA.rid===r.id&&!$("varaDlg").open?`<p class="${VA.msg.bad?"bad":"ok"}" role="status">${esc(VA.msg.text)}</p>`:"";
+  const status=(m.warn?`<p class="bad" role="alert">⚠ ${esc(m.warn)}</p>`:"")+`<p class="vpstat"><span class="vdot ${m.status.key}"></span><b>${esc(m.status.text)}</b>${conn&&st.peer_proto==="raw"?' <span class="muted">(plain terminal: chat only)</span>':""}${st.ptt?' <span class="badge emergency">ON AIR</span>':""}${st.busy?' <span class="badge" title="VARA says it hears something on this radio\'s audio (a signal, or noise with the radio\'s squelch open). It waits for a clear channel before it transmits.">channel busy</span>':""} <span class="muted small">as <button class="linkish small" data-vmycall title="Your call on this modem: change it in Modem setup"><b>${esc(m.call||"")}</b></button></span></p>`;
+  const okLine=ok?"":`<p class="small warnc">Not transmitting: ${esc(m.tx_why)} (keep-alives and waiting messages pause until it is fixed)</p>`;
+  const sending=st.sending?`<p class="small">Sending ${esc(st.sending.name)}: <progress max="${st.sending.size}" value="${st.sending.size-(st.sending.left||0)}"></progress></p>`:"";
+  const inbox=(m.inbox||[]).length?`<details class="small vinbox"><summary>Files received (${m.inbox.length})</summary><ul>${m.inbox.map(f=>`<li><a href="/api/vara/inbox/${enc(f.name)}">${esc(f.name)}</a> <span class="muted">${Math.round(f.bytes/1024)} KB · ${f.adhoc?"ad hoc channels file: read as data only":"a download only, never opened here"}</span>${f.adhoc?` <button class="small primary" data-vadinst="${esc(f.name)}" title="Add these reserved ad hoc channels to yours (Band plan → Ad hoc): ${f.adhoc.voice} FM voice, ${f.adhoc.data} VARA FM">★ Install ${f.adhoc.channels} ad hoc channel${f.adhoc.channels===1?"":"s"}${f.adhoc.from?" from "+esc(f.adhoc.from):""}</button>`:""}</li>`).join("")}</ul></details>`:"";
+  if(st.link!=="up"&&!(m.channel&&((m.channel.roster||[]).length)))return head()+status+okLine+msg+`<p class="small muted">When VARA answers, join the channel here to see who is on the frequency and chat or send files.</p>`+inbox;
+  return head()+status+okLine+msg+(m.channel?vChannel(m,ok):"")+sending+inbox+`<p class="small muted vpnote">Sent in the clear (Part 97). Nothing transmits while you are away from this PC.</p>`}
+function renderVaraPanels(){for(const r of (S.radios||[])){const box=$("vp-"+r.id);if(!box||r.role!=="winlink")continue;
+  const ae=document.activeElement,inside=ae&&box.contains(ae),isMsg=inside&&ae.id==="vMsg-"+r.id;
+  if(inside&&!isMsg&&ae.matches("input:not([type=checkbox]):not([type=file]),textarea,select"))continue;    // typing a call, editing quick messages
+  const pos=isMsg?[ae.selectionStart,ae.selectionEnd]:null,th0=$("vThread-"+r.id),atEnd=!th0||th0.scrollHeight-th0.scrollTop-th0.clientHeight<40,top0=th0?th0.scrollTop:0;
+  box.innerHTML=vPanelHtml(r);vWire(r.id);
+  const th=$("vThread-"+r.id);if(th)th.scrollTop=atEnd?th.scrollHeight:top0;
+  if(pos){const x=$("vMsg-"+r.id);if(x){x.focus();try{x.setSelectionRange(pos[0],pos[1])}catch(e){}}}}}
+function vWire(rid){
+  const cm=vI("vMsg",rid);if(cm){cm.oninput=()=>VA.draft[rid]=cm.value;cm.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();vI("vCompose",rid).requestSubmit()}}}
+  const cf=vI("vCompose",rid);if(cf)cf.onsubmit=async e=>{e.preventDefault();VA.rid=rid;const t=vI("vMsg",rid).value.trim();if(!t)return;const to=vSel(rid).slice();
+    if(to.length>1&&!confirm(`Send this to ${to.length} stations? Each gets its own link, one after another.`))return;
+    VA.draft[rid]="";await varaAct("csend",{to,text:t});const x=vI("vMsg",rid);if(x)x.focus()};
+  const cfi=vI("vCFile",rid);if(cfi)cfi.onchange=async()=>{const f=cfi.files[0];if(!f)return;VA.rid=rid;const to=vSel(rid).slice();const b64=await new Promise((ok_,no)=>{const r=new FileReader();r.onload=()=>ok_(String(r.result).split(",")[1]);r.onerror=no;r.readAsDataURL(f)});await varaAct("csend",{to,name:f.name,data:b64})};
+  const sm=vModem(rid),one=vSel(rid).length===1?vSel(rid)[0]:null;
+  if(sm&&sm.channel&&one&&!document.hidden){const rr=(sm.channel.roster||[]).find(x=>x.call===one);if(rr&&rr.unread&&!VA.reading){VA.reading=true;post("/api/vara/channel",{radio:rid,read:one}).then(r=>{VA.d=r;VA.reading=false;renderVaraPanels()}).catch(()=>VA.reading=false)}}}
+function renderVara(){renderVaraDlg();renderVaraPanels()}
+function renderVaraDlg(){
   const box=$("varaBody"),d=VA.d;if(!box)return;
   if(!d){box.innerHTML=`<p class="bad">${esc(VA.msg?VA.msg.text:"VARA is not available")}</p>`;return}
-  const head=`<h3>VARA chat and files <a class="small" href="/help/vara" target="_blank" rel="noopener" style="font-weight:400">Card (printable)</a></h3>`;
+  const head=`<h3>VARA modem <a class="small" href="/help/vara" target="_blank" rel="noopener" style="font-weight:400">Card (printable)</a></h3>`;
   if(!d.radios.length){box.innerHTML=head+`<p>VARA runs on a <b>data radio</b>: on the radio's card set <b>Used for</b> to <b>Data (Winlink / VARA)</b>, so the station never records from the sound card VARA uses. Then come back here.</p>`;return}
   if(!d.radios.some(r=>r.id===VA.rid))VA.rid=d.radios[0].id;
   const tabs=d.radios.length>1||d.modems.length>1?`<nav class="ntabs" role="tablist" aria-label="Data radios">${d.radios.map(r=>{const m=vModem(r.id);return `<button role="tab" class="${VA.rid===r.id?"on":""}" aria-selected="${VA.rid===r.id}" data-vtab="${esc(r.id)}">${esc(r.name)}${m?` <span class="vdot ${m.status.key}"></span>`:' <span class="muted small">(no modem)</span>'}</button>`}).join("")}</nav>`:"";
@@ -2185,47 +2240,38 @@ function renderVara(){
    <div class="row nfrow">${conn?`<button data-vact="disconnect">Disconnect ${esc(st.peer||"")}</button> <button data-vact="adhoc" title="Send your reserved ad hoc channels (Band plan → Ad hoc) to ${esc(st.peer||"")} as a file: their station offers ★ Install">★ Send my ad hoc channels</button>`:`<input id="vCall" placeholder="Callsign" autocomplete="off" style="width:8em;text-transform:uppercase">${c.kind==="fm"?'<input id="vVia" placeholder="via (digipeater)" style="width:9em;text-transform:uppercase">':""}<button data-vact="connect"${ok?"":" disabled"}>Connect</button><button data-vact="cq"${ok?"":" disabled"}>Call CQ</button><label class="chk small"><input type="checkbox" data-vlisten${st.listening?" checked":""}${ok||st.listening?"":" disabled"}> Answer calls</label>`} <button class="danger small" data-vact="abort" title="Drop the link at once and let go of the transmitter">Abort</button></div>
    ${heard}<details><summary>Log</summary><div class="vlog" id="vLog">${msgs||'<p class="muted small">Nothing yet.</p>'}</div></details>
    ${conn&&!m.channel?`<form id="vChat" class="row"><input id="vText" maxlength="4000" placeholder="Type, then Enter to send" autocomplete="off" style="flex:1"><button class="primary">Send</button><label class="small">File <input type="file" id="vFile"></label></form>`:""}</details>`;
-  const ops=runs?okLine+vChannel(m,ok)+sending+direct:"";
+  const ops=runs?okLine+`<p class="small">Stations on the channel, chat and files are <b>under ${esc(r.name)}</b> on the dashboard. <button class="small" data-vgopanel="${esc(r.id)}">Show me</button></p>`+sending+direct:"";
   box.innerHTML=head+tabs+status+turn+`<div class="row">${onoff}</div>`+msg+ops+inbox+setup
    +`<p class="small muted">Chat and files are sent in the clear (no encryption: Part 97). Nothing transmits while you are away from this PC: listening, keep-alives and waiting messages pause until you are back.</p>`;
   const lg=$("vLog");if(lg)lg.scrollTop=lg.scrollHeight;
-  const vt=$("vThread");if(vt)vt.scrollTop=vt.scrollHeight;
-  const dd=box.querySelector("[data-vdirect]");if(dd)dd.ontoggle=()=>VA.directOpen=dd.open;
-  const cm=$("vMsg");if(cm){cm.oninput=()=>VA.draft[VA.rid]=cm.value;cm.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("vCompose").requestSubmit()}}}
-  const cf=$("vCompose");if(cf)cf.onsubmit=async e=>{e.preventDefault();const t=$("vMsg").value.trim();if(!t)return;const to=vSel(VA.rid).slice();
-    if(to.length>1&&!confirm(`Send this to ${to.length} stations? Each gets its own link, one after another.`))return;
-    VA.draft[VA.rid]="";await varaAct("csend",{to,text:t});const x=$("vMsg");if(x)x.focus()};
-  const cfi=$("vCFile");if(cfi)cfi.onchange=async()=>{const f=cfi.files[0];if(!f)return;const to=vSel(VA.rid).slice();const b64=await new Promise((ok_,no)=>{const r=new FileReader();r.onload=()=>ok_(String(r.result).split(",")[1]);r.onerror=no;r.readAsDataURL(f)});await varaAct("csend",{to,name:f.name,data:b64})};
-  const sm=vModem(VA.rid),one=vSel(VA.rid).length===1?vSel(VA.rid)[0]:null;
-  if(sm&&sm.channel&&one){const rr=(sm.channel.roster||[]).find(x=>x.call===one);if(rr&&rr.unread&&!VA.reading){VA.reading=true;post("/api/vara/channel",{radio:VA.rid,read:one}).then(r=>{VA.d=r;VA.reading=false;renderRadios()}).catch(()=>VA.reading=false)}}
   const sd=box.querySelector("[data-vsetupd]");if(sd)sd.ontoggle=()=>VA.setupOpen=sd.open&&c.enabled;
   const ch=$("vChat");if(ch)ch.onsubmit=async e=>{e.preventDefault();const t=$("vText").value.trim();if(!t)return;await varaAct("chat",{text:t});const x=$("vText");if(x)x.focus()};
   const fi=$("vFile");if(fi)fi.onchange=async()=>{const f=fi.files[0];if(!f)return;const b64=await new Promise((ok_,no)=>{const r=new FileReader();r.onload=()=>ok_(String(r.result).split(",")[1]);r.onerror=no;r.readAsDataURL(f)});await varaAct("file",{name:f.name,data:b64})};
 }
 async function varaAct(what,body){try{VA.d=await post("/api/vara/"+what,Object.assign({radio:VA.rid},body||{}));VA.msg=null}catch(e){VA.msg={bad:true,text:e.message}}renderVara();renderRadios()}
 async function varaSet(body){try{VA.d=await post("/api/vara/settings",Object.assign({radio:VA.rid},body));VA.msg=null}catch(e){VA.msg={bad:true,text:e.message};await varaLoad()}renderVara();renderRadios()}
-document.addEventListener("submit",async e=>{const f=e.target.closest&&e.target.closest("#varaDlg [data-vaddcall]");if(!f)return;e.preventDefault();
+document.addEventListener("submit",async e=>{const f=e.target.closest&&e.target.closest("[data-vaddcall]");if(!f)return;e.preventDefault();{const vp=f.closest("[data-vpanel]");if(vp)VA.rid=vp.dataset.vpanel}
   const c=(f.querySelector("input").value||"").trim().toUpperCase();if(!/^[A-Z0-9]{3,7}(-([1-9]|1[0-5]))?$/.test(c)){VA.msg={bad:true,text:"That is not a callsign."};renderVara();return}
-  VA.sel[VA.rid]=[c];VA.msg=null;const m=vModem(VA.rid);if(m&&m.channel&&!(m.channel.roster||[]).some(r=>r.call===c))m.channel.roster.push({call:c,state:"unheard",unread:0});renderVara();const x=$("vMsg");if(x)x.focus()});
-document.addEventListener("change",e=>{const t=e.target;if(!t.closest||!t.closest("#varaDlg"))return;
+  VA.sel[VA.rid]=[c];VA.msg=null;const m=vModem(VA.rid);if(m&&m.channel&&!(m.channel.roster||[]).some(r=>r.call===c))m.channel.roster.push({call:c,state:"unheard",unread:0});f.querySelector("input").blur();renderVara();const x=vI("vMsg");if(x)x.focus()});
+document.addEventListener("change",e=>{const t=e.target;if(!t.closest)return;{const vp=t.closest("[data-vpanel]");if(vp)VA.rid=vp.dataset.vpanel;else if(!t.closest("#varaDlg"))return}
   if(t.matches("[data-vevery]")){varaAct("channel",{every_min:+t.value});return}
   if(t.dataset.vset){const k=t.dataset.vset;let v=t.value;if(k==="cmd_port"||k==="bw")v=v===""?null:Number(v);varaSet({[k]:v});return}
   if(t.dataset.vnew){const s=VA.setup[VA.rid]=VA.setup[VA.rid]||{};s[t.dataset.vnew]=t.dataset.vnew==="cmd_port"?Number(t.value):t.value;renderVara()}});
 document.addEventListener("click",async e=>{const t=e.target;if(!t.closest)return;
-  if(t.closest("[data-vmycall]")){const d=$("varaBody").querySelector("[data-vsetupd]");if(d){d.open=true;VA.setupOpen=true;const s=d.querySelector('[data-vset="call"]');d.scrollIntoView({block:"center"});if(s)s.focus()}return}
-  const cp=t.closest("[data-vcardpick]");if(cp){VA.sel[cp.dataset.vcardpick]=[cp.dataset.c];await varaOpen(cp.dataset.vcardpick);const x=$("vMsg");if(x)x.focus();return}
+  if(t.closest("[data-vmycall]")){const vp=t.closest("[data-vpanel]");if(vp)await varaOpen(vp.dataset.vpanel);const d=$("varaBody").querySelector("[data-vsetupd]");if(d){d.open=true;VA.setupOpen=true;const s=d.querySelector('[data-vset="call"]');d.scrollIntoView({block:"center"});if(s)s.focus()}return}
+  const gp=t.closest("[data-vgopanel]");if(gp){$("varaDlg").close();selectRadio(gp.dataset.vgopanel);const b=$("vp-"+gp.dataset.vgopanel);if(b)b.scrollIntoView({block:"nearest",behavior:"smooth"});return}
   const op=t.closest("[data-varaopen]");if(op){varaOpen(op.dataset.varaopen);return}
-  if(!t.closest("#varaDlg"))return;
+  {const vp=t.closest("[data-vpanel]");if(vp)VA.rid=vp.dataset.vpanel;else if(!t.closest("#varaDlg"))return}
   const tb=t.closest("[data-vtab]");if(tb){VA.rid=tb.dataset.vtab;VA.msg=null;renderVara();return}
   if(t.closest("[data-vjoin]")){await varaAct("join",{});return}
   if(t.closest("[data-vleave]")){if(!confirm("Leave the channel? Keep-alives and answering calls stop; other stations see you go grey after a while."))return;await varaAct("leave",{});return}
   if(t.closest("[data-vann]")){await varaAct("announce",{});return}
   const mu=t.closest("[data-vmulti]");if(mu){const s=vSel(VA.rid),c=mu.dataset.vmulti;VA.sel[VA.rid]=mu.checked?[...new Set([...s,c])]:s.filter(x=>x!==c);renderVara();return}
-  const pk=t.closest("[data-vpick]");if(pk){VA.sel[VA.rid]=[pk.dataset.vpick];renderVara();const x=$("vMsg");if(x)x.focus();return}
+  const pk=t.closest("[data-vpick]");if(pk){VA.sel[VA.rid]=[pk.dataset.vpick];renderVara();const x=vI("vMsg");if(x)x.focus();return}
   if(t.closest("[data-vall]")){const ch=(vModem(VA.rid)||{}).channel||{};VA.sel[VA.rid]=(ch.roster||[]).filter(r=>r.state==="here"||r.linked).map(r=>r.call);renderVara();return}
-  const pr=t.closest("[data-vpreset]");if(pr){const m=vModem(VA.rid),ch=m.channel,s=vSel(VA.rid),one=s.length===1?s[0]:"";const txt=vFill(ch.presets[+pr.dataset.vpreset],ch,one,m);const x=$("vMsg");if(x){x.value=(x.value.trim()?x.value.trim()+" ":"")+txt;VA.draft[VA.rid]=x.value;x.focus()}return}
+  const pr=t.closest("[data-vpreset]");if(pr){const m=vModem(VA.rid),ch=m.channel,s=vSel(VA.rid),one=s.length===1?s[0]:"";const txt=vFill(ch.presets[+pr.dataset.vpreset],ch,one,m);const x=vI("vMsg");if(x){x.value=(x.value.trim()?x.value.trim()+" ":"")+txt;VA.draft[VA.rid]=x.value;x.focus()}return}
   if(t.closest("[data-vpedit]")){VA.pedit=!VA.pedit;renderVara();return}
-  if(t.closest("[data-vpsave]")){const v=($("vPresets")||{}).value||"";VA.pedit=false;await varaAct("channel",{presets:v.split("\n")});return}
+  if(t.closest("[data-vpsave]")){const v=(vI("vPresets")||{}).value||"";VA.pedit=false;await varaAct("channel",{presets:v.split("\n")});return}
   const rt=t.closest("[data-vretry]");if(rt){await varaAct("retry",{id:rt.dataset.vretry});return}
   const cn=t.closest("[data-vcancel]");if(cn){await varaAct("cancel",{id:cn.dataset.vcancel});return}
   const pn=t.closest("[data-vpin]");if(pn){await varaAct("channel",{pin:pn.dataset.vpin});return}
@@ -2249,7 +2295,7 @@ document.addEventListener("click",async e=>{const t=e.target;if(!t.closest)retur
   await varaAct(w,{});
 });
 varaLoad().then(()=>{try{renderRadios()}catch(e){}});
-setInterval(()=>{if(((VA.d||{}).modems||[]).some(m=>m.on_channel&&(m.on_channel.on||(m.on_channel.stations||[]).length))&&!$("varaDlg").open)varaLoad().then(()=>{try{renderRadios()}catch(e){}})},60000);  // here → quiet as time passes
+setInterval(()=>{if(((VA.d||{}).modems||[]).some(m=>m.on_channel&&(m.on_channel.on||(m.on_channel.stations||[]).length)))varaLoad().then(()=>{try{renderVara()}catch(e){}})},60000);  // here → quiet as time passes
 // ----- The consolidated band plan (station/consolidate.py): header -> Band plan -----
 const BP={d:null,band:"all",mine:false,flags:false,chans:true,msg:null,view:"table"};
 async function bpOpen(){BP.msg=null;if(!$("bpDlg").open)$("bpDlg").showModal();$("bpBody").innerHTML='<p class="muted">Loading…</p>';try{[BP.d,BP.vara]=await Promise.all([api("/api/bandplan/area"),api("/api/vara").catch(()=>null)])}catch(e){BP.msg={bad:true,text:e.message}}renderBP()}

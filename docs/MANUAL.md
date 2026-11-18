@@ -291,7 +291,10 @@ you chose is remembered. Each column shows:
   start, or same name) apart, under "not heard here", and adds it only with **Add anyway** (it then leaves Not heard).
   Kept in `data/nets_unheard.json`.
 - **VARA chat and files** (owner 2026-11-15; several modems 2026-11-16): on a radio's card set **Used for** to
-  **Data (Winlink / VARA)**, then **VARA…** on its card. Each data radio has **one VARA modem** (a copy of VARA HF or
+  **Data (Winlink / VARA)**. The radio's column then becomes its **VARA workspace**: instead of the nets strip, the
+  Coach / Net board tabs and the voice log, **VARA chat and files** sits under the radio's card (the stations on the
+  channel, the chat with the one you pick, files), and **Modem setup…** there opens the modem's own window (ports,
+  your call, what it is used for, a link by hand). Each data radio has **one VARA modem** (a copy of VARA HF or
   VARA FM with that radio's sound card and PTT, at its own TCP ports), used for one job:
   - **Chat & files**: this station only; Winlink Express uses a different modem.
   - **Shared with Winlink Express**: they **take turns**. While Express is open and no chat is under way the station
@@ -314,8 +317,9 @@ you chose is remembered. Each column shows:
   several stations at once: each message waits its turn (⏳), goes out over a short link when the frequency is clear
   (✓ sent, ✓✓ delivered when VARA confirms it), and the link is let go after 20 s of quiet (**Keep the link open** for a
   back-and-forth). Replies come back the same way. A station that does not answer is called 3 times, then ⚠ **Retry**.
-  The radio's card on the dashboard says **On the VARA channel as W9XYZ-8** and lists the stations heard (grey =
-  quiet, a number = unread); click one to open its chat. After each announcement the window says whether **VARA
+  All of this is under the radio on the dashboard (owner 2026-11-18), so the stations on the channel and the chat
+  stay in view beside your net radios; a message you are typing is kept while the list updates. The status line
+  there shows your call on this modem (click it to change it). After each announcement it says whether **VARA
   keyed the transmitter** and when it last heard a signal on the frequency: "⚠ VARA did not say it keyed the
   transmitter" points at VARA's PTT setting. With two copies of VARA on one PC (Winlink Express's and a second for
   chat), each copy keys **its own** radio: a copied VARA folder keeps the first copy's RA-Board (PTT) device, so
@@ -325,8 +329,8 @@ you chose is remembered. Each column shows:
   Keep-alives, listening and waiting messages pause when you leave the PC. The old controls (Connect, Call CQ, Answer
   calls, the log) are under **Direct link**. Details: `docs/VARA.md`.
 
-  Several modems run at once, each with its own log and received files (`data/vara/radios/<radio>/`); the window has a
-  tab per data radio. **One radio, taking turns:** one VARA at 8300/8301 (Winlink Express's default) → Shared.
+  Several modems run at once, each with its own log and received files (`data/vara/radios/<radio>/`); each data radio's
+  column has its own chat, and the Modem setup window has a tab per data radio. **One radio, taking turns:** one VARA at 8300/8301 (Winlink Express's default) → Shared.
   **Separate radios:** radio A's VARA FM at 8300/8301 → Winlink Express only; a **second copy of VARA in its own
   folder** (e.g. `C:\VARA FM 2`), its VARA Setup → TCP port **8310** (data 8311), the second radio's sound card and
   PTT → radio B → Chat & files. A third: 8320/8321. Adding a modem fills in the next free pair, and two modems can never
