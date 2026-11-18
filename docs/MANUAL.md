@@ -337,7 +337,9 @@ you chose is remembered. Each column shows:
   with about how long the frequency stays in use. The receiver's numbers run a little behind the sender's: VARA
   hands data over a block at a time. Both stations show a progress bar: percent, KB of the size, the transfer rate, the
   time left and the time so far. **Cancel** stops it (VARA can only stop by dropping the link; the part already
-  sent is thrown away); a cancelled file is not sent again unless you press Retry.
+  sent is thrown away); a cancelled file is not sent again unless you press Retry. A cancelled or broken transfer is written in the chat
+  on both stations: the receiver sees "cancelled: not received" (or "not received" when the link closed) with how
+  much had arrived, and the sender sees why ("cancelled by the operator at W9XYZ, 45% had gone") with Retry.
   **Digipeaters (VARA FM only, owner 2026-11-18).** When two stations cannot hear each other directly, a VARA FM
   digipeater in between relays the link. A digipeater is simply another station's VARA FM with its digipeater call
   set: in VARA FM, **Settings → VARA Setup → Digipeater**, a callsign with its own SSID (for example W9XYZ-4,

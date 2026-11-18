@@ -485,3 +485,38 @@ def test_a_file_is_announced_before_it_is_sent_so_the_receiver_sees_it_at_once(t
     t[0] += 60
     r._on_data(wrote[1][:1000])
     assert r.state()["receiving"]["at"] == t[0] - 60 and r.state()["receiving"]["done"] > 0
+
+
+def test_cancelling_a_receive_tells_the_sender_and_both_logs_say_so(tmp_path):
+    """Owner 2026-11-18: "I cancelled on [the receiver]. The cancellation took, but there is no message on either
+    side saying that it was cancelled. That should be in the message log." """
+    t = [1000.0]
+    rx_out, rx_ev = [], []
+    r = V.Vara(tmp_path / "r", "K7ABC", winlink_open=lambda: False, clock=lambda: t[0], tx_allowed=lambda: True,
+               on_event=lambda n, d: rx_ev.append((n, d)))
+    r._data = rx_out.append
+    r._cmd = lambda line: None
+    with r.lock:
+        r.st.update(session="connected", peer="W9XYZ")
+    r._on_data(b"HSK1 W9XYZ +TEST\nOFFER 1 big.xlsx 5000\nFILE 1 big.xlsx 5000 " + b"0" * 64 + b"\n" + b"x" * 2000)
+    r.cancel_receive()
+    assert rx_out[-1] == b"NAK 1 cancelled by the operator at K7ABC\n" and r.state()["receiving"] is None
+    ev = [d for n, d in rx_ev if n == "file_rejected"]
+    assert len(ev) == 1 and ev[0]["why"] == "you cancelled it" and ev[0]["done"] == 2000 and ev[0]["size"] == 5000
+    r._on_status("DISCONNECTED")                                          # no second entry when the link goes
+    assert len([1 for n, d in rx_ev if n == "file_rejected"]) == 1 and not list((tmp_path / "r").rglob("inbox/*"))
+    # the sender: the NAK arrives while its modem still holds the rest: it says why, and drops the link
+    tx_ev, cmds = [], []
+    v = V.Vara(tmp_path / "s", "W9XYZ", winlink_open=lambda: False, clock=lambda: t[0], tx_allowed=lambda: True,
+               on_event=lambda n, d: tx_ev.append((n, d)))
+    v._data = lambda b: None
+    v._cmd = cmds.append
+    v.available = lambda: (True, "")
+    with v.lock:
+        v.st.update(link="up", session="connected", peer="K7ABC", peer_proto="HSK1")
+    v.send_file(name="big.xlsx", data=b"x" * 5000)
+    with v.lock:
+        v.st["buffer"] = 3000
+    v._on_data(b"HSK1 K7ABC +TEST\nNAK 1 cancelled by the operator at K7ABC\n")
+    why = [d for n, d in tx_ev if n == "file_failed"][0]["why"]
+    assert why == "cancelled by the operator at K7ABC (40% had gone)" and "ABORT" in cmds

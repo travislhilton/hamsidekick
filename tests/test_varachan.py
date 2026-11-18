@@ -333,3 +333,14 @@ def test_a_station_is_reached_through_vara_fm_digipeaters(tmp_path):
     assert next(x for x in m.chan.view()["roster"] if x["call"] == "K7ABC")["via"] == ["N0CALL-4", "N0CALL-8"]
     m.act("channel", {"via_for": "K7ABC", "via": ""})                    # empty: direct again
     assert next(x for x in m.chan.view()["roster"] if x["call"] == "K7ABC")["via"] == []
+
+
+def test_a_file_that_did_not_arrive_is_in_the_message_log(tmp_path):
+    st, m, v, clk = _chan(tmp_path)
+    m.act("join", {})
+    _link(m, v, "K7ABC")
+    m._event("file_rejected", {"seq": 1, "name": "big.xlsx", "size": 5000, "done": 2000, "why": "you cancelled it", "peer": "K7ABC"})
+    m._event("file_rejected", {"seq": 2, "name": "b.pdf", "size": 900, "done": 100, "peer": "K7ABC",
+                               "why": "the link closed before the file was whole (the sender may have cancelled it)"})
+    th = m.chan.view()["threads"]["K7ABC"]
+    assert [(it["dir"], it["status"], it["name"], it["done"]) for it in th] == [("in", "cancelled", "big.xlsx", 2000), ("in", "failed", "b.pdf", 100)]

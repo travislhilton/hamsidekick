@@ -364,6 +364,8 @@ class Modem:
                 self._v().disconnect()
             elif what == "abort":
                 self._v().abort("operator")
+            elif what == "stoprx":                           # stop a file (or a link test) that is arriving
+                self._v().cancel_receive()
             elif what == "listen":
                 self._v().listen(bool(body.get("on")))
             elif what == "cq":

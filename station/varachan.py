@@ -413,7 +413,15 @@ class Channel:
                                               "name": Path(data["path"]).name if data.get("path") else data.get("name"),
                                               "size": data.get("size"), "at": self.clock(), "status": "received"})
                 self.activity_at = self.clock()
-            elif name in ("file_sent", "file_failed", "file_rejected") and peer:
+            elif name == "file_rejected" and peer:               # a file that was arriving and did not: say so in the log
+                self._heard(d, peer, "link")
+                self._thread(d, peer).append({"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "file",
+                                              "name": data.get("name"), "size": data.get("size"),
+                                              "done": data.get("done"), "at": self.clock(),
+                                              "status": "cancelled" if data.get("why") == "you cancelled it" else "failed",
+                                              "why": data.get("why")})
+                self.activity_at = self.clock()
+            elif name in ("file_sent", "file_failed") and peer:
                 it = self._find(d, peer, "file", data.get("seq"))
                 if it and it["status"] != "cancelled":
                     it.update(status="delivered" if name == "file_sent" else "failed", why=data.get("why"))
