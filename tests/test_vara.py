@@ -134,7 +134,8 @@ class Station:
 
 
 @pytest.fixture
-def pair(tmp_path):
+def pair(tmp_path, monkeypatch):
+    monkeypatch.setattr(V, "OFFER_WAIT_S", 0.1)          # the fake modem says BUFFER 0 at once: do not wait 8 s for it
     a, b = FakeVara(), FakeVara()
     a.partner, b.partner = b, a
     A, B = Station(tmp_path, "W9XYZ", a), Station(tmp_path, "K7ABC", b)
@@ -438,7 +439,7 @@ def test_a_link_test_waits_for_varas_buffer_count_before_feeding_more(tmp_path):
     t = [1000.0]
     wrote = []
     v = V.Vara(tmp_path, "W9XYZ", winlink_open=lambda: False, clock=lambda: t[0], tx_allowed=lambda: True)
-    v._data = lambda b: wrote.append(len(b))
+    v._data = lambda b: wrote.append(len(b)) if not b.startswith(b"TESTING ") else None
     v._cmd = lambda line: None
     with v.lock:
         v.st.update(link="up", session="connected", peer="K7ABC", peer_proto="HSK1", peer_caps=["+TEST"])
@@ -456,3 +457,32 @@ def test_a_link_test_waits_for_varas_buffer_count_before_feeding_more(tmp_path):
     v._on_status("BUFFER 300")                                          # most of it is over: now more goes in
     assert len(wrote) == 2 and v.state()["testing"]["bytes"] == wrote[0] - 300
     assert sum(wrote) < 4 * 1024
+
+
+def test_a_file_is_announced_before_it_is_sent_so_the_receiver_sees_it_at_once(tmp_path):
+    """On the air 2026-11-18: the receiver's progress bar "just popped" over a minute into a 137 KB file: VARA hands
+    data over a block at a time. A short notice goes first; the file follows when the modem has sent it."""
+    t = [1000.0]
+    wrote = []
+    v = V.Vara(tmp_path, "W9XYZ", winlink_open=lambda: False, clock=lambda: t[0], tx_allowed=lambda: True)
+    v._data = wrote.append
+    cmds = []
+    v._cmd = cmds.append
+    v.available = lambda: (True, "")
+    with v.lock:
+        v.st.update(link="up", session="connected", peer="K7ABC", peer_proto="HSK1")
+    v.send_file(name="list.xlsx", data=b"x" * 5000)
+    assert wrote == [b"OFFER 1 list.xlsx 5000\n"] and cmds == []          # the notice alone, still as text
+    t[0] += 2
+    v._on_status("BUFFER 0")                                              # the modem has sent it: now the file
+    assert cmds == ["COMPRESSION FILES"] and wrote[1].startswith(b"FILE 1 list.xlsx 5000 ") and len(wrote) == 2
+    # the other end: the notice opens the progress display, the FILE header keeps it
+    r = V.Vara(tmp_path / "r", "K7ABC", winlink_open=lambda: False, clock=lambda: t[0], tx_allowed=lambda: True)
+    r._data = lambda b: None
+    r._on_data(b"HSK1 W9XYZ +TEST\n" + wrote[0])
+    rx = r.state()["receiving"]
+    assert rx["name"] == "list.xlsx" and rx["size"] == 5000 and rx["done"] == 0 and rx["at"] == t[0]
+    t[0] += 60
+    r._on_data(wrote[1][:1000])
+    assert r.state()["receiving"]["at"] == t[0] - 60 and r.state()["receiving"]["done"] > 0
+    r._on_data(b"TESTING 2 60\n") if False else None

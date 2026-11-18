@@ -23,6 +23,8 @@ The bytes may arrive in any size of piece: a receiver buffers until a header lin
 | `HSK1 <call>\n` | Sent once by each side right after `CONNECTED`: "I speak HSK1". |
 | `MSG <seq> <len>\n` then `<len>` bytes | A chat message: UTF-8 text, line breaks as LF, at most 4000 characters. |
 | `FILE <seq> <name> <size> <sha256>\n` then `<size>` bytes | A file. `<name>` is percent-encoded (no spaces), `<sha256>` the 64-hex-digit SHA-256 of the bytes. |
+| `OFFER <seq> <name> <size>\n` | A notice sent just before a FILE with the same `<seq>`: the receiver shows the name, size and progress at once (VARA hands a file over a block at a time, so its FILE header can arrive a minute late). The FILE follows when the sender's modem has sent the notice. A program that does not know OFFER ignores the line. |
+| `TESTING <seq> <seconds>\n` | The same kind of notice before a link test. |
 | `ACK <seq>\n` | The receiver's answer to a FILE: received whole, the SHA-256 matches, saved. |
 | `NAK <seq> <reason>\n` | The receiver's answer to a FILE: not saved (`checksum mismatch`, `too large (...)`, ...). |
 | `TEST <seq> <len>\n` then `<len>` bytes | Link test data: random bytes, thrown away by the receiver (never saved or shown). Sent in several frames with one `<seq>`. |

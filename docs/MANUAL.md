@@ -333,7 +333,9 @@ you chose is remembered. Each column shows:
   air) and **Show in folder** opens the folder with the file selected; from a phone or another PC, click the name to
   download it. A program file is given a `.blocked` ending and is never opened from the dashboard. The other station needs this
   program for files (a plain VARA terminal gets chat only).
-  While a file is on its way, both stations show a progress bar: percent, KB of the size, the transfer rate, the
+  While a file is on its way, both stations show it at the top of the VARA panel (whatever station is chosen),
+  with about how long the frequency stays in use. The receiver's numbers run a little behind the sender's: VARA
+  hands data over a block at a time. Both stations show a progress bar: percent, KB of the size, the transfer rate, the
   time left and the time so far. **Cancel** stops it (VARA can only stop by dropping the link; the part already
   sent is thrown away); a cancelled file is not sent again unless you press Retry.
   **Digipeaters (VARA FM only, owner 2026-11-18).** When two stations cannot hear each other directly, a VARA FM

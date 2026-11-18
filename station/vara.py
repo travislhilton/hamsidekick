@@ -72,6 +72,7 @@ CAPS = "+TEST"                      # after our call in the handshake: what this
 TEST_S, TEST_MIN_S, TEST_MAX_S = 60, 15, 180
 TEST_MAX_BYTES = 400_000
 TEST_STALE_S = 6.0
+OFFER_WAIT_S = 8.0                  # a file follows its notice when the modem has sent the notice, or after this long
 TEST_CHUNK = (1024, 16384)          # a test keeps this much ahead of the modem: about 15 s of data at the current speed
 CALL_RE = re.compile(r"^[A-Z0-9]{3,7}(-([1-9]|1[0-5]|T|R))?$")
 
@@ -136,7 +137,7 @@ class Vara:
                    "ptt": False, "busy": False, "sn": None, "registered": None, "alive_at": None,
                    "soundcard_ok": True, "last_reply": None, "last_cmd": None, "listening": False,
                    "peer_proto": None, "sending": None, "cq_heard": [], "error": None, "kind": kind,
-                   "peer_caps": [], "bitrate": {}, "testing": None, "receiving": None,
+                   "peer_caps": [], "bitrate": {}, "testing": None, "receiving": None, "test_rx": None,
                    "mycall": call, "ptt_mode": ptt_mode,
                    "ptt_at": None, "busy_at": None, "cq_at": None}   # last PTT ON / BUSY ON / our CQ frame: did VARA key, hear
         self._reset_session()
@@ -269,20 +270,48 @@ class Vara:
             self.out_files[seq] = {"seq": seq, "name": name, "size": len(data), "sha256": sha, "at": self.clock()}
             self.st["sending"] = {"seq": seq, "name": name, "size": len(data), "left": len(data), "at": self.clock(),
                                   "done": 0, "bps": None, "eta_s": None, "elapsed_s": 0}
-        self._cmd("COMPRESSION FILES")
-        self._data(f"FILE {seq} {urllib.parse.quote(name, safe='')} {len(data)} {sha}\n".encode() + data)
+        # First a short notice, so the other operator sees at once what is coming and how big it is (on the air
+        # 2026-11-18 the receiver learnt of a 137 KB file only when VARA handed over its first block, over a minute
+        # in). The file itself follows when the modem has sent the notice (or after OFFER_WAIT_S).
+        q = urllib.parse.quote(name, safe="")
+        with self.lock:
+            self.offer = {"seq": seq, "at": self.clock(),
+                          "frame": f"FILE {seq} {q} {len(data)} {sha}\n".encode() + data}
+        self._data(f"OFFER {seq} {q} {len(data)}\n".encode())
         self._log({"kind": "file", "dir": "out", "peer": self.st["peer"], "seq": seq, "name": name,
                    "size": len(data), "sha256": sha})
         self._emit("file_sending", {"seq": seq, "name": name, "size": len(data)})
         return seq
 
+    def _file_go(self, from_buffer: bool = False):
+        """Send the file a notice was sent for: when VARA's buffer is empty again, or after OFFER_WAIT_S."""
+        with self.lock:
+            o = self.offer
+            if not o:
+                return
+            now = self.clock()
+            empty = from_buffer and not self.st["buffer"] and now - o["at"] >= 0.3
+            if not empty and now - o["at"] < OFFER_WAIT_S:
+                return
+            self.offer = None
+            if self.st["sending"]:
+                self.st["sending"]["at"] = now                     # the speed is counted from the file's first byte
+                self.st["sending"].pop("hist", None)
+        try:
+            self._cmd("COMPRESSION FILES")
+            self._data(o["frame"])
+        except (OSError, VaraRefused):
+            pass
+
     @staticmethod
     def _progress(x: dict, done: int, now: float):
-        """A transfer's numbers for the operator: bytes done, the speed over the last 15 s or so, the time left."""
+        """A transfer's numbers for the operator: bytes done, the speed over the last 30 s or so, the time left. Both
+        ends work them out the same way, each from the bytes it has itself: the receiver's are a block behind the
+        sender's (VARA hands data over a block at a time)."""
         h = x.setdefault("hist", [[x.get("at", now), 0]])
         if done > h[-1][1]:
             h.append([now, done])
-        while len(h) > 2 and h[1][0] <= now - 15:
+        while len(h) > 2 and h[1][0] <= now - 30:
             h.pop(0)
         span = now - h[0][0]
         rate = (done - h[0][1]) / span if span >= 2 and done > h[0][1] else None      # bytes a second
@@ -305,6 +334,10 @@ class Vara:
                          "curve": [[0.0, 0]], "write_at": 0.0, "buffer_at": 0.0, "rand": os.urandom, "levels": [], "bps": [],
                          "end_at": None, "sn": []}
             self.st["testing"] = {"seq": seq, "s": 0, "bytes": 0, "max_s": seconds}
+        try:
+            self._data(f"TESTING {seq} {int(seconds)}\n".encode())   # the other operator sees it, and for how long
+        except (OSError, VaraRefused):
+            pass
         self._cmd("COMPRESSION FILES")
         self._log({"kind": "test", "dir": "out", "peer": self.st["peer"], "seq": seq, "seconds": seconds})
         self._emit("test_started", {"seq": seq, "seconds": seconds})
@@ -559,11 +592,12 @@ class Vara:
                 self.st["buffer"] = n
                 if self.st["sending"]:
                     x = self.st["sending"]
-                    x["left"] = min(x["size"], n)
-                    if self.clock() - x["at"] >= 0.3:              # a BUFFER line from before the file was written lies
+                    x["left"] = min(x["size"], n) if not self.offer else x["size"]
+                    if not self.offer and self.clock() - x["at"] >= 0.3:   # a BUFFER line from before the file went lies
                         self._progress(x, x["size"] - x["left"], self.clock())
             self._emit("buffer", {"bytes": n, "sending": self.state()["sending"]})
             self._test_feed(from_buffer=True)
+            self._file_go(from_buffer=True)
         elif k == "BITRATE" and len(w) >= 3:                       # "BITRATE (4)  1415 bps TX": VARA's speed level now
             try:
                 level, bps = int(w[1].strip("()")), int(w[2])
@@ -653,7 +687,7 @@ class Vara:
             res = self._test_result(test, partial=True) if test and test["curve"][-1][1] >= 2000 else None
             self._reset_session()
             self.st.update(session="idle", peer=None, via=[], bw=None, peer_proto=None, sending=None, buffer=0,
-                           peer_caps=[], bitrate={}, testing=None, receiving=None)
+                           peer_caps=[], bitrate={}, testing=None, receiving=None, test_rx=None)
         if test:
             self._emit("test_done" if res else "test_failed",
                        {"seq": test["seq"], "result": res, "why": "the link closed before the test finished"})
@@ -678,6 +712,7 @@ class Vara:
         self.seq = 0
         self.session_at = None
         self.ptt_on_at = None
+        self.offer = None                       # a file whose notice is on its way: the file follows
         self.test = None                        # a link test we are sending
         self.rx_test = None                     # ... or receiving
 
@@ -764,6 +799,17 @@ class Vara:
                     self.st["peer_caps"] = [x.upper() for x in w[2:] if x.startswith("+")][:8]
                     self.st["peer_proto"] = "HSK1"
                 self._emit("handshake", {"peer": w[1].upper() if len(w) > 1 else None, "caps": self.st["peer_caps"]})
+            elif k == "OFFER" and len(w) == 4:                     # a file is coming: say so now, with its size
+                name, size = clean_name(urllib.parse.unquote(w[2])), int(w[3])
+                with self.lock:
+                    self.st["receiving"] = {"seq": int(w[1]), "name": name, "size": max(0, size), "at": self.clock(),
+                                            "done": 0, "bps": None, "eta_s": None, "elapsed_s": 0,
+                                            "said_at": self.clock()}
+                self._emit("file_receiving", {"seq": int(w[1]), "name": name, "size": size})
+            elif k == "TESTING" and len(w) == 3:                   # a link test is coming, for this many seconds
+                with self.lock:
+                    self.st["test_rx"] = {"bytes": 0, "s": 0, "max_s": int(float(w[2]))}
+                self._emit("test_receiving", {"seq": int(w[1])})
             elif k == "TEST" and len(w) == 3:
                 n = int(w[2])
                 if not 0 < n <= 4 * TEST_CHUNK[1]:
@@ -772,9 +818,14 @@ class Vara:
                     self.rx_test = {"seq": int(w[1]), "bytes": 0, "at": self.clock()}
                     self._emit("test_receiving", {"seq": int(w[1])})
                 self.rx_test["bytes"] += len(line) + 1
+                with self.lock:                                  # shown on this station: the frequency is in use
+                    self.st["test_rx"] = dict(self.st["test_rx"] or {}, bytes=self.rx_test["bytes"],
+                                              s=round(self.clock() - self.rx_test["at"]))
                 self.pending = {"kind": "test", "seq": int(w[1]), "need": n, "body": bytearray(), "discard": "test"}
             elif k == "TESTEND" and len(w) == 2:
                 r, self.rx_test = self.rx_test, None
+                with self.lock:
+                    self.st["test_rx"] = None
                 if r and r["seq"] == int(w[1]):
                     ms = int((self.clock() - r["at"]) * 1000)
                     try:
@@ -817,9 +868,13 @@ class Vara:
                     p["discard"] = f"too large ({size} bytes; this station takes up to {self.max_file})"
                 self.pending = p
                 with self.lock:
-                    self.st["receiving"] = {"seq": seq, "name": name, "size": size, "at": self.clock(), "done": 0,
-                                            "bps": None, "eta_s": None, "elapsed_s": 0, "said_at": self.clock()}
-                self._emit("file_receiving", {"seq": seq, "name": name, "size": size})
+                    old = self.st["receiving"]
+                    if not (old and old.get("seq") == seq):         # no notice came first (an older program)
+                        self.st["receiving"] = {"seq": seq, "name": name, "size": size, "at": self.clock(),
+                                                "done": 0, "bps": None, "eta_s": None, "elapsed_s": 0,
+                                                "said_at": self.clock()}
+                if not (old and old.get("seq") == seq):
+                    self._emit("file_receiving", {"seq": seq, "name": name, "size": size})
                 if size == 0:
                     self.pending = None
                     self._finish(p)
@@ -932,6 +987,7 @@ class Vara:
             try:
                 self.watchdog()
                 self._test_feed()
+                self._file_go()
             except Exception:  # noqa: BLE001
                 pass
 
