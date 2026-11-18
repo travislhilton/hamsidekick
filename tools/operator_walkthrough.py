@@ -109,6 +109,8 @@ class Walk:
             self.p.click("#rdAdd")                                   # a new station has none: the card says + Add a radio
         elif self.p.locator("#radiosBody .rad").count() == 0:
             self.p.click("#rdAdd")
+        if self.p.locator("#radiosBody details.rad:not([open])").count():      # several radios: each is folded to one line
+            self.p.locator("#radiosBody details.rad:not([open]) > summary").first.click()
         t = self.p.inner_text("#radiosBody")
         for want in ("Sound input", "Audio from", "Mode", "Frequency", "Save and restart the station"):
             assert want in t, f"missing {want!r} in Radios…"

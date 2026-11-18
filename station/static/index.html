@@ -197,6 +197,7 @@ body.dragging{user-select:none;cursor:row-resize}
 #levelDlg .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}#levelDlg .big{font-size:20px;font-weight:600;margin:6px 0}
 #radiosDlg .rad{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0}#radiosDlg .rad input,#radiosDlg .rad select{font:inherit}
 #radiosDlg .rad .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:4px 12px}#radiosDlg label{margin:4px 0 0}
+#radiosDlg details.rad>summary{cursor:pointer;padding:2px 0}#radiosDlg details.rad[open]>summary{margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:6px}
 #levelDlg .say.ok{color:var(--ok)}#levelDlg .say.low,#levelDlg .say.high{color:var(--warnc)}#levelDlg .say.clip,#levelDlg .say.dead{color:var(--bad)}#levelDlg ol{padding-left:20px}
 #levelDlg .sq{border-radius:8px;padding:8px 12px;margin:8px 0;font-weight:600}#levelDlg .sq.open{background:rgba(220,160,0,.18);border:1px solid var(--warnc)}#levelDlg .sq.closed{background:rgba(40,160,80,.15);border:1px solid var(--ok)}#levelDlg .sq .small{font-weight:400}
 .warnc{color:var(--warn)}.nfrow{align-items:center;gap:8px 14px}.nfrow label{display:inline-flex;align-items:center;gap:6px;margin:0}.nfrow label[hidden]{display:none}.nfrow select{width:auto}.mv.ok{color:var(--ok)}.mv.warn{color:var(--warn)}.mv.bad{color:var(--bad)}.mv.idle{color:var(--muted)}
@@ -1114,9 +1115,13 @@ async function runAcc(radio,start,end){
 }
 // ---------- Radios…: add / replace / remove a radio (station/radios.py); saving restarts the station ----------
 let RD=null;
-async function openRadios(){
+// Radios… (header) lists every radio folded to one line; ⚙ Settings… on a radio's card opens that radio's settings
+async function openRadios(rid){
   try{RD=await api("/api/radio-list")}catch(e){alert(e.message);return}
-  RD.list=RD.radios.map(r=>({...r}));RD.msg="";renderRadiosDlg();if(!$("radiosDlg").open)$("radiosDlg").showModal();
+  RD.list=RD.radios.map(r=>({...r}));RD.msg="";
+  const fi=typeof rid==="string"?RD.list.findIndex(r=>r.id===rid):-1;
+  RD.open=new Set(fi>=0?[fi]:RD.list.length===1?[0]:[]);renderRadiosDlg();
+  if(fi>=0)setTimeout(()=>{const el=$("radiosBody").querySelector(`.rad[data-i="${fi}"]`);if(el)el.scrollIntoView({block:"start"})},0);if(!$("radiosDlg").open)$("radiosDlg").showModal();
 }
 // CAT on a radio card: read from the radio (✓), not answering (!), tuned for a net
 function catBadge(r){const c=r.cat;if(!c)return"";
@@ -1151,11 +1156,11 @@ function renderRadiosDlg(){
   const ins=RD.inputs||[],used=new Set(RD.list.map(r=>r.device));
   const opt=(cur)=>{const have=ins.includes(cur);
     return `<option value="">— choose —</option>${cur&&!have?`<option selected value="${esc(cur)}">${esc(cur)} (not plugged in now)</option>`:""}${ins.map(n=>`<option value="${esc(n)}"${n===cur?" selected":""}>${esc(n)}${n!==cur&&used.has(n)?" (another radio's)":""}</option>`).join("")}`};
-  const rows=RD.list.map((r,i)=>`<div class="rad" data-i="${i}"><div class="grid">
+  const rows=RD.list.map((r,i)=>`<details class="rad" data-i="${i}"${RD.open&&RD.open.has(i)?" open":""}><summary><b>${esc(r.name||"New radio")}</b> <span class="muted small">${esc([r.device||"no sound input yet",r.freq_mhz?r.freq_mhz+" MHz "+(r.mode||"FM"):"",r.tx&&r.tx.ptt&&r.tx.ptt!=="none"?(r.tx.enabled?"transmit ON":"transmit set up, off"):"listen only",r.state?"now: "+r.state:""].filter(Boolean).join(" · "))}</span></summary><div class="grid">
      <label>Name <input data-k="name" value="${esc(r.name||"")}" maxlength="60" placeholder="Net radio (handheld)"></label>
      <label>Sound input <select data-k="device">${opt(r.device||"")}</select></label>
      <label>Audio from <select data-k="gate"><option value="voice"${r.gate==="voice"?" selected":""}>Speaker / earphone jack, or SSB (squelch closed)</option><option value="carrier"${r.gate==="carrier"?" selected":""}>FM data jack (hiss always on)</option></select></label>
-     <p class="small muted" style="flex-basis:100%;margin:0">${r.gate==="carrier"?"A data jack (e.g. FTM-150R DATA) leaves the radio's own speaker on: you hear the radio as usual."
+     <p class="small muted" style="grid-column:1/-1;margin:0">${r.gate==="carrier"?"A data jack (e.g. FTM-150R DATA) leaves the radio's own speaker on: you hear the radio as usual."
        :"A cable in a handheld's speaker / earphone jack turns the radio's speaker off. To hear it on this PC: Windows Sound settings → Recording → this sound input → Properties → Listen → <b>Listen to this device</b>. (A USB radio such as the IC-705 keeps its speaker on.)"}</p>
      <label>Mode <select data-k="mode">${["FM","USB","LSB","AM","CW","DIG"].map(m=>`<option${m===(r.mode||"FM")?" selected":""}>${m}</option>`).join("")}</select></label>
      <label>Frequency, MHz <input data-k="freq_mhz" value="${r.freq_mhz??""}" inputmode="decimal" placeholder="146.940" style="width:8em"></label>
@@ -1164,12 +1169,13 @@ function renderRadiosDlg(){
      ${txBlock(r)}
      <div class="row small">${r.state?`<span class="muted">now: ${esc(r.state)}${r.error?" · "+esc(r.error):""}</span>`:'<span class="muted">new</span>'}
      ${(RD.nets[r.id]||[]).length?`<span class="muted">nets: ${esc(RD.nets[r.id].join(", "))}</span>`:""}
-     <button class="linkish" data-rm="${i}">Remove</button></div></div>`).join("");
+     <button class="linkish" data-rm="${i}">Remove</button></div></details>`).join("");
   $("radiosBody").innerHTML=`<h3>Radios</h3>
-   <p class="small">Each radio needs its <b>own sound input</b> (never the one Winlink / VARA uses). <b>Replace</b> a radio or its cable: change its sound input below. Two identical adapters: rename one in Windows (Settings → System → Sound → the input → Rename) so they can be told apart. After saving, use <b>Set level…</b> on the radio's card.</p>
+   <p class="small">Click a radio to change its settings (or <b>⚙ Settings…</b> on its card). Each radio needs its <b>own sound input</b> (never the one Winlink / VARA uses). <b>Replace</b> a radio or its cable: change its sound input below. Two identical adapters: rename one in Windows (Settings → System → Sound → the input → Rename) so they can be told apart. After saving, use <b>Set level…</b> on the radio's card.</p>
    ${rows}<div class="row"><button id="rdAdd">+ Add a radio</button> <button class="linkish small" id="rdRescan" title="Plugged something in? Look again">Look for sound inputs again</button></div>
    <div class="row"><button class="primary" id="rdSave">Save and restart the station</button> <button onclick="$('radiosDlg').close()">Cancel</button> <span class="bad small">${esc(RD.msg)}</span></div>
-   <p class="small muted">Saving restarts the station (about 15 s; the page reconnects by itself). The list is then kept in data\radios.json (station.yaml's radios are no longer read).${RD.from==="station.yaml"?"":" Delete that file to go back to station.yaml's list."}</p>`;
+   <p class="small muted">Saving restarts the station (about 15 s; the page reconnects by itself). The list is then kept in data\\radios.json (station.yaml's radios are no longer read).${RD.from==="station.yaml"?"":" Delete that file to go back to station.yaml's list."}</p>`;
+  for(const el of $("radiosBody").querySelectorAll("details.rad"))el.ontoggle=()=>{RD.open=RD.open||new Set();RD.open[el.open?"add":"delete"](+el.dataset.i)};
   for(const el of $("radiosBody").querySelectorAll("[data-k]"))el.onchange=el.oninput=()=>{RD.list[+el.closest(".rad").dataset.i][el.dataset.k]=el.value};
   for(const el of $("radiosBody").querySelectorAll("[data-cat]"))el.onchange=()=>{const r=RD.list[+el.closest(".rad").dataset.i];
     if(el.dataset.cat==="port"){r.cat=el.value?{...(r.cat||{civ:"A4"}),port:el.value}:null;renderRadiosDlg()}else if(r.cat)r.cat.civ=el.value.trim().toUpperCase()};
@@ -1193,18 +1199,20 @@ function renderRadiosDlg(){
     }catch(err){out.textContent=err.message}};
   for(const b of $("radiosBody").querySelectorAll("[data-rm]"))b.onclick=()=>{const r=RD.list[+b.dataset.rm];
     const nn=(RD.nets[r.id]||[]).length;
-    if(confirm(`Remove ${r.name||"this radio"}?${nn?` Its ${nn} net${nn>1?"s stay":" stays"} in the list with no radio: choose another radio for ${nn>1?"them":"it"} in Nets.`:""} Its log and recordings stay on disk.`)){RD.list.splice(+b.dataset.rm,1);renderRadiosDlg()}};
-  $("rdAdd").onclick=()=>{RD.list.push({name:"",device:"",gate:"voice",mode:"FM",freq_mhz:""});renderRadiosDlg()};
+    if(confirm(`Remove ${r.name||"this radio"}?${nn?` Its ${nn} net${nn>1?"s stay":" stays"} in the list with no radio: choose another radio for ${nn>1?"them":"it"} in Nets.`:""} Its log and recordings stay on disk.`)){RD.list.splice(+b.dataset.rm,1);RD.open=new Set([...(RD.open||[])].filter(i=>i!==+b.dataset.rm).map(i=>i>+b.dataset.rm?i-1:i));renderRadiosDlg()}};
+  $("rdAdd").onclick=()=>{RD.list.push({name:"",device:"",gate:"voice",mode:"FM",freq_mhz:""});(RD.open=RD.open||new Set()).add(RD.list.length-1);renderRadiosDlg();
+    const n=$("radiosBody").querySelector(`.rad[data-i="${RD.list.length-1}"] [data-k=name]`);if(n)n.focus()};
   $("rdRescan").onclick=async()=>{try{RD.inputs=(await api("/api/radio-list")).inputs}catch(e){}renderRadiosDlg()};
   $("rdSave").onclick=async()=>{
     const r=await fetch("/api/radio-list",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({radios:RD.list})});
-    const d=await r.json().catch(()=>({}));if(!r.ok){RD.msg=d.error||"could not save";renderRadiosDlg();return}
+    const d=await r.json().catch(()=>({}));if(!r.ok){RD.msg=d.error||"could not save";const bi=RD.list.findIndex(x=>x.name&&RD.msg.startsWith(x.name+":"));if(bi>=0)(RD.open=RD.open||new Set()).add(bi);renderRadiosDlg();return}
     $("radiosBody").innerHTML=d.restarting?'<h3>Radios saved</h3><p>The station is restarting with the new radios… this page reloads in about 15 s.</p>'
       :'<h3>Radios saved</h3><p>Restart the station to use them.</p><div class="row"><button onclick="$(\'radiosDlg\').close()">Close</button></div>';
     if(d.restarting)setTimeout(()=>location.reload(),15000)};
 }
-$("openRadios").onclick=openRadios;
-document.addEventListener("click",e=>{if(e.target.closest("[data-pickinput]"))openRadios()});
+$("openRadios").onclick=()=>openRadios();
+document.addEventListener("click",e=>{const b=e.target.closest("[data-rset]");if(b)openRadios(b.dataset.rset)});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-pickinput]");if(b)openRadios(b.closest(".rcol")?b.closest(".rcol").id.slice(4):undefined)});
 // ---------- Set level…: the radio's audio against a target, and the Windows recording level (station/levels.py) ----------
 let LVD=null;
 function openLevel(rid){
@@ -1434,7 +1442,7 @@ function ensureCard(r){
    <canvas class="wf" width="${m.bins||128}" height="120" aria-label="Waterfall"></canvas>
    <div class="axis">${axis(r)}</div><div class="cap small muted"></div><div class="err"></div>
    <div class="rsetup"></div><div class="why"></div><div class="endnet"></div><div class="sch"></div>
-   <div class="cardbtns"><button class="pz" data-pause="${esc(r.id)}"></button> <button data-nets="${esc(r.id)}" title="This radio's nets, and listening only while they are on">Nets…</button> <button data-clear="${esc(r.id)}" title="Clear this radio's log and stations heard from the screen (files stay on disk)">Clear log…</button> <button data-test="${esc(r.id)}" title="Read a fixed text over the air and see how many words the station gets right">Test transcription…</button> <button data-level="${esc(r.id)}" title="Set this radio's audio level just right, with a meter and a target">Set level…</button></div>`;
+   <div class="cardbtns"><button class="pz" data-pause="${esc(r.id)}"></button> <button data-nets="${esc(r.id)}" title="This radio's nets, and listening only while they are on">Nets…</button> <button data-clear="${esc(r.id)}" title="Clear this radio's log and stations heard from the screen (files stay on disk)">Clear log…</button> <button data-test="${esc(r.id)}" title="Read a fixed text over the air and see how many words the station gets right">Test transcription…</button> <button data-level="${esc(r.id)}" title="Set this radio's audio level just right, with a meter and a target">Set level…</button> <button data-rset="${esc(r.id)}" title="Change this radio: name, sound input, mode, frequency, CAT and transmit (PTT)">⚙ Settings…</button></div>`;
   const c=el.querySelector("canvas").getContext("2d");c.fillStyle="rgb(8,12,40)";c.fillRect(0,0,m.bins||128,120);
   const id=esc(r.id),top=document.createElement("section");top.className="toptabs";
   top.innerHTML=`<div class="tabs" role="tablist"><button class="on" data-tab="radio" data-rid="${id}" role="tab">Radio</button><button data-tab="guide" data-rid="${id}" role="tab"><span class="lg">Coach</span><span class="sm">Coach</span><span class="gn"></span></button><button data-tab="board" data-rid="${id}" role="tab" title="The net on the air: who is in, who to ask again, traffic, regulars not heard yet"><span class="lg">Net board</span><span class="sm">Board</span> <span class="bn"></span></button><button data-tab="heard" data-rid="${id}" role="tab"><span class="lg">Stations heard</span><span class="sm">Heard</span> <span class="hn"></span></button><button class="fold" data-fold="${id}" title="Fold this panel away to see more of the log (or tap the open tab)"></button></div>

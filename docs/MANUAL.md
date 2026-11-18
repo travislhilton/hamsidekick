@@ -68,6 +68,9 @@ you chose is remembered. Each column shows:
   voice over the noise floor; green 20 dB+, yellow 10–20, red under 10), and a **waterfall** of the
   receiver's audio on the current frequency (the PC gets audio, not RF, so this is the audio passband,
   like WSJT-X/fldigi). Bounds can be changed per radio in `station.yaml` (`meter:`).
+- **⚙ Settings…** (on each radio card): opens that radio's settings: name, sound input, audio source, mode,
+  frequency, CAT and Transmit (PTT). **Radios…** in the header lists every radio, one line each: click a line to
+  open it, **+ Add a radio** for a new one. Saving restarts the station (about 15 s).
 - **Set level…** (on each radio card): sets the audio level just right, once per radio and cable. Step 1, *radio
   volume*: a handheld's amplifier adds hiss and hum as its volume goes up and distorts near the top, so for each knob
   position (1/8 … 7/8 of a turn) the station measures squelch-open hiss (after setting the Windows level) and the

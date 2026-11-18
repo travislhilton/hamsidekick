@@ -705,3 +705,12 @@ def test_radios_lists_the_audio_outputs_windows_has_now(tmp_path, monkeypatch):
     assert st.radio_list()["outputs"] == ["Digirig Lite", "Speakers"]
     monkeypatch.setattr(ptt, "fresh_outputs", lambda: None)                                 # unreadable: the old list
     assert st.radio_list()["outputs"] == ["Digirig Lite VARA FM 2", "Speakers"]
+
+
+def test_a_radio_card_has_a_settings_button_that_opens_that_radio():
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'data-rset="${esc(r.id)}"' in idx and "⚙ Settings…</button></div>`" in idx          # on every radio's card
+    assert 'closest("[data-rset]");if(b)openRadios(b.dataset.rset)' in idx
+    assert "async function openRadios(rid)" in idx and '<details class="rad" data-i="${i}"' in idx   # one folded row a radio
+    assert ".rcol.data .cardbtns [data-rset]" not in idx                                        # a data radio keeps it
