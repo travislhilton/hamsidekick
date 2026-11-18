@@ -43,3 +43,12 @@ def test_every_card_has_a_share_qr_to_its_own_pdf_on_github():
         assert html.count("<!--DOWNLOAD_QR-->") == 1 and html.index("<!--DOWNLOAD_QR-->") < html.index('class="card card-back"'), src.name
         assert phone.card_with_download(html, None).count("<svg") >= 2
     assert phone.card_pdf_url("X") == phone.REPO_URL + "/blob/master/docs/X.pdf"
+
+
+def test_every_card_leaves_a_binding_margin():
+    """Owner 2026-11-18: about 3/4 inch on the binding edge for spiral binding (US Letter): the left of the front,
+    and, printed double-sided, the right of the back."""
+    from tools import build_ref_card
+    for src, _ in build_ref_card.CARDS:
+        css = src.read_text(encoding="utf-8")
+        assert "@page{size:letter;margin:.5in .5in .5in .75in}@page :left{margin:.5in .75in .5in .5in}" in css, src.name

@@ -62,7 +62,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 @media (max-width:600px){.card-row{flex-direction:column}.card{min-width:0;max-width:none;padding:18px 16px;overflow-wrap:anywhere}.card-head{flex-direction:column}}
 /* Printing: every card side is one US Letter page, front then back, so a sheet printed double-sided
    ("flip on long edge") is the card. Nothing flows from one side onto the next. */
-@page{size:letter;margin:.5in}
+@page{size:letter;margin:.5in .5in .5in .75in}@page :left{margin:.5in .75in .5in .5in}
 @media print{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   html,body{background:#fff;padding:0;margin:0}

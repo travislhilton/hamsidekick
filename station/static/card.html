@@ -63,7 +63,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 @media (max-width:600px){.card-row{flex-direction:column}.card{min-width:0;max-width:none;padding:18px 16px;overflow-wrap:anywhere}.card-head{flex-direction:column}}
 /* Printing: every card side is one US Letter page, front then back, so a sheet printed double-sided
    ("flip on long edge") is the card. Nothing flows from one side onto the next. */
-@page{size:letter;margin:.5in}
+@page{size:letter;margin:.5in .5in .5in .75in}@page :left{margin:.5in .75in .5in .5in}
 @media print{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   html,body{background:#fff;padding:0;margin:0}
@@ -142,7 +142,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 
   <p class="card-part">Before the net</p>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><div class="step-text"><b>Tune the radio</b> to the net. Frequency changed? <span class="k">Change</span> on the card<small>A radio with CAT tunes itself for each of its nets and is put back after. A net counts only on its own frequency.</small></div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text"><b>Tune the radio</b> to the net. Frequency changed? <span class="k">Change</span> on the card<small>A CAT radio tunes itself for its nets. A net counts only on its own frequency.</small></div></div>
     <div class="step"><div class="step-num">2</div><div class="step-text"><b>5 minutes before</b>, a yellow alert says what to set. Tune, then <span class="k">Radio is set</span></div></div>
   </div>
 
@@ -160,7 +160,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
   <p class="card-part">After the net: Winlink messages</p>
   <div class="steps">
     <div class="step"><div class="step-num">3</div><div class="step-text"><b>Net closed</b> (or press <span class="k">End net</span>): recording stops and the accurate pass re-reads the net</div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text"><span class="k">Winlink messages…</span> on the net's header: an <b>ICS-309</b> communications log and an <b>ICS-213</b> summary<small>Check the To: list (unconfirmed calls start unticked). First time: <span class="k">Settings</span> → Winlink Express folder.</small></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text"><span class="k">Winlink messages…</span> on the net's header: an <b>ICS-309</b> log and an <b>ICS-213</b> summary<small>Check the To: list (unconfirmed calls start unticked). First time: <span class="k">Settings</span> → Winlink Express folder.</small></div></div>
     <div class="step"><div class="step-num">5</div><div class="step-text"><b>Close Winlink Express</b> → <span class="k">Put in Winlink Express Outbox</span> → open Winlink Express and connect</div></div>
   </div>
 
@@ -172,11 +172,11 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
     <tr><td>Meter red / none</td><td>Too loud: turn the volume down. None: check the cable and the radio's input in <b>Radios…</b></td></tr>
     <tr><td>Wrong net name</td><td>Is the card's frequency what the radio is on? <span class="k">Change</span> it</td></tr>
     <tr><td>Outbox refused</td><td>Winlink Express is still open: close it, then try again</td></tr>
-    <tr><td>Page won't open</td><td>Sign in to Windows on the PC. Phone: same Wi-Fi or Tailscale. Any window: <span class="k">✕</span> or Esc</td></tr>
+    <tr><td>Page won't open</td><td>Sign in to Windows on the PC. Phone: same Wi-Fi or Tailscale</td></tr>
   </table>
 
-  <div class="note-box" style="font-size:14px">This station: <span class="fill"></span><br>Radios / nets: <span class="fill" style="min-width:2.6in"></span></div>
-  <p class="card-disclaimer">HAM Sidekick Station is an independent volunteer project (MIT License), a companion to the Church of Jesus Christ EMCOMM forms. Machine transcription: the operator reviews every message before it is sent. It transmits only with Sidekick on Send. <b>☾ Night</b> (top) turns the screen red to keep your night vision. Manual: README.md.</p>
+  <div class="note-box" style="font-size:14px">This station: <span class="fill"></span> Radios / nets: <span class="fill" style="min-width:2.2in"></span></div>
+  <p class="card-disclaimer">An independent volunteer project (MIT License), a companion to the Church of Jesus Christ EMCOMM forms. Machine transcription: review every message before it is sent. It transmits only with Sidekick on Send. <b>☾ Night</b> = red screen for night vision. Manual: README.md.</p>
 </div>
 
 </div>
