@@ -485,4 +485,3 @@ def test_a_file_is_announced_before_it_is_sent_so_the_receiver_sees_it_at_once(t
     t[0] += 60
     r._on_data(wrote[1][:1000])
     assert r.state()["receiving"]["at"] == t[0] - 60 and r.state()["receiving"]["done"] > 0
-    r._on_data(b"TESTING 2 60\n") if False else None
