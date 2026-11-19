@@ -312,6 +312,8 @@ def test_winlink_express_open_keeps_us_off_vara(tmp_path):
 
 def test_a_plain_vara_terminal_gets_text_and_no_files(pair):
     A, B = pair
+    send = B.v._data                                                         # B plays a plain terminal: it never says
+    B.v._data = lambda d: None if d.startswith(b"HSK1 ") else send(d)        # HSK1 (its own would race the text to A)
     B.v.listen(True)
     assert wait(lambda: B.fake.listening)
     A.v.connect("K7ABC")
