@@ -1,10 +1,12 @@
 # HAM Sidekick Station — ham net speech-to-text
 
-Live speech-to-text for **amateur radio voice nets**, on a Windows PC connected to one or more radios.
+Live speech-to-text for **amateur radio voice nets**, and **keyboard chat and file exchange over the radio** (VARA HF / VARA FM), on a Windows PC connected to one or more radios.
 
 > **An independent volunteer project** (MIT License), offered freely to any amateur radio club, ARES (Amateur Radio Emergency Service) group or EOC (Emergency Operations Center) that can use it. A companion to the [Church of Jesus Christ EMCOMM forms](https://github.com/travislhilton/church-emcomm-wnlk-forms): the station writes the net's ICS (Incident Command System) 309 and 213 messages for Winlink, and can read an EOC's situation report out on a voice net. Machine transcription: the operator reviews everything before it is sent.
 
 HAM Sidekick Station listens to your radio and writes down every transmission a few seconds after the station unkeys. It shows who is talking, looks up every callsign in the FCC (Federal Communications Commission) database, explains Q-codes and prowords, coaches a newer operator through check-ins, relays and emergency traffic, and keeps each net's log, minutes and history. After the net it builds the **ICS-309** communications log and **ICS-213** summary for Winlink Express. It works with **no internet** once installed; a bigger home computer, when there is one, can re-read the net more accurately.
+
+On a **data radio** the station is also a **VARA chat and file station**: through the VARA HF or VARA FM modem you already use for Winlink, it announces your call on a channel, lists the stations it hears, and lets you **chat by keyboard** and **send files** to any of them, radio to radio, with no internet, no Winlink server and no gateway in between. Each message shows when it was delivered; each file shows its progress, speed and time left on both ends, and can be cancelled from either end. **Test link speed** measures what a link to a station really carries and tells you how long a file of a given size will take; VARA FM **digipeaters** reach stations you cannot hear directly. See [Chat and files over the radio (VARA)](#chat-and-files-over-the-radio-vara).
 
 > **Renamed 2026-11:** this project was called *HamNet Station* (repository `ham-net-speech-to-text`). It is now **HAM Sidekick Station**
 > (`travislhilton/hamsidekick`; the old address redirects). Run the installer again on an existing PC: it moves the scheduled tasks,
@@ -18,6 +20,7 @@ HAM Sidekick Station listens to your radio and writes down every transmission a 
 | Setting up a station PC for the first time | [Install](#install) — then [After installing — what to do](#after-installing--what-to-do) |
 | An operator or net control logging a net | [Running a net](#running-a-net) and the [Quick Reference Card](#quick-reference-card) |
 | Sending the net's log to an EOC or your ARES group | [After the net: Winlink messages](#after-the-net-winlink-messages) |
+| Chatting or exchanging files with another station over the radio (VARA) | [Chat and files over the radio (VARA)](#chat-and-files-over-the-radio-vara) and the [VARA card](#quick-reference-card) |
 | Reading an EOC's situation report out on a voice net | [Incident read-out](#incident-read-out-situation-report-on-a-voice-net) |
 | Connecting a radio (handheld, mobile, HF rig) | [Connecting a radio](#connecting-a-radio) |
 | An instructor giving a class | [Quick Reference Card](#quick-reference-card) — print one per student |
@@ -190,7 +193,7 @@ messages every few seconds and writes them into that PC's Outbox, with Winlink E
 **The screen.** The navy bar at the top is the station: your call, the net on the air, the clock (local and UTC),
 **● Live text** (the speech engine is ready) and **● Home server** (where the better second reading is made, see
 below), **Search everything**, and the buttons **Nets**, **Radios…**, **Settings**, **Open on phone**,
-**Read-out**, **☾ Night** and **Help** (the reference cards: the station, Sidekick, recording a conversation). Below it, one column per radio: its nets today, its
+**Read-out**, **☾ Night** and **Help** (the reference cards: the station, Sidekick, recording a conversation, VARA chat and files, the band plan, ad hoc channels). Below it, one column per radio: its nets today, its
 card (frequency, Signal and SNR meters, waterfall, **Change**, **Pause**, **Set level…**), and its log. On a phone
 the radios are tabs.
 
@@ -217,6 +220,51 @@ for normal colours. **Settings → Display** chooses Automatic / Light / Dark / 
 (per browser). The colours match the companion EMCOMM forms' EOC Message Center.
 
 Every feature in detail: [the manual](docs/MANUAL.md).
+
+## Chat and files over the radio (VARA)
+
+Keyboard chat and file transfer between stations, radio to radio, through VARA (no internet, no Winlink server).
+The full detail is in [the manual](docs/MANUAL.md) (VARA chat and files) and the protocol in [docs/VARA.md](docs/VARA.md);
+the [VARA card](#quick-reference-card) has it on two printed sides.
+
+**What you need.** A radio for data with its own sound interface and PTT (a Digirig, a SignaLink, an IC-705's USB),
+and VARA FM (VHF/UHF) or VARA HF installed and set up for that radio, as for Winlink. Each station on the channel
+uses its own call with an SSID (W9XYZ-7 here, K7ABC-8 there).
+
+**Set it up once.**
+1. **Radios…** → the radio → **Used for: Data (Winlink / VARA)**, with its **Transmit** switch on. Its column on the
+   dashboard becomes its **VARA workspace**: the stations on the channel, the chat and the files, under the radio.
+2. **Modem setup…** under the radio: VARA's TCP ports (8300 is Winlink Express's own VARA), your **call** for this
+   modem, and its job: **Chat & files** (this station only), **Shared with Winlink Express** (they take turns: the
+   station lets go while Express is open) or **Winlink Express only**. A second copy of VARA in its own folder (for
+   example `C:\VARA FM 2` on ports 8310/8311) lets one radio do Winlink and another do chat.
+3. Put both stations on the same frequency: **Band plan → Ad hoc VARA** lists the ranges open to you for data, and
+   **Use** tunes the radio there.
+
+**On the channel.**
+- **Join the channel** announces your call and repeats it every 10 minutes (VARA HF 15) while you are at the
+  dashboard. Stations heard are listed **● here**, **○ quiet** (grey) or **Earlier**.
+- **Chat:** click a station, type, Enter. VARA links one station at a time, so each message waits its turn (**⏳ queued**,
+  shown as such while the frequency is busy, for example with a file), goes out over a short link when the
+  frequency is clear (**✓** sent, **✓✓** delivered), and the link is let go after 20 s of quiet. **Keep the link
+  open** for a back-and-forth. Tick several stations, or **Select everyone here**, to send one message to each.
+- **Send a file:** choose the station, **📎 Send a file…** (up to 5 MB). You are told about how long it will take
+  before it goes. While it is on its way **both** stations show it in the chat and at the top of the panel: percent,
+  size, transfer rate, time left and how long the frequency stays in use. **Cancel** works on either end; the other
+  end's chat says who cancelled and how much had arrived, so a cancel is never mistaken for a link failure.
+- **Receive a file:** nothing to press. It appears in the chat as a 📎 link and under **Files received**; on the
+  station PC **Open** opens it (it asks first) and **Show in folder** shows where it was kept. Program files are
+  given a `.blocked` ending and are never opened from the dashboard.
+- **Test link speed** (under the chat, 30 / 60 / 120 s, on demand): VARA starts slow and steps up as data flows,
+  so the test measures the real speed reached and gives a table of **how long a 1 KB to 1 MB file would take** to
+  that station. Check the frequency is clear first: the test uses it for that long.
+- **Digipeaters (VARA FM):** when a station is out of reach, **🛰 Path to …** sends through up to two VARA FM
+  digipeaters; a path is learnt by itself from the way a station's announcement came. **Announce via** sends your
+  announcements through one too.
+
+**When it transmits.** Only while you are at the dashboard (page open and in front, within the last 3 minutes),
+with the radio's Transmit switch on and data privileges for your licence class at that frequency; the panel says
+why when it will not. Everything is sent in the clear, as Part 97 requires: no encryption.
 
 ## The home server (optional)
 
@@ -345,6 +393,7 @@ The station can read an EOC's situation report on a voice net — from the compa
 | **A sound input per radio** | A USB sound card or interface (Digirig, SignaLink, a data-jack cable) — never the one VARA or Winlink uses. An IC-705 on Wi-Fi uses Icom Remote Utility's virtual sound input |
 | **Internet, the first time** | About 4 GB for the install. Afterwards the station works with none |
 | **Winlink Express** | Only to send the net's messages by Winlink · [winlink.org](https://winlink.org) |
+| **VARA HF or VARA FM** (optional) | Only for keyboard chat and files over the radio: the modem from [rosmodem.wordpress.com](https://rosmodem.wordpress.com), with the data radio's own sound interface and PTT (Digirig, SignaLink…). VARA's free version is limited in speed; a licence key (from its author) unlocks the full speed and digipeating. The other station needs HAM Sidekick Station for files; any VARA keyboard program can chat |
 | **Intel or NVIDIA graphics** (optional) | Faster text with a current driver; the CPU works too. The installer measures this PC and picks |
 
 ## Your own settings stay on your PC

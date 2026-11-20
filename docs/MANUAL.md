@@ -391,7 +391,7 @@ you chose is remembered. Each column shows:
   Sidekick & AI) has data privileges at that radio's frequency; the window says why when it will not. **Abort** drops
   the link at once. **Band plan → Ad hoc VARA → Use** sets a chat modem's radio to an open range (one button per
   modem that fits). "VARA is not answering" means that copy of VARA is not open on those ports, or another program
-  (Winlink Express?) holds it. Files received are listed under the chat as downloads, never opened by the station.
+  (Winlink Express?) holds it. Files received are listed under the chat; the station opens one only when you press Open on the station PC.
   Chat with another HAM Sidekick Station gets files too; any other VARA keyboard program gets plain chat.
 - **Band plan for your area** (header → **Band plan**, owner 2026-11-15; its own card: Help → Band plan for your
   area): one table per band of where you may transmit and what each frequency is for. Built in: the FCC rules for
