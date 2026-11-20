@@ -1,5 +1,5 @@
 name: operator-walkthrough
-# Installs the project the way the Quick Reference Card says, on a clean Windows machine, then walks both cards in a browser
+# Installs the project the way the Quick Reference Card says, on a clean Windows machine, then walks every reference card in a browser
 # (tools/operator_install_check.ps1, tools/operator_walkthrough.py). Reports and screenshots are kept as an artifact.
 on:
   workflow_dispatch: {}
@@ -15,7 +15,7 @@ jobs:
       - name: Install as the card says (steps 1-4), then open the dashboard
         shell: powershell
         run: ./tools/operator_install_check.ps1 -ZipUrl "https://github.com/${{ github.repository }}/archive/${{ github.sha }}.zip" -Report install-report.json
-      - name: Walk both cards in a browser (a throwaway station)
+      - name: Walk the reference cards in a browser (a throwaway station)
         shell: powershell
         env:
           STATION_PYTHON: C:\HAM-Sidekick-Station\.venv\Scripts\python.exe

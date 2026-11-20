@@ -1,4 +1,4 @@
-"""Walk the two reference cards as a human operator, in a browser, and report what works.
+"""Walk the reference cards as a human operator, in a browser, and report what works.
 
     python -m tools.operator_walkthrough --url http://localhost:8091 --mode live      # read-only, any running station
     python -m tools.operator_walkthrough --sandbox                                    # a throwaway station: every step for real
@@ -268,6 +268,42 @@ class Walk:
                 "Winlink messages… shows the ICS-309 / ICS-213 preview; Winlink Express is open on this PC, so the button says to close it first (step 5 of the card)" if wx_open else
                 "Winlink messages… shows the ICS-309 / ICS-213 preview; the Outbox button says 'Choose the Winlink Express folder in Settings' "
                 "until that is set (the card now says so)")
+
+    # ---- band plan and ad hoc cards ----
+    def _bandplan(self, view=None):
+        self.goto()
+        self.p.get_by_role("button", name="Band plan", exact=True).first.click()   # the header button the card names
+        self.need(self.p.locator("#bpDlg[open] [data-bpview]").first, "the Band plan window with its tabs")
+        if view:
+            self.p.locator("#bpDlg [data-bpview]", has_text=view).first.click()
+
+    def h_bandplan_open_1(self):
+        self._bandplan()
+        tabs = [t.strip() for t in self.p.locator("#bpDlg [data-bpview]").all_inner_texts()]
+        for t in ("Band plan", "Full spectrum", "Ad hoc voice", "Ad hoc VARA", "💾 Radio channels"):
+            assert t in tabs, f"no {t!r} tab in the Band plan window (tabs: {tabs})"
+        self.need(self.p.locator("#bpDlg .bpband h4").first, "a table per band (a band heading)", 15000)
+        bands = self.p.locator("#bpDlg .bpband h4").count()
+        return f"Band plan opens one table per band ({bands} bands) with the tabs {', '.join(tabs)}"
+
+    def h_adhoc_reserve_1(self):
+        self._bandplan("Ad hoc VARA")
+        free = self.p.locator('#bpDlg button.adch:not(.on)')
+        self.need(free.first, "a ☆ channel to reserve on the Ad hoc VARA tab", 15000)
+        n = free.count()
+        if self.mode != "sandbox":
+            return f"Ad hoc VARA lists {n} ☆ channels to reserve (not reserved: live mode)"
+        f = free.first.get_attribute("data-adtog")
+        self.p.once("dialog", lambda d: d.accept("Walkthrough VARA simplex"))   # the card: type its name → OK
+        free.first.click()
+        on = self.p.locator(f'#bpDlg button.adch.on[data-adtog="{f}"]')
+        self.need(on, f"{f} turning ★ after OK")
+        name = self.p.locator(f'#bpDlg .admine [data-adname="{f}"]')
+        self.need(name, f"{f} under ★ My ad hoc channels")
+        assert name.input_value() == "Walkthrough VARA simplex", f"its name under ★ My ad hoc channels is {name.input_value()!r}"
+        on.click()                                                                  # release it again
+        self.need(self.p.locator(f'#bpDlg button.adch:not(.on)[data-adtog="{f}"]'), f"{f} back to ☆ after release")
+        return f"☆ {f} → named → ★ (listed under ★ My ad hoc channels), then released"
 
     # ---- sidekick card: set up ----
     def _settings(self):

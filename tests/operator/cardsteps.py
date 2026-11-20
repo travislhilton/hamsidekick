@@ -1,5 +1,5 @@
-"""The three reference cards (station/static/card.html, sidekick_card.html, conversation_card.html) as a list of steps
-and table rows.
+"""The reference cards (station/static/card.html, sidekick_card.html, conversation_card.html, vara_card.html,
+bandplan_card.html, adhoc_card.html) as a list of steps and table rows.
 
 The operator walkthrough (tools/operator_walkthrough.py) follows these in card order, and tests/test_card_in_sync.py
 fails when a card changes without the walkthrough being looked at again: each item carries a short hash of its text.
@@ -13,7 +13,8 @@ from pathlib import Path
 
 STATIC = Path(__file__).resolve().parent.parent.parent / "station" / "static"
 CARDS = {"station": STATIC / "card.html", "sidekick": STATIC / "sidekick_card.html",
-         "conversation": STATIC / "conversation_card.html"}
+         "conversation": STATIC / "conversation_card.html", "vara": STATIC / "vara_card.html",
+         "bandplan": STATIC / "bandplan_card.html", "adhoc": STATIC / "adhoc_card.html"}
 
 
 def clean(t: str) -> str:
@@ -59,6 +60,13 @@ SIDEKICK_PARTS = (("a ·", "switch"), ("b ·", "itself"), ("c ·", "ask"), ("the
 SIDEKICK_BUTTON_ROWS = ("i checked in myself", "mute for this net")
 CONVERSATION_PARTS = (("a ·", "before"), ("b ·", "during"), ("c ·", "done"), ("find", "find"), ("use", "use"),
                       ("when something", "wrong"))
+VARA_PARTS = (("what each modem", "use"), ("two ways", "ways"), ("set up each", "modem"), ("join", "join"),
+              ("chat and files", "chat"), ("speed", "speed"), ("taking turns", "turns"), ("the status", "status"))
+BANDPLAN_PARTS = (("a ·", "needs"), ("b ·", "find"), ("c ·", "keep"), ("open it", "open"), ("the columns", "cols"),
+                  ("who speaks", "order"), ("⚠ what", "check"), ("your say", "say"))
+ADHOC_PARTS = (("what the arrl", "open"), ("reading", "read"), ("a ·", "reserve"), ("name and", "name"), ("b ·", "share"),
+               ("c ·", "chirp"))
+PARTS = {"conversation": CONVERSATION_PARTS, "vara": VARA_PARTS, "bandplan": BANDPLAN_PARTS, "adhoc": ADHOC_PARTS}
 
 
 def _group(part: str, table) -> str:
@@ -77,6 +85,6 @@ def _slug(card: str, it: dict) -> str:
         if grp == "chip" and first in SIDEKICK_BUTTON_ROWS:
             grp = "buttons"
     else:
-        grp = _group(part, CONVERSATION_PARTS)
+        grp = _group(part, PARTS[card])
     key = str(it["n"]) if it["kind"] == "step" else re.sub(r"[^a-z0-9]+", "-", first).strip("-")[:28]
     return f"{grp}.{key}"

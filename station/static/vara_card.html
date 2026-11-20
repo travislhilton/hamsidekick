@@ -154,29 +154,30 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
   <div class="steps">
     <div class="step"><div class="step-num">3</div><div class="step-text"><b>Click a station</b> → type → <span class="k">Enter</span> · <span class="k">📎</span> a file (5 MB) · <b>quick messages</b> fill the box (<span class="k">Edit</span>; {them} {sn} {me})<small>Tick several, or <b>Select everyone here</b>: each gets the message over its own link, one after another.</small></div></div>
     <div class="step"><div class="step-num">4</div><div class="step-text">It goes by itself: <b>⏳ waiting</b> → a short link when the frequency is clear → <b>✓ sent</b> → <b>✓✓ delivered</b>; the link closes after 20 s of quiet<small><span class="k">Keep the link open</span> for a back-and-forth. 3 calls unanswered: ⚠ <span class="k">Retry</span>. <span class="k">Leave</span> · <span class="k">Abort</span> (drops any link at once).</small></div></div>
-    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Files received</b> are downloads, never opened; a <span class="mono">.hsadhoc</span> file: <span class="k">★ Install</span> · <span class="k">Modem setup…</span> → <b>Direct link</b>: Connect / CQ / Answer calls by hand</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Files received</b> (📎 in the chat): on the station PC <span class="k">Open</span> (it asks first) · <span class="k">Show in folder</span>; elsewhere the name downloads it<small>Program files get a <span class="mono">.blocked</span> ending and are never opened. A <span class="mono">.hsadhoc</span> file: <span class="k">★ Install</span>. <span class="k">Modem setup…</span> → <b>Direct link</b>: Connect / CQ / Answer calls by hand.</small></div></div>
   </div>
+
+  <p class="card-part">Speed and reach <span>(under the chat with one station)</span></p>
+  <table class="tier-table">
+    <tr><td>Test link speed</td><td>30/60/120 s, only when pressed (frequency clear first): speed reached, S/N, time for 1 KB–1 MB; shown before a file goes</td></tr>
+    <tr><td>🛰 Path to … (VARA FM)</td><td>≤ 2 digipeaters, nearest first → <span class="k">Save path</span> (learnt from its announcement) · <b>announce via</b> on the channel bar · each hop ≈ half speed</td></tr>
+  </table>
 
   <p class="card-part">Taking turns with Winlink Express <span>(a Shared modem)</span></p>
   <div class="steps">
-    <div class="step"><div class="step-num">6</div><div class="step-text"><b>Automatic:</b> open Winlink Express → the station lets go (after your chat, if one is under way) → close Express → it takes VARA back<small><span class="k">Modem setup…</span> → <span class="k">Hand to Winlink Express now</span> / <span class="k">Take it back</span> do the same by hand.</small></div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-text"><b>Automatic:</b> open Express → the station lets go (after your chat) → close Express → it takes VARA back. By hand: <span class="k">Modem setup…</span> → <span class="k">Hand to Winlink Express now</span> / <span class="k">Take it back</span></div></div>
   </div>
 
   <p class="card-part">The status line</p>
   <table class="tier-table">
     <tr><td>Winlink Express's turn</td><td>A Shared modem while Express is open</td></tr>
-    <tr><td>"VARA is not answering"</td><td>Is the copy it names open, on that port? After changing the port, reopen VARA. Chat-only ≠ Express's</td></tr>
+    <tr><td>"VARA is not answering"</td><td>Is the copy it names open on that port? Reopen VARA after a port change</td></tr>
     <tr><td>Nobody hears you</td><td>"keys the radio of …": that copy's PTT → RA-Board = its own sound card</td></tr>
-    <tr><td>Connect greyed</td><td>Read the amber line: Transmit switch, you at the PC, license class, or the frequency</td></tr>
+    <tr><td>Connect greyed</td><td>The amber line says why: Transmit switch, you at the PC, class, frequency</td></tr>
   </table>
 
-  <p class="card-part">Who you can talk to</p>
-  <table class="tier-table">
-    <tr><td>Another HAM Sidekick Station</td><td>Chat <b>and</b> files</td></tr>
-    <tr><td>Any other VARA keyboard program</td><td>Plain chat ("plain terminal"); files need this program at both ends</td></tr>
-  </table>
 
-  <p class="card-disclaimer">Part of HAM Sidekick Station (MIT License). You are the control operator for every transmission: keep-alives and waiting messages go only while you are at the station. Part 97: never encrypted; no relay or automatic reply. The chat and file format is this program's own (docs/VARA.md); VARA is a separate product.</p>
+  <p class="card-disclaimer"><b>Files need HAM Sidekick Station at both ends</b>; any other VARA keyboard program gets plain chat. You are the control operator for every transmission; Part 97: never encrypted, no relay or automatic reply. HAM Sidekick Station (MIT); format: docs/VARA.md; VARA is a separate product.</p>
 </div>
 
 </div>
