@@ -803,8 +803,13 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
 - **Test transcription…** (on each radio card): someone reads a fixed text over the air; **Score** shows how
   many words the live text and the accurate pass got wrong (0% = all right) and keeps a history, so a change
   to the radio, the cable or the settings can be judged by a number (`data\tests.jsonl`).
-- **Help** (top right): opens the two-sided reference card (`/help`, from `station/static/card.html`) in a new tab.
-  Print it double-sided on letter paper (flip on the long edge) and keep it by the radio.
+- **Help** (top right): opens the reference cards in a new tab (`/help`, from `station/static/card.html`); the bar at
+  the top of each card reaches the other five (Sidekick, recording a conversation, VARA chat and files, the band plan,
+  ad hoc channels). Print a card double-sided on letter paper (flip on the long edge) and keep it by the radio.
+  **Business card ↗** at the end of that bar (needs the internet) opens the business card to hand out, kept in the
+  Church of Jesus Christ EMCOMM project so both projects share one card: HAM Sidekick Station on one side, Church of
+  Jesus Christ EMCOMM on the other, each with a QR code to its page, 10 per sheet on Avery 5371 (print two-sided at
+  Actual size, flip on the long edge; its page has an alignment test and nudge boxes).
 - **Settings** (top right), in tabs (it opens on the tab you used last; the links in the dashboard's notices open
   their own tab):
   - **Station**: your callsign, name and grid square; **Display** (colours, 12- or 24-hour clock: this browser only).

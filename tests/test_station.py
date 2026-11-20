@@ -558,6 +558,7 @@ def test_help_has_six_cards_each_linking_the_others():
         nav = html[html.index('<nav class="card-nav"'):html.index("</nav>")]
         assert all(f'href="{p}"' in nav for p in pages)             # Help: every card reaches the others
         assert f'href="{path}" aria-current="page"' in nav
+        assert 'href="https://travislhilton.github.io/church-emcomm-wnlk-forms/training/handouts/business-card-avery-5371.html"' in nav   # owner 11-20: the shared card
         assert "side 1 of 2" in html and "side 2 of 2" in html
     conv = (STATIC / "conversation_card.html").read_text(encoding="utf-8")
     assert "Record a Conversation" in conv and "Include conversations" in conv and "conversations only" in conv
