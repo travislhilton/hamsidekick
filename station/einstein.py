@@ -530,7 +530,12 @@ class Einstein:
             taken |= set((self._modem(rid).chan.load().get("roster") or {}).keys())
         except Exception:  # noqa: BLE001
             pass
-        for n in SSIDS:
+        try:                                     # W9XYZ-7 -> -14, W9XYZ-8 -> -15: two of your stations never suggest one call
+            own = int(self.of(rid).split("-")[1])
+        except (IndexError, ValueError):
+            own = 0
+        first = own + 7 if 9 <= own + 7 <= 15 else DEFAULT_SSID
+        for n in (first,) + SSIDS:
             if f"{b}-{n}" not in taken:
                 return f"{b}-{n}"
         return f"{b}-{DEFAULT_SSID}"

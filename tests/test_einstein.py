@@ -125,7 +125,7 @@ def _ask(m, v, peer, text):
     return [c[1] for c in v.calls if c[0] == "chat"][-1]
 
 
-def _link_e(m, v, peer, ecall="W9XYZ-15"):
+def _link_e(m, v, peer, ecall="W9XYZ-14"):
     v.st.update(session="connected", peer=peer, peer_proto="HSK1", local=ecall)
     m.einstein().on_connected(m.rid, peer)
     m._event("connected", {"peer": peer, "local": ecall})
@@ -163,7 +163,7 @@ def test_switched_on_from_a_dashboard_with_the_internet_only(tmp_path):
     with pytest.raises(ValueError, match="own call"):
         e.settings({"radio": rid, "call": "W9XYZ-7"})
     v = e.settings({"radio": rid, "on": True})
-    assert v["radios"][rid]["state"] == "answering" and v["radios"][rid]["call"] == "W9XYZ-15"
+    assert v["radios"][rid]["state"] == "answering" and v["radios"][rid]["call"] == "W9XYZ-14"
     from station.online import Online
     st.agent.online["xai"] = o = Online("xai")
     o.failed("down")                                           # no internet: its call comes off the modem
@@ -177,20 +177,20 @@ def test_with_the_operator_away_only_einsteins_call_answers(tmp_path):
     e.settings({"radio": rid, "on": True})
     v = m.vara
     m.einstein_sync()
-    assert v.st["calls"] == ["W9XYZ-7", "W9XYZ-15"]           # both while the operator is here
+    assert v.st["calls"] == ["W9XYZ-7", "W9XYZ-14"]           # both while the operator is here
     st.agent.sender.here = False
     m.check()
-    assert v.st["calls"] == ["W9XYZ-15"] and v.st["listening"]  # away: Einstein only, still answering
+    assert v.st["calls"] == ["W9XYZ-14"] and v.st["listening"]  # away: Einstein only, still answering
     assert m.tx_allowed("operator")[0] is False
     assert m.tx_allowed("data:W9XYZ-7")[0] is False             # the operator's call never transmits unattended
-    assert m.tx_allowed("data:W9XYZ-15") == (True, "")
-    assert m.tx_allowed("cq:W9XYZ-15") == (True, "")
+    assert m.tx_allowed("data:W9XYZ-14") == (True, "")
+    assert m.tx_allowed("cq:W9XYZ-14") == (True, "")
     m.chan.send("K7ABC", "see you at the net")                  # the operator's own message waits for the operator
     m.chan.tick()
     assert not any(c[0] == "connect" for c in v.calls)
-    assert ("cq", "W9XYZ-15") in v.calls                       # Einstein announces itself on 70 cm
+    assert ("cq", "W9XYZ-14") in v.calls                       # Einstein announces itself on 70 cm
     st.ptt.on = False                                           # the Transmit switch is off: nothing at all
-    assert m.tx_allowed("data:W9XYZ-15")[0] is False
+    assert m.tx_allowed("data:W9XYZ-14")[0] is False
 
 
 def test_a_session_discloses_answers_and_sends_a_chirp_file(tmp_path):
@@ -209,7 +209,7 @@ def test_a_session_discloses_answers_and_sends_a_chirp_file(tmp_path):
     m._event("chat", {"peer": "K7ABC", "text": "Can you make me a CHIRP file?"})
     assert _wait(lambda: any(c[0] == "file" for c in v.calls))
     chats = [c[1] for c in v.calls if c[0] == "chat"]
-    assert "automated AI assistant" in chats[0] and "W9XYZ-15" in chats[0] and "W9XYZ" in chats[0]
+    assert "automated AI assistant" in chats[0] and "W9XYZ-14" in chats[0] and "W9XYZ" in chats[0]
     assert "CHIRP file" in chats[-1]
     f = next(c for c in v.calls if c[0] == "file")
     assert f[1].startswith("CHIRP-my-plan") and b"446.000000" in f[2] and b"+" in f[2] and b"100.0" in f[2]
@@ -284,25 +284,25 @@ def test_the_asker_learns_ai_stations_proves_ownership_and_waits_for_the_answer(
     m._event("cq_heard", {"call": "W9XYZ-8"})
     v.st.update(session="connected", peer="W9XYZ-8", peer_proto="HSK1", local="W9XYZ-7")
     m._event("connected", {"peer": "W9XYZ-8", "local": "W9XYZ-7"})
-    m._event("handshake", {"peer": "W9XYZ-8", "caps": ["+TEST", "+AI=W9XYZ-14"]})
+    m._event("handshake", {"peer": "W9XYZ-8", "caps": ["+TEST", "+AI=W9XYZ-15"]})
     ro = {r["call"]: r for r in m.chan.view()["roster"]}
-    assert ro["W9XYZ-8"]["einstein"] == "W9XYZ-14" and ro["W9XYZ-14"]["ai"]["of"] == "W9XYZ-8"
+    assert ro["W9XYZ-8"]["einstein"] == "W9XYZ-15" and ro["W9XYZ-15"]["ai"]["of"] == "W9XYZ-8"
     _drop(m, v)
-    m.chan.send("W9XYZ-14", "What is the weather?")
+    m.chan.send("W9XYZ-15", "What is the weather?")
     m.chan.tick()
-    v.st.update(session="connected", peer="W9XYZ-14", peer_proto="HSK1", local="W9XYZ-7")
-    m._event("connected", {"peer": "W9XYZ-14", "local": "W9XYZ-7"})
-    m._event("handshake", {"peer": "W9XYZ-14", "caps": ["+TEST", "+AI", "+OF=W9XYZ-8", "+NAME=EINSTEIN", "+NONCE=ABCD1234"]})
+    v.st.update(session="connected", peer="W9XYZ-15", peer_proto="HSK1", local="W9XYZ-7")
+    m._event("connected", {"peer": "W9XYZ-15", "local": "W9XYZ-7"})
+    m._event("handshake", {"peer": "W9XYZ-15", "caps": ["+TEST", "+AI", "+OF=W9XYZ-8", "+NAME=EINSTEIN", "+NONCE=ABCD1234"]})
     assert v.notes == [f"AUTH {E.owner_token('KEY-123456-ABCDEF', 'ABCD1234', 'W9XYZ-7')}"]
     m.chan.tick()                                               # the question goes
     clk.t += 60
     m.chan.tick()
     assert not any(c[0] == "disconnect" for c in v.calls)       # an AI station owes an answer: the link stays
-    m._event("chat", {"peer": "W9XYZ-14", "text": "Clear tonight."})
+    m._event("chat", {"peer": "W9XYZ-15", "text": "Clear tonight."})
     clk.t += 60
     m.chan.tick()
     assert any(c[0] == "disconnect" for c in v.calls)
-    assert {r["call"]: r for r in m.chan.view()["roster"]}["W9XYZ-14"]["ai"]["name"] == "Einstein"
+    assert {r["call"]: r for r in m.chan.view()["roster"]}["W9XYZ-15"]["ai"]["name"] == "Einstein"
 
 
 # ---------------------------------------------------------------- forms, weather --------------------------------------
@@ -341,6 +341,13 @@ def test_the_band_range_words():
     assert E._band_range("146.52")[:2] == (144.0, 148.0) and E._band_range("banana")[0] is None
 
 
+def test_two_of_your_stations_suggest_different_calls(tmp_path):
+    st, rid, m, clk, e = _setup(tmp_path)
+    assert e.suggest_call(rid) == "W9XYZ-14"                   # W9XYZ-7
+    st.vara.settings({"radio": rid, "call": "W9XYZ-8"})
+    assert e.suggest_call(rid) == "W9XYZ-15"
+
+
 # ---------------------------------------------------------------- over HTTP: View, Einstein, my other stations --------
 def test_view_einstein_and_my_other_stations_over_http(tmp_path):
     import json as _j
@@ -371,7 +378,7 @@ def test_view_einstein_and_my_other_stations_over_http(tmp_path):
         v = _post(base, "/api/einstein/settings", {"radio": rid, "on": True})
         assert v["radios"][rid]["state"] == "answering"
         b = _j.loads(urllib.request.urlopen(base + "/api/station/brief").read())
-        assert b["radios"][0]["einstein"]["call"] == "W9XYZ-15" and b["present"]
+        assert b["radios"][0]["einstein"]["call"] == "W9XYZ-14" and b["present"]
         # this station's "other station" is itself here: presence from it names who sent it
         st.agent.sender.presence = lambda: {"present": True}
         r = remote.Remote(st)
