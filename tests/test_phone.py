@@ -52,3 +52,11 @@ def test_every_card_leaves_a_binding_margin():
     for src, _ in build_ref_card.CARDS:
         css = src.read_text(encoding="utf-8")
         assert "@page{size:letter;margin:.5in .5in .5in .75in}@page :left{margin:.5in .75in .5in .5in}" in css, src.name
+
+
+def test_card_urls_are_links():
+    """Owner 2026-11-21: every URL on a card is a link (the download URL, its QR code, each card's share QR)."""
+    html = "<p><!--DOWNLOAD_QR--><!--DOWNLOAD_URL--><!--CARD_QR:X--></p>"
+    out = phone.card_with_download(html, "https://example.org/get")
+    assert '<a href="https://example.org/get"' in out and ">https://example.org/get</a>" in out
+    assert f'<a href="{phone.card_pdf_url("X")}"' in out

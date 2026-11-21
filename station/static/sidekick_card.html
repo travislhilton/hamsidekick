@@ -92,6 +92,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 .card-nav a{display:inline-block;padding:6px 14px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--navy);font-size:15px;font-weight:600;text-decoration:none}
 .card-nav a:hover{border-color:var(--navy)}
 .card-nav a[aria-current]{background:var(--navy);border-color:var(--navy);color:#fff}
+.card-qr a,a.ulink{color:inherit;text-decoration:underline;text-decoration-color:#8a94a6}.card-qr a:has(svg){text-decoration:none}
 </style>
 </head>
 <body>
@@ -163,7 +164,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 
   <p class="card-part">Set up once</p>
   <div class="steps">
-    <div class="step"><div class="step-num">1</div><div class="step-text"><b>An xAI key</b> (optional): <span class="mono">console.x.ai</span> → API Keys → Create; add a little credit. <span class="k">Settings</span> → <b>Einstein &amp; AI</b> → <b>xAI key</b> → paste → <span class="k">Save key</span><small>Without one: offline rules (no answers). Well under a cent a turn. Kept on this PC only.</small></div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text"><b>An xAI key</b> (optional): <a class="ulink mono" href="https://console.x.ai" target="_blank" rel="noopener">console.x.ai</a> → API Keys → Create; add a little credit. <span class="k">Settings</span> → <b>Einstein &amp; AI</b> → <b>xAI key</b> → paste → <span class="k">Save key</span><small>Without one: offline rules (no answers). Well under a cent a turn. Kept on this PC only.</small></div></div>
     <div class="step"><div class="step-num">2</div><div class="step-text"><span class="k">Settings</span> → <b>Einstein &amp; AI</b> → open <b>Station agent (Einstein)</b> → tick <b>Enable the station agent</b>; fill in <b>On-air name</b>, <b>your first name</b>, <b>check-in line</b>, <b>license class</b>, <b>your region</b><small>Region = your state (and county): it answers a roll call by place only there.</small></div></div>
     <div class="step"><div class="step-num">3</div><div class="step-text"><b>Its voice</b>: <span class="k">Settings</span> → <b>Einstein's voice</b> → ▶ to try, pick one · Nets it must not join: <span class="k">Nets</span> → the net → <b>Never checks in</b></div></div>
     <div class="step"><div class="step-num">4</div><div class="step-text"><b>Before the first Send, into a dummy load:</b> <span class="k">Radios…</span> → <b>Transmit</b> (how it keys, Audio out, tick <b>Allow transmitting</b>) → <b>Transmit test</b>: tick <i>a dummy load is connected</i>, <b>Tone + ID</b>, set <b>Drive level</b> (about 3 kHz FM deviation; SSB ALC just touching), then <b>Phrase + ID</b></div></div>

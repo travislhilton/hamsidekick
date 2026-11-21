@@ -79,7 +79,8 @@ def _share_qr(html: str) -> str:
 
     def qr(m):
         try:
-            return qr_svg(card_pdf_url(m.group(1)), error="l")     # fewer, larger squares: it is printed small
+            u = card_pdf_url(m.group(1))                           # a link too: the card on screen or as a PDF
+            return f'<a href="{u}" target="_blank" rel="noopener">{qr_svg(u, error="l")}</a>'  # fewer, larger squares
         except ImportError:
             return ""
     return re.sub(r"<!--CARD_QR:(\w+)-->", qr, html)
@@ -98,6 +99,8 @@ def card_with_download(html: str, url: str | None = REPO_URL) -> str:
             qr = qr_svg(url)
         except ImportError:
             qr = ""
-        return html.replace("<!--DOWNLOAD_QR-->", qr).replace("<!--DOWNLOAD_URL-->", h.escape(url))
+        a = f'<a href="{h.escape(url)}" target="_blank" rel="noopener">'    # owner 11-21: every URL is a link
+        return html.replace("<!--DOWNLOAD_QR-->", a + qr + "</a>" if qr else "").replace(
+            "<!--DOWNLOAD_URL-->", a + h.escape(url) + "</a>")
     return html.replace("<!--DOWNLOAD_QR-->", "").replace(
         "<!--DOWNLOAD_URL-->", "Ask the instructor for the download link, or set download_url in config\\station.yaml")

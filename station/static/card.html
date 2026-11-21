@@ -90,6 +90,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 .card-nav a{display:inline-block;padding:6px 14px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--navy);font-size:15px;font-weight:600;text-decoration:none}
 .card-nav a:hover{border-color:var(--navy)}
 .card-nav a[aria-current]{background:var(--navy);border-color:var(--navy);color:#fff}
+.card-qr a,a.ulink{color:inherit;text-decoration:underline;text-decoration-color:#8a94a6}.card-qr a:has(svg){text-decoration:none}
 </style>
 </head>
 <body>
@@ -115,12 +116,12 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
     <div class="step"><div class="step-num">1</div><div class="step-text"><b>Download:</b> open the download page (scan the code) → green <span class="k">Code</span> → <b>Download ZIP</b><small>Internet is needed this first time: about 4 GB, 10–30 minutes.</small></div></div>
     <div class="step"><div class="step-num">2</div><div class="step-text"><b>Unblock, then extract:</b> right-click the ZIP → Properties → tick <b>Unblock</b> → OK; then right-click → <b>Extract All</b></div></div>
     <div class="step"><div class="step-num">3</div><div class="step-text"><b>Run</b> the extracted folder's <span class="mono">install\windows\install.cmd</span> and press <b>Yes</b><small>"Windows protected your PC"? <b>More info</b> → <b>Run anyway</b>. It asks for administrator rights itself.</small></div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text"><b>Type your callsign.</b> Press Enter to skip the QRZ.com question. Wait for <span class="mono">== Done</span><small>Keep the PC plugged in while it measures. It lists what would slow this PC and the sound inputs it can record from.</small></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text"><b>Type your callsign.</b> Press Enter to skip the <a class="ulink" href="https://www.qrz.com" target="_blank" rel="noopener">QRZ.com</a> question. Wait for <span class="mono">== Done</span><small>Keep the PC plugged in while it measures. It lists what would slow this PC and the sound inputs it can record from.</small></div></div>
   </div>
 
   <p class="card-part">B · First steps <span>(on the dashboard)</span></p>
   <div class="steps">
-    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Open</b> the <b>HAM Sidekick Station</b> shortcut on the desktop<small>Or <span class="mono">http://localhost:8091</span>. On a phone: <span class="k">Open on phone</span> → scan the code (same Wi-Fi or Tailscale).</small></div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Open</b> the <b>HAM Sidekick Station</b> shortcut on the desktop<small>Or <a class="ulink mono" href="http://localhost:8091" target="_blank" rel="noopener">http://localhost:8091</a>. On a phone: <span class="k">Open on phone</span> → scan the code (same Wi-Fi or Tailscale).</small></div></div>
     <div class="step"><div class="step-num">6</div><div class="step-text"><b>Add your radio:</b> <span class="k">Radios…</span> → <b>+ Add a radio</b> → name, sound input, audio from, mode, frequency → <b>Save and restart the station</b><small>Icom IC-705: also its CAT (computer control) port, so the station reads and tunes the radio.</small></div></div>
     <div class="step"><div class="step-num">7</div><div class="step-text"><b>Set level…</b> on the radio's card: follow its steps with the radio's volume and squelch</div></div>
     <div class="step"><div class="step-num">8</div><div class="step-text"><b>Add your nets:</b> <span class="k">Nets</span> → <b>+ Add a net</b>: name, radio, start, length, frequency, how it repeats</div></div>
@@ -128,7 +129,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
 
   <div class="note-box warning"><b>Each radio needs its own sound input,</b> never the one VARA or Winlink uses. Two identical adapters? Rename one in Windows: Settings → System → Sound → the input → Rename.</div>
   <div class="note-box tip"><b>On a laptop:</b> keep it plugged in and set the maker's fan profile to <b>Performance</b>. The station keeps the screen on and runs at full speed only while it transcribes, then puts your power plan back.</div>
-  <div class="note-box"><b>Optional, in Settings:</b> your name, grid and Winlink account (for the messages) · a QRZ.com login · local names · an xAI key for <b>Einstein</b>, the AI assistant. <b>Help</b> has its card, and one to record a conversation.<br><b>To update:</b> download again and run <span class="mono">install.cmd</span> again. Your settings stay.</div>
+  <div class="note-box"><b>Optional, in Settings:</b> your name, grid and Winlink account (for the messages) · a <a class="ulink" href="https://www.qrz.com" target="_blank" rel="noopener">QRZ.com</a> login · local names · an xAI key for <b>Einstein</b>, the AI assistant. <b>Help</b> has its card, and one to record a conversation.<br><b>To update:</b> download again and run <span class="mono">install.cmd</span> again. Your settings stay.</div>
   <p class="turn-over">Turn over → side 2: Running a Net</p>
 </div>
 
