@@ -168,7 +168,56 @@ class Modem:
         return base if c.get("legacy_dir") else base / "radios" / self.rid
 
     # ----- transmit permission -----
-    def tx_allowed(self) -> tuple[bool, str]:
+    def einstein(self):
+        return getattr(self.st, "einstein", None)
+
+    def tx_allowed(self, purpose: str | None = None) -> tuple[bool, str]:
+        """Every transmission: the operator at a dashboard (local or remote: 97.213), or, for Einstein's own call
+        only, automatic control as a data station (97.221; station/einstein.py). purpose: None / "operator", "listen",
+        "ptt", "cq:<call>", "data:<our call on the link>"."""
+        ok, why = self.operator_ok()
+        if ok:
+            return True, ""
+        e = self.einstein()
+        if purpose and purpose != "operator" and e is not None:
+            try:
+                ec = e.call(self.rid)
+                if e.active(self.rid):
+                    rules = e.rules(self.rid)
+                    if purpose in ("listen", "ptt") and self.cfg_calls_einstein_only() or purpose == f"data:{ec}":
+                        if rules["answer"][0]:
+                            return True, ""
+                        return False, rules["answer"][1]
+                    if purpose == f"cq:{ec}":
+                        return rules["announce"] if not rules["announce"][0] else (True, "")
+            except Exception:  # noqa: BLE001 - Einstein never widens permission by failing
+                pass
+        return False, why
+
+    def cfg_calls_einstein_only(self) -> bool:
+        """VARA answers only Einstein's call now (the operator's is off the modem)."""
+        v, e = self.vara, self.einstein()
+        if not v or e is None:
+            return False
+        try:
+            calls = v.state().get("calls") or []
+        except Exception:  # noqa: BLE001
+            return False
+        return bool(calls) and all(c == e.call(self.rid) for c in calls)
+
+    def operator_ok(self) -> tuple[bool, str]:
+        ok, why = self.base_ok()
+        if not ok:
+            return ok, why
+        agent = getattr(self.st, "agent", None)
+        sender = getattr(agent, "sender", None)
+        if not (sender and sender.present()):
+            return False, "you are not at the dashboard (VARA transmits only with you here)"
+        return True, ""
+
+    def base_ok(self) -> tuple[bool, str]:
+        """What every transmission needs, the operator present or not: a data radio, its Transmit switch, a license
+        class with data privileges at its frequency."""
         r = (getattr(self.st, "radios", {}) or {}).get(self.rid)
         if not r or r.get("role") != "winlink":
             return False, "the VARA radio is not a data (Winlink) radio"
@@ -178,9 +227,6 @@ class Modem:
         if not ok:
             return False, why
         agent = getattr(self.st, "agent", None)
-        sender = getattr(agent, "sender", None)
-        if not (sender and sender.present()):
-            return False, "you are not at the dashboard (VARA transmits only with you here)"
         cls = ((getattr(agent, "cfg", None) or {}).get("license_class") or "").lower() or None
         if not cls:
             return False, "set your license class (Settings → Einstein & AI)"
@@ -217,7 +263,8 @@ class Modem:
             v = mk(data_dir=self.st.data, log_dir=self.dir(), mycall=self.call(), kind=c["kind"],
                    host=c["host"], cmd_port=c["cmd_port"], data_port=c["data_port"], tx_allowed=self.tx_allowed,
                    bw=c["bw"] if c["kind"] == "hf" else None, on_event=self._event,
-                   winlink_open=(lambda: self.link._express()) if shared else (lambda: False))
+                   winlink_open=(lambda: self.link._express()) if shared else (lambda: False),
+                   aux_calls=self._einstein_calls(), caps=self._caps)
         except ValueError as e:
             self.last_event = {"name": "error", "error": str(e)}
             self.link._publish("error", self.rid)
@@ -225,6 +272,50 @@ class Modem:
         with self.lock:
             self.vara = v
         v.start()
+
+    def _einstein_calls(self) -> list[str]:
+        e = self.einstein()
+        try:
+            return [e.call(self.rid)] if e is not None and e.answering(self.rid) else []
+        except Exception:  # noqa: BLE001
+            return []
+
+    def _caps(self, local: str) -> str:
+        from .vara import CAPS
+        e = self.einstein()
+        if e is None:
+            return CAPS
+        try:
+            if local == e.call(self.rid):
+                nonce = e.on_connected(self.rid, (self.vara.state().get("peer") or "") if self.vara else "")
+                return e.handshake_caps(self.rid) + f" +NONCE={nonce}"
+            extra = e.parent_caps(self.rid)
+            return CAPS + (" " + extra if extra else "")
+        except Exception:  # noqa: BLE001
+            return CAPS
+
+    def einstein_sync(self):
+        """The calls VARA answers, and listening, follow who may answer now: the operator's call while the operator
+        is at a dashboard, Einstein's while it is on and online (and its frequency allows automatic control)."""
+        v, e = self.vara, self.einstein()
+        if not v or e is None:
+            return
+        try:
+            s = v.state()
+            if s.get("link") != "up":
+                return
+            me = self.call()
+            op_ok, _ = self.operator_ok()
+            ein = e.answering(self.rid)
+            want = ([me] if op_ok or not ein else []) + ([e.call(self.rid)] if ein else [])
+            if want != (s.get("calls") or []):
+                v.set_calls(want)
+            if ein and not s.get("listening") and s.get("session") == "idle":
+                v.listen(True)
+            elif not ein and not op_ok and s.get("listening") and s.get("session") == "idle":
+                v.listen(False)
+        except Exception as ex:  # noqa: BLE001
+            self.last_event = {"name": "einstein", "error": str(ex)[:160]}
 
     def stop(self):
         with self.lock:
@@ -244,9 +335,14 @@ class Modem:
             s = v.state()
         except Exception:  # noqa: BLE001
             return None
+        try:
+            self.einstein_sync()
+            s = v.state()
+        except Exception:  # noqa: BLE001
+            pass
         if not s.get("listening"):
             return None
-        ok, why = self.tx_allowed()
+        ok, why = self.tx_allowed("listen")
         if ok:
             return None
         try:

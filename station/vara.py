@@ -104,7 +104,7 @@ class Vara:
                  data_port: int = DATA_PORT, tx_allowed=None, ptt=None, ptt_mode: str = "vara",
                  winlink_open=None, on_event=None, bw: int | None = None, max_file: int = MAX_FILE,
                  watchdog_s: float = WATCHDOG_S, reconnect_s: float = RECONNECT_S, clock=time.time,
-                 tick_s: float = 0.5, log_dir=None):
+                 tick_s: float = 0.5, log_dir=None, aux_calls=(), caps=None):
         call = str(mycall or "").strip().upper()
         if not CALL_RE.match(call):
             raise ValueError("set your callsign first (3-7 letters and digits, an optional -SSID)")
@@ -118,6 +118,11 @@ class Vara:
             raise ValueError("VARA HF bandwidth is 500, 2300 or 2750 Hz")
         self.dir = Path(log_dir) if log_dir else Path(data_dir) / "vara"     # one folder per modem (varalink.py)
         self.mycall, self.kind, self.host, self.ports = call, kind, host, (int(cmd_port), int(data_port))
+        # Every call this modem answers (VARA's MYCALL takes several): the operator's, and Einstein's own while it
+        # answers (station/einstein.py). The operator's is left off while only Einstein may answer.
+        self.calls = [call] + [str(c).upper() for c in aux_calls or () if CALL_RE.match(str(c).upper())]
+        self._want_calls = None
+        self.caps = caps or (lambda local: CAPS)        # the handshake's words after the call, per local call
         self.tx_allowed = tx_allowed or (lambda: (False, "transmitting is not allowed"))
         self.ptt, self.ptt_mode = ptt, ptt_mode
         if winlink_open is None:
@@ -138,7 +143,7 @@ class Vara:
                    "soundcard_ok": True, "last_reply": None, "last_cmd": None, "listening": False,
                    "peer_proto": None, "sending": None, "cq_heard": [], "error": None, "kind": kind,
                    "peer_caps": [], "bitrate": {}, "testing": None, "receiving": None, "test_rx": None,
-                   "mycall": call, "ptt_mode": ptt_mode,
+                   "mycall": call, "ptt_mode": ptt_mode, "local": None, "calls": list(self.calls),
                    "ptt_at": None, "busy_at": None, "cq_at": None}   # last PTT ON / BUSY ON / our CQ frame: did VARA key, hear
         self._reset_session()
 
@@ -178,7 +183,7 @@ class Vara:
         """Answer calls (VARA answers by itself while listening, so this needs transmit permission) or stop."""
         self._need_link()
         if on:
-            self._need_tx()
+            self._need_tx("listen")
             self._cmd("CHAT ON")                         # CHAT ON includes LISTEN ON (VARA's own spec)
             self._cmd("LISTEN CQ")                       # ... and report the CQ frames heard (CQFRAME <call>): with plain
             # LISTEN ON VARA answers calls but says nothing of announcements (2026-11-18: two stations announced on
@@ -199,7 +204,7 @@ class Vara:
         self._need_link()
         if self.st["session"] != "idle":
             raise VaraRefused("already in a session: disconnect first")
-        self._need_tx()
+        self._need_tx("operator")
         self._cmd("CHAT ON")                             # keyboard timing (and listening, for the answer)
         with self.lock:
             self.st["session"], self.st["peer"], self.st["via"] = "connecting", dest, via
@@ -245,16 +250,18 @@ class Vara:
             raise VaraRefused("the other station does not run this program")
         self._data(line.strip().encode() + b"\n")
 
-    def cq(self, via=()):
+    def cq(self, via=(), call: str | None = None):
+        """One CQ frame (an announcement) for `call` (default the operator's): Einstein announces its own."""
+        call = str(call or self.mycall).upper()
         self._need_link()
-        self._need_tx()
+        self._need_tx("operator" if _same_call(call, self.mycall) else f"cq:{call}")
         if self.kind == "hf":
-            self._cmd(f"CQFRAME {self.mycall} {self.bw or 2300}")
+            self._cmd(f"CQFRAME {call} {self.bw or 2300}")
         else:
-            self._cmd(f"CQFRAME {self.mycall}" + "".join(" " + str(v).upper() for v in via or ()))
+            self._cmd(f"CQFRAME {call}" + "".join(" " + str(v).upper() for v in via or ()))
         with self.lock:
             self.st["cq_at"] = self.clock()
-        self._log({"kind": "cq", "dir": "out"})
+        self._log({"kind": "cq", "dir": "out", "call": call})
 
     def send_chat(self, text: str) -> int:
         text = str(text or "").replace("\r\n", "\n").strip()
@@ -433,8 +440,45 @@ class Vara:
         if not ok:
             raise VaraRefused(why)
 
-    def _need_tx(self):
-        r = self.tx_allowed()
+    def _allowed(self, purpose: str | None = None):
+        """tx_allowed(purpose): "operator" (the operator's own action), "listen", "ptt" (VARA keying by itself),
+        "cq:<call>", "data:<our call on this link>". An older tx_allowed() without the argument is still called."""
+        if purpose is None:
+            with self.lock:
+                loc = self.st["local"] if self.st["session"] == "connected" else None
+            purpose = f"data:{loc}" if loc else "operator"
+        try:
+            return self.tx_allowed(purpose)
+        except TypeError:
+            return self.tx_allowed()
+
+    def set_calls(self, calls) -> None:
+        """The calls this modem answers. Sent to VARA now when no link is up, else when the link ends."""
+        calls = [str(c).upper() for c in calls if CALL_RE.match(str(c).upper())] or [self.mycall]
+        with self.lock:
+            self._want_calls = calls
+            idle = self.st["session"] == "idle" and self.st["link"] == "up"
+        if idle:
+            self._apply_calls()
+
+    def _apply_calls(self):
+        with self.lock:
+            want, self._want_calls = self._want_calls, None
+        if not want or want == self.calls:
+            return
+        try:
+            self._cmd("MYCALL " + " ".join(want))
+        except VaraRefused:
+            with self.lock:
+                self._want_calls = want
+            return
+        with self.lock:
+            self.calls = want
+            self.st["calls"] = list(want)
+        self._emit("status", self.state())
+
+    def _need_tx(self, purpose: str | None = None):
+        r = self._allowed(purpose)
         ok, why = (r, "") if isinstance(r, bool) else (bool(r[0]), r[1] if len(r) > 1 else "")
         if not ok:
             raise VaraRefused(why or "transmitting is not allowed now")
@@ -466,7 +510,7 @@ class Vara:
 
     def _data(self, b: bytes):
         """Every byte to the other station: transmit permission first; refused mid-session = the link is aborted."""
-        r = self.tx_allowed()
+        r = self._allowed()
         ok = r if isinstance(r, bool) else bool(r[0])
         if not ok:
             self.abort("transmitting is no longer allowed")
@@ -491,7 +535,7 @@ class Vara:
         self._cmd_buf = b""
         with self.lock:
             self.st.update(link="up", error=None)
-        self._cmd(f"MYCALL {self.mycall}")
+        self._cmd("MYCALL " + " ".join(self.calls))
         self._cmd("LISTEN ON" if self.listening else "LISTEN OFF")
         self._cmd("COMPRESSION TEXT")
         if self.kind == "hf":
@@ -595,17 +639,23 @@ class Vara:
             if rest and rest[0].lower() == "via":
                 via = [x.upper() for x in rest[1:] if not x.isdigit()]
             bw = next((int(x) for x in reversed(rest) if x.isdigit()), None)
-            out = _same_call(src, self.mycall)        # W9XYZ-7 calling W9XYZ-8: different stations, same base call
+            mine = [self.mycall] + list(self.calls)
+            out = any(_same_call(src, c) for c in mine)   # W9XYZ-7 calling W9XYZ-8: different stations, same base call
             peer = dst if out else src
+            local = src if out else next((c for c in mine if _same_call(dst, c)), self.mycall)
             with self.lock:                          # bytes may already be here (two sockets): keep the buffer;
                 self.st.update(session="connected", peer=peer, via=via, bw=bw,   # the last session's end cleared it
-                               peer_proto=self.st["peer_proto"])
+                               peer_proto=self.st["peer_proto"], local=local)
                 self.session_at = self.clock()
             self._log({"kind": "connected", "peer": peer, "via": via, "bw": bw,
-                       "dir": "out" if out else "in"})
-            self._emit("connected", {"peer": peer, "via": via, "bw": bw})
+                       "dir": "out" if out else "in", "local": local})
+            self._emit("connected", {"peer": peer, "via": via, "bw": bw, "local": local, "dir": "out" if out else "in"})
             try:
-                self._data(f"HSK1 {self.mycall} {CAPS}\n".encode())
+                caps = self.caps(local) or CAPS
+            except Exception:  # noqa: BLE001
+                caps = CAPS
+            try:
+                self._data(f"HSK1 {local} {caps}\n".encode())
             except VaraRefused:
                 pass
         elif k == "DISCONNECTED":
@@ -637,7 +687,7 @@ class Vara:
         elif k == "PTT" and len(w) > 1:
             on = w[1].upper() == "ON"
             if on and self.ptt_mode == "station":
-                r = self.tx_allowed()
+                r = self._allowed("ptt" if self.st["session"] != "connected" else None)
                 if not (r if isinstance(r, bool) else bool(r[0])):
                     self.abort("VARA wanted to transmit but transmitting is not allowed")
                     return
@@ -711,7 +761,7 @@ class Vara:
             res = self._test_result(test, partial=True) if test and test["curve"][-1][1] >= 2000 else None
             self._reset_session()
             self.st.update(session="idle", peer=None, via=[], bw=None, peer_proto=None, sending=None, buffer=0,
-                           peer_caps=[], bitrate={}, testing=None, receiving=None, test_rx=None)
+                           peer_caps=[], bitrate={}, testing=None, receiving=None, test_rx=None, local=None)
         if test:
             self._emit("test_done" if res else "test_failed",
                        {"seq": test["seq"], "result": res, "why": "the link closed before the test finished"})
@@ -730,6 +780,8 @@ class Vara:
                 self._cmd("LISTEN OFF")                         # CONNECT turned CHAT ON (and listening) on
             except (OSError, VaraRefused):
                 pass
+        if self._want_calls and self.cmd_sock is not None:
+            self._apply_calls()                                 # the calls asked for while the link was up
 
     # ------------------------------------------------------------------ the other station -> us ----------------
     def _reset_session(self):
@@ -827,6 +879,10 @@ class Vara:
                     self.st["peer_caps"] = [x.upper() for x in w[2:] if x.startswith("+")][:8]
                     self.st["peer_proto"] = "HSK1"
                 self._emit("handshake", {"peer": w[1].upper() if len(w) > 1 else None, "caps": self.st["peer_caps"]})
+            elif k == "AUTH" and len(w) == 2:                      # the operator's answer to Einstein's challenge
+                self._emit("auth", {"token": w[1][:64], "peer": self.st["peer"]})
+            elif k == "WORKING" and len(w) == 2:                   # Einstein is working on an answer
+                self._emit("peer_working", {"s": int(w[1]) if w[1].isdigit() else 30, "peer": self.st["peer"]})
             elif k == "OFFER" and len(w) == 4:                     # a file is coming: say so now, with its size
                 name, size = clean_name(urllib.parse.unquote(w[2])), int(w[3])
                 with self.lock:

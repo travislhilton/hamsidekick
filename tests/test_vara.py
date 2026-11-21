@@ -334,7 +334,8 @@ def test_two_ssids_of_one_callsign_are_two_stations(tmp_path):
     got = []
     v.on_event = lambda name, data: got.append((name, data))
     v._on_status("CONNECTED W9XYZ-7 W9XYZ-8 2300")
-    assert v.state()["peer"] == "W9XYZ-7" and ("connected", {"peer": "W9XYZ-7", "via": [], "bw": 2300}) in got
+    assert v.state()["peer"] == "W9XYZ-7" and any(n == "connected" and d["peer"] == "W9XYZ-7" and d["local"] == "W9XYZ-8"
+                                              for n, d in got)
     v._on_status("DISCONNECTED")
     v._on_status("CONNECTED W9XYZ-8 W9XYZ-7 2300")             # our own call out
     assert v.state()["peer"] == "W9XYZ-7"

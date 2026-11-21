@@ -274,6 +274,8 @@ class Station:
                              name="winlink-list").start()
         if self.vara.any_enabled():                        # VARA modems: chat / files (station/varalink.py)
             threading.Thread(target=self.vara.restart, daemon=True, name="vara-start").start()
+            if any(self.einstein.rcfg(r)["on"] for r in self.einstein.cfg["radios"]):
+                self.einstein.start_probe()                # Einstein on the air: is xAI reachable (einstein.py)
 
     @property
     def wlhelpers(self):
@@ -291,6 +293,15 @@ class Station:
             from .varalink import Link
             v = self.__dict__["_vara"] = Link(self)
         return v
+
+    @property
+    def einstein(self):
+        """Einstein on the air: the AI assistant answering other stations over VARA at its own call (einstein.py)."""
+        e = self.__dict__.get("_einstein")
+        if e is None:
+            from .einstein import Einstein
+            e = self.__dict__["_einstein"] = Einstein(self)
+        return e
 
     @property
     def costs(self):

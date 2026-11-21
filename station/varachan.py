@@ -90,6 +90,10 @@ def estimate_s(speed: dict | None, size: int) -> float | None:
     return setup + curve[-1][0] + (size - curve[-1][1]) / late
 
 
+EINSTEIN_IDLE_S = 300          # Einstein lets a link go after this long with nothing said (the asker opened it)
+AI_WAIT_S = 150                # the asker keeps its link open this long for an AI station's answer
+
+
 class Channel:
     def __init__(self, modem, clock=time.time):
         self.m, self.clock = modem, clock
@@ -102,6 +106,7 @@ class Channel:
         self.linked = False
         self.last_peer = None
         self.dirty = False
+        self.local = None              # our call on the link now (the operator's, or Einstein's: station/einstein.py)
 
     # ----- storage -----
     def _path(self) -> Path:
@@ -119,6 +124,7 @@ class Channel:
         d.setdefault("threads", {})
         d.setdefault("last_announce", 0)
         d.setdefault("pinned", None)
+        d.setdefault("e_last_announce", 0)
         return d
 
     def save(self, d: dict):
@@ -374,6 +380,11 @@ class Channel:
             elif name == "connected":
                 self.linked = True
                 self.last_peer = peer
+                self.local = (data.get("local") or "").upper() or None
+                if self._is_einstein(self.local):
+                    for it in d["threads"].get(peer or "", []):  # answers kept since its last link
+                        if it.get("by") == "einstein" and it["status"] == "held":
+                            it["status"] = "queued"
                 self._heard(d, peer, "link")
                 if self.opened != peer and data.get("via") is not None:      # it called us: its path, backwards, is ours
                     r, back = d["roster"][peer], [x for x in reversed(data.get("via") or []) if x][:MAX_DIGIS]
@@ -414,9 +425,30 @@ class Channel:
                 self.activity_at = self.clock()
             elif name == "chat" and peer:
                 self._heard(d, peer, "link")
-                d["roster"][peer]["unread"] = d["roster"][peer].get("unread", 0) + 1
-                self._thread(d, peer).append({"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "chat",
-                                              "text": data.get("text"), "at": self.clock(), "status": "received"})
+                to_e = self._is_einstein(self.local)
+                if not to_e:
+                    d["roster"][peer]["unread"] = d["roster"][peer].get("unread", 0) + 1
+                self._thread(d, peer).append(dict({"id": uuid.uuid4().hex[:12], "dir": "in", "kind": "chat",
+                                                   "text": data.get("text"), "at": self.clock(), "status": "received"},
+                                                  **({"to": "einstein"} if to_e else {})))
+                r = d["roster"][peer]
+                r.pop("working_until", None)
+                self.activity_at = self.clock()
+                if to_e:
+                    self.save(d)
+                    e = self.m.einstein()
+                    threading.Thread(target=e.on_chat, args=(self.m.rid, peer, data.get("text"), self._einstein_send(peer)),
+                                     daemon=True, name="einstein-in").start()
+                    return
+            elif name == "handshake" and peer:
+                self._heard(d, peer, "link")
+                self._learn_ai(d, peer, data.get("caps") or [])
+            elif name == "auth" and peer:
+                if self._is_einstein(self.local):
+                    self.m.einstein().on_auth(self.m.rid, peer, data.get("token"))
+                changed = False
+            elif name == "peer_working" and peer:
+                self._heard(d, peer, "link", working_until=self.clock() + min(180, int(data.get("s") or 30)))
                 self.activity_at = self.clock()
             elif name == "file_receiving" and peer:              # a file is arriving: its line in the chat, with progress
                 self._heard(d, peer, "link")
@@ -478,7 +510,15 @@ class Channel:
                         it.update(status="failed", why="the link closed before the test finished")
                 if gone and gone == self.opened and not self.linked:
                     self._connecting_failed(d, gone)             # our call was never answered
-                self.opened, self.connect_at, self.linked = None, None, False
+                if self._is_einstein(self.local) and gone:
+                    try:
+                        self.m.einstein().on_disconnected(self.m.rid, gone)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    for it in d["threads"].get(gone, []):        # not sent: kept for its next link to Einstein
+                        if it.get("by") == "einstein" and it["status"] in ("queued", "sending"):
+                            it["status"] = "held"
+                self.opened, self.connect_at, self.linked, self.local = None, None, False, None
                 if d.get("pinned") == gone:
                     d["pinned"] = None
             else:
@@ -521,7 +561,21 @@ class Channel:
             session = s.get("session")
             if session == "connected":
                 peer = (s.get("peer") or "").upper()
-                self._flush(d, v, s, peer, ok)
+                local = (s.get("local") or "").upper()
+                if self._is_einstein(local):                     # Einstein's link: its own answers only
+                    eok = self.m.tx_allowed(f"data:{local}")[0]
+                    self._flush(d, v, s, peer, eok, only="einstein")
+                    quiet = now - self.activity_at
+                    e = self.m.einstein()
+                    if quiet >= EINSTEIN_IDLE_S and not (e and e.busy.get((self.m.rid, peer))) \
+                            and not s.get("sending") and not s.get("buffer") and not s.get("receiving"):
+                        try:
+                            v.disconnect()                       # a link left open with nothing said: let it go
+                        except Exception:  # noqa: BLE001
+                            pass
+                    self.save(d)
+                    return
+                self._flush(d, v, s, peer, ok, only="operator")
                 waiting = [it for it in d["threads"].get(peer, []) if it["dir"] == "out" and it["status"] == "queued"]
                 others = any(it["dir"] == "out" and it["status"] == "queued"
                              for c, th in d["threads"].items() if c != peer for it in th)
@@ -531,6 +585,8 @@ class Channel:
                         it["status"] = "delivered"
                 unconfirmed = any(it["status"] in ("sent", "sending") for it in d["threads"].get(peer, []))
                 idle = quiet >= LINGER_S.get(s.get("kind") or "fm", 20) or (others and quiet >= MIN_QUIET_S)
+                if self._ai_owes(d, peer, now):
+                    idle = False                                 # an AI station is still working on our question
                 if (self.opened == peer and d.get("pinned") != peer and not waiting and not unconfirmed
                         and not s.get("sending") and not s.get("buffer") and idle):
                     try:
@@ -552,6 +608,8 @@ class Channel:
                     self.save(d)
                 return
             if not ok or s.get("busy"):
+                if not s.get("busy"):
+                    self._einstein_announce(d, v, s, now)        # you left: Einstein may still announce itself
                 return                                           # you left, or someone is on the frequency
             nxt = self._next(d, now)
             if nxt:
@@ -570,6 +628,7 @@ class Channel:
                     self.announce()
                 except Exception:  # noqa: BLE001
                     pass
+            self._einstein_announce(d, v, s, now)
 
     def _next(self, d: dict, now: float) -> str | None:
         best = None
@@ -581,12 +640,15 @@ class Channel:
                 best = (min(q), c)
         return best[1] if best else None
 
-    def _flush(self, d: dict, v, s: dict, peer: str, ok: bool):
-        """Send what waits for the station we are linked to (whoever opened the link)."""
+    def _flush(self, d: dict, v, s: dict, peer: str, ok: bool, only: str = "operator"):
+        """Send what waits for the station we are linked to (whoever opened the link). On Einstein's link only
+        Einstein's own answers go; on the operator's, only the operator's."""
         if not ok or not peer:
             return
         for it in d["threads"].get(peer, []):
             if it["dir"] != "out" or it["status"] != "queued":
+                continue
+            if (it.get("by") == "einstein") != (only == "einstein"):
                 continue
             try:
                 if it["kind"] == "chat":
@@ -634,7 +696,115 @@ class Channel:
                 it["why"] = str(e)
                 return
 
+    # ----- Einstein (station/einstein.py) -----
+    def _is_einstein(self, local) -> bool:
+        e = self.m.einstein()
+        try:
+            return bool(local and e is not None and local.upper() == e.call(self.m.rid).upper())
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _einstein_send(self, peer: str):
+        """What Einstein puts on the link: queued as its own lines in that station's thread, sent by _flush on this
+        link (or kept, "held", for the station's next link if this one has closed)."""
+        def send(text=None, name=None, data=None, note=None):
+            v = self.m.vara
+            s = v.state() if v else {}
+            here = (s.get("session") == "connected" and (s.get("peer") or "").upper() == peer
+                    and self._is_einstein(s.get("local")))
+            if note:
+                if here and s.get("peer_proto") == "HSK1":
+                    try:
+                        v.send_note(note)
+                    except Exception:  # noqa: BLE001
+                        pass
+                return
+            with self.lock:
+                d = self.load()
+                it = {"id": uuid.uuid4().hex[:12], "dir": "out", "at": self.clock(), "status": "queued" if here else "held",
+                      "tries": 0, "by": "einstein"}
+                if name is not None:
+                    from .vara import clean_name
+                    it.update(kind="file", name=clean_name(name), size=len(data or b""))
+                    f = self._files() / it["id"]
+                    f.parent.mkdir(parents=True, exist_ok=True)
+                    f.write_bytes(data or b"")
+                else:
+                    it.update(kind="chat", text=str(text or ""))
+                self._thread(d, peer).append(it)
+                if here:
+                    s = v.state()
+                    self._flush(d, v, s, peer, self.m.tx_allowed(f"data:{s.get('local')}")[0], only="einstein")
+                    self.activity_at = self.clock()
+                self.save(d)
+        return send
+
+    def _learn_ai(self, d: dict, peer: str, caps: list):
+        """What a station's handshake says about AI stations: "+AI +OF=<call> +NAME=<name>" (it is one) or
+        "+AI=<call>" (its operator's Einstein answers at that call). Then, as the asker: prove we are its operator."""
+        r = d["roster"].get(peer)
+        if r is None:
+            return
+        kv = {}
+        for c in caps:
+            k, _, val = str(c).lstrip("+").partition("=")
+            kv[k.upper()] = val
+        if "AI" in kv and not kv["AI"]:
+            r["ai"] = {"of": kv.get("OF") or None, "name": (kv.get("NAME") or "AI").replace("_", " ").title()}
+        elif kv.get("AI"):
+            from .vara import CALL_RE
+            ac = kv["AI"].split(":")[0].upper()
+            if CALL_RE.match(ac):
+                r["einstein"] = ac
+                a = d["roster"].setdefault(ac, {"call": ac, "first_at": self.clock(), "unread": 0, "heard_at": None})
+                a.setdefault("ai", {"of": peer, "name": "AI"})
+        nonce = kv.get("NONCE")
+        if "AI" in kv and nonce and not kv["AI"]:
+            from .einstein import base, owner_token
+            mine = self.m.call()
+            e = self.m.einstein()
+            key = e.owner_key() if e is not None else None
+            if key and base(peer) == base(mine):
+                try:
+                    self.m.vara.send_note(f"AUTH {owner_token(key, nonce, mine)}")
+                    r["owner"] = True
+                except Exception:  # noqa: BLE001
+                    pass
+
+    def _ai_owes(self, d: dict, peer: str, now: float) -> bool:
+        r = d["roster"].get(peer) or {}
+        if not r.get("ai"):
+            return False
+        if (r.get("working_until") or 0) > now:
+            return True
+        th = d["threads"].get(peer, [])
+        last_in = max((it["at"] for it in th if it["dir"] == "in"), default=0)
+        last_q = max((it["at"] for it in th if it["dir"] == "out" and it.get("kind") == "chat"), default=0)
+        return last_q > last_in and now - last_q < AI_WAIT_S
+
+    def _einstein_announce(self, d: dict, v, s: dict, now: float):
+        e = self.m.einstein()
+        if e is None or s.get("session") != "idle" or s.get("busy"):
+            return
+        try:
+            if not e.answering(self.m.rid) or not e.rules(self.m.rid)["announce"][0]:
+                return
+            if now - (d.get("e_last_announce") or 0) < d["every_min"] * 60:
+                return
+            v.cq(d.get("announce_via") or (), call=e.call(self.m.rid))
+            d["e_last_announce"] = now
+            self.save(d)
+        except Exception:  # noqa: BLE001
+            pass
+
     # ----- the view -----
+    def _einstein_view(self):
+        e = self.m.einstein()
+        try:
+            return e.state(self.m.rid) if e is not None else None
+        except Exception:  # noqa: BLE001
+            return None
+
     def summary(self) -> dict:
         """For the radio card: on the channel or not, who is here or quiet, unread messages (owner 2026-11-18: "I don't
         see anything on the dashboard ... radio column showing that a station has announced")."""
@@ -673,4 +843,6 @@ class Channel:
                 "testing": s.get("testing"), "bitrate": s.get("bitrate"),
                 "threads": {c: th[-120:] for c, th in d["threads"].items()},
                 "me": {"call": self.m.call(), "name": op.get("name") or "", "grid": op.get("grid") or ""},
+                "local": s.get("local"),
+                "einstein": self._einstein_view(),
                 "linger_s": LINGER_S.get(s.get("kind") or self.m.cfg().get("kind", "fm"), 20)}

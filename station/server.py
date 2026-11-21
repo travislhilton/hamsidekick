@@ -222,6 +222,43 @@ def make_handler(station):
                 self.end_headers()
                 self.wfile.write(data)
                 return
+            if u.path == "/api/einstein":                        # Einstein on the air (einstein.py)
+                return self._json(station.einstein.view())
+            if u.path == "/api/einstein/notes":
+                rid = (parse_qs(u.query).get("radio") or [""])[0]
+                return self._json({"notes": station.einstein.mail(rid)[-100:]})
+            vv = re.fullmatch(r"/api/vara/view/([^/]+)", u.path)
+            if vv:                                               # a received file shown in the browser, never run
+                from urllib.parse import unquote
+                p = station.vara.inbox_file(unquote(vv.group(1)))
+                if not p:
+                    return self._json({"error": "not found"}, 404)
+                from . import forms
+                data = p.read_bytes()[:2 * 1024 * 1024]
+                ext = p.suffix.lower()
+                title = p.name
+                if ext in (".html", ".htm"):
+                    page = data.decode("utf-8", "replace")
+                elif ext == ".xml" and forms.read_winlink_xml(data):
+                    page = forms.html_for(forms.read_winlink_xml(data))
+                elif ext == ".csv":
+                    page = forms.csv_table(data.decode("utf-8", "replace"), title)
+                elif ext in (".txt", ".md", ".json", ".xml", ".hsadhoc", ".log"):
+                    page = forms.text_page(data.decode("utf-8", "replace"), title)
+                else:
+                    return self._json({"error": "this kind of file is downloaded, not viewed"}, 415)
+                body = page.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                # the page came over the air: no script, no outside request, no form, no navigation, ever
+                self.send_header("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; "
+                                                            "img-src data:; form-action 'none'; base-uri 'none'")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if u.path == "/api/localplans":                      # Nets -> Plans (localplans.py)
                 return self._json(_plans(station).state())
             if u.path == "/api/radio/export.csv":          # radio channels for CHIRP (radiochan.py)
@@ -346,7 +383,8 @@ def make_handler(station):
                       "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
-                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
+                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio",
+                      "/api/einstein/settings", "/api/einstein/notes", "/api/einstein/ownerkey"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "adhoc", "handoff", "takeback", "join", "leave",
                       "announce", "csend", "retry", "cancel", "closelink", "channel", "linktest", "open", "stoprx")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
@@ -430,6 +468,16 @@ def make_handler(station):
                                                                          noise=bool(body.get("noise")))))
                     except LookupError:
                         return self._json({"error": "no such transmission"}, 404)
+                if u.path == "/api/einstein/settings":           # {"radio", "on", "call"} / {"share_library"}
+                    return self._json(station.einstein.settings(body))
+                if u.path == "/api/einstein/notes":              # {"radio", "read": [ids] | null = all}
+                    station.einstein.mail_read(str(body.get("radio") or ""), set(body["read"]) if body.get("read") else None)
+                    return self._json({"notes": station.einstein.mail(str(body.get("radio") or ""))[-100:]})
+                if u.path == "/api/einstein/ownerkey":           # {"key": ...} | {"new": true} | {"key": ""} = remove
+                    from .einstein import Einstein
+                    k = Einstein.new_owner_key() if body.get("new") else body.get("key")
+                    r = station.einstein.set_owner_key(k)
+                    return self._json(dict(r, key=k if body.get("new") else None))
                 if u.path.startswith("/api/vara/"):              # VARA (varalink.py)
                     what = u.path.rsplit("/", 1)[1]
                     if what == "settings":
