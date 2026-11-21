@@ -50,6 +50,21 @@ From that curve the station works out how long a file of a given size takes: up 
 time is read off the curve; beyond it, the rest goes at the speed of the test's last third. VARA's own `BITRATE`
 lines (speed level and bit rate) and `SN` are recorded beside it.
 
+**AI stations (Einstein).** A station's AI assistant answers at a call of its own (the operator's base call with
+another SSID; VARA's `MYCALL` takes several calls, so both share one modem). Its handshake says what it is:
+`HSK1 W9XYZ-15 +TEST +AI +OF=W9XYZ-7 +NAME=Einstein +NONCE=<16 hex>`, and while it answers, the operator's own call
+says where to find it: `HSK1 W9XYZ-7 +TEST +AI=W9XYZ-15`. Other stations list the AI station under its operator's.
+Two more header lines (ignored by a program that does not know them):
+
+| From | Line | Meaning |
+|---|---|---|
+| the asker | `AUTH <32 hex>\n` | "I am this station's operator": the first 32 hex digits of HMAC-SHA256(owner key, `<NONCE>:<my call>`), sent by a station with the same base call that holds the same owner key. It proves the key without saying it and hides nothing (Part 97: authentication, not encryption). The AI station then also takes STATUS, MESSAGES, PAUSE and RESUME. |
+| the AI station | `WORKING <seconds>\n` | "Working on your question": the asker keeps the link open (up to about 2½ minutes) for the answer instead of letting it go after its usual quiet time. |
+
+An AI station only answers: it never opens a link. An answer not ready when the link closes is kept (6 hours) and
+sent on the asker's next link to it. Its first message in a session says it is an automated assistant and names the
+control operator; it gives its call every 10 minutes. See [EINSTEIN.md](EINSTEIN.md).
+
 * `<seq>` counts up from 1 per sender per session; an ACK or NAK names the FILE it answers.
 * A FILE larger than the receiver takes (this station: 5 MB) is still read to its end (so the stream stays in step)
   and answered with NAK.

@@ -315,6 +315,15 @@ you chose is remembered. Each column shows:
     Winlink → Send as) and from the station's callsign in Settings (net logs, Einstein, spoken IDs), which do not
     change. The station gives VARA this call (MYCALL) each time it connects; the window shows it ("VARA FM as W9XYZ-8").
 
+  **Einstein on the air** (owner 2026-11-21; [EINSTEIN.md](EINSTEIN.md)): the panel's **🤖 Einstein on the air** bar
+  switches the AI assistant on for this radio, at a call of its own (yours with another SSID, e.g. W9XYZ-15). Other
+  amateurs link to that call and ask it anything; it sends CHIRP files, the band plan, weather / HF conditions as an
+  ICS-213, an ICS-205, an ICS-309, and takes notes for you (**✉ Notes**). With you away it answers only where Part 97
+  allows automatic control (6 m and up; the HF automatic segments; elsewhere HF 500 Hz answering only) and never
+  opens a link; with no internet it stops answering. AI stations heard show **🤖** under their operator's call; choose
+  one for ready questions (HELP, weather, a CHIRP file…). Files received open with **View** (forms as forms, a CSV as
+  a table, no script). **My stations** (top) lets you be the control operator of your other stations from this one
+  (Settings → Einstein & AI → My other stations; tick **Control from here**; ⏹ Stop).
   **The channel** (owner 2026-11-16; Help → VARA chat and files, side 2): **Join the channel** announces your call (a
   VARA CQ frame), answers calls, and repeats the announcement every **10 min** (VARA HF 15; choose 5–60) while you are
   at the PC. The left of the window lists the stations heard: **● here**, **○ quiet** (grey: no keep-alive heard for

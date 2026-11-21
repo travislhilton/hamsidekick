@@ -5,6 +5,7 @@ import json
 import queue
 import re
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from datetime import datetime
@@ -222,6 +223,13 @@ def make_handler(station):
                 self.end_headers()
                 self.wfile.write(data)
                 return
+            if u.path == "/api/station/brief":                   # for the operator's other stations (remote.py)
+                from .remote import brief
+                return self._json(brief(station))
+            if u.path == "/api/remote":                          # Control my other stations from here (remote.py)
+                from .remote import Remote
+                r = Remote(station)
+                return self._json({"peers": r.peers(), "status": r.status()})
             if u.path == "/api/einstein":                        # Einstein on the air (einstein.py)
                 return self._json(station.einstein.view())
             if u.path == "/api/einstein/notes":
@@ -384,7 +392,8 @@ def make_handler(station):
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
                       "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio",
-                      "/api/einstein/settings", "/api/einstein/notes", "/api/einstein/ownerkey"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
+                      "/api/einstein/settings", "/api/einstein/notes", "/api/einstein/ownerkey",
+                      "/api/remote/peers", "/api/remote/presence", "/api/remote/stop"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "adhoc", "handoff", "takeback", "join", "leave",
                       "announce", "csend", "retry", "cancel", "closelink", "channel", "linktest", "open", "stoprx")}
             sched = re.fullmatch(r"/api/schedule(/[\w-]+(/(delete|skip|move|restore|radio|settle|keep|unheard|back|forget))?)?", u.path)   # schedule
@@ -408,6 +417,8 @@ def make_handler(station):
                     return self._json({"error": f"too large (at most {cap // 1024 ** 2 or 0.5} MB)"}, 413)
                 body = json.loads(self.rfile.read(n) or b"{}")
                 if agent:
+                    if body.get("from") and agent.group(1) in ("presence", "stop"):   # another of the operator's stations
+                        station.agent.sender.remote_from = (str(body["from"])[:12].upper(), time.monotonic())
                     return self._json(station.agent.post(u.path, body))
                 if grk:
                     if grk.group(1) == "settings":
@@ -468,6 +479,15 @@ def make_handler(station):
                                                                          noise=bool(body.get("noise")))))
                     except LookupError:
                         return self._json({"error": "no such transmission"}, 404)
+                if u.path.startswith("/api/remote/"):            # Control my other stations from here (remote.py)
+                    from .remote import Remote
+                    r = Remote(station)
+                    what = u.path.rsplit("/", 1)[1]
+                    if what == "peers":
+                        return self._json({"peers": r.set_peers(body.get("urls"))})
+                    if what == "presence":
+                        return self._json(r.presence_all(body.get("idx")))
+                    return self._json(r.act(int(body.get("i", -1)), "stop"))
                 if u.path == "/api/einstein/settings":           # {"radio", "on", "call"} / {"share_library"}
                     return self._json(station.einstein.settings(body))
                 if u.path == "/api/einstein/notes":              # {"radio", "read": [ids] | null = all}

@@ -129,7 +129,7 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
   </div>
 
   <div class="note-box warning"><b>Ham practice.</b> A COM port opens in one program only: if the station tunes this radio by CAT, give VARA another PTT (RTS on a separate port, the Digirig's second port, or VOX). Two 2 m radios side by side desense each other: use different bands (Winlink on 2 m, chat on 70 cm or HF) or well-spaced antennas. Each transmission IDs as usual.</div>
-  <p class="turn-over">Turn over → side 2: Contacts, Chat, Files, Taking Turns</p>
+  <p class="turn-over">Turn over → side 2: Contacts, Chat, Files, Einstein</p>
 </div>
 
 <!-- ===================== BACK ===================== -->
@@ -143,41 +143,39 @@ h1{font-size:32px;font-weight:700;color:var(--navy);margin-bottom:6px}
   <p class="card-part">Join the channel <span>(under the data radio: VARA chat and files)</span></p>
   <div class="steps">
     <div class="step"><div class="step-num">1</div><div class="step-text"><b>Pick a frequency:</b> <span class="k">Band plan</span> → <b>Ad hoc VARA</b> → <span class="k">Use</span> (or a <b>★</b> reserved channel). Listen first</div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text"><span class="k">Join the channel</span>: announces your call (a VARA CQ frame), answers calls, and says you are still here every <b>10 min</b> (VARA HF 15; 5–60)<small>Only while you are at this PC with the Transmit switch on: all of it pauses when you leave.</small></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><span class="k">Join the channel</span>: announces your call (a VARA CQ frame), answers calls, and says you are still here every <b>10 min</b> (VARA HF 15; 5–60), only while you are here</div></div>
   </div>
   <table class="tier-table">
-    <tr><td>● here</td><td>Announced or linked within the keep-alive time (and 3 min grace)</td></tr>
-    <tr><td>○ quiet (grey)</td><td>No keep-alive heard: may have left. Under <b>Earlier</b> after 3 intervals</td></tr>
-    <tr><td>🔗 linked · ⏳ · ⚠</td><td>The station linked now · messages waiting to go · not sent (Retry)</td></tr>
+    <tr><td>● here · ○ quiet</td><td>Heard within the keep-alive time (+3 min) · grey: may have left (<b>Earlier</b> after 3 intervals)</td></tr>
+    <tr><td>🔗 linked · ⏳ · ⚠ · 🤖</td><td>Linked now · waiting to go · not sent (Retry) · an AI station, under its operator</td></tr>
   </table>
   <p class="card-part">Chat and files <span>(VARA links one station at a time)</span></p>
   <div class="steps">
-    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Click a station</b> → type → <span class="k">Enter</span> · <span class="k">📎</span> a file (5 MB) · <b>quick messages</b> fill the box (<span class="k">Edit</span>; {them} {sn} {me})<small>Tick several, or <b>Select everyone here</b>: each gets the message over its own link, one after another.</small></div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text">It goes by itself: <b>⏳ waiting</b> → a short link when the frequency is clear → <b>✓ sent</b> → <b>✓✓ delivered</b>; the link closes after 20 s of quiet<small><span class="k">Keep the link open</span> for a back-and-forth. 3 calls unanswered: ⚠ <span class="k">Retry</span>. <span class="k">Leave</span> · <span class="k">Abort</span> (drops any link at once).</small></div></div>
-    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Files received</b> (📎 in the chat): on the station PC <span class="k">Open</span> (it asks first) · <span class="k">Show in folder</span>; elsewhere the name downloads it<small>Program files get a <span class="mono">.blocked</span> ending and are never opened. A <span class="mono">.hsadhoc</span> file: <span class="k">★ Install</span>. <span class="k">Modem setup…</span> → <b>Direct link</b>: Connect / CQ / Answer calls by hand.</small></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><b>Click a station</b> → type → <span class="k">Enter</span> · <span class="k">📎</span> a file (5 MB) · <b>quick messages</b> · tick several: one link each</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">It goes by itself: <b>⏳ waiting</b> → a short link when the frequency is clear → <b>✓ sent</b> → <b>✓✓ delivered</b>; the link closes after 20 s of quiet<small><span class="k">Keep the link open</span> for a back-and-forth · <span class="k">Abort</span> drops any link at once.</small></div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text"><b>Files received</b> (📎 in the chat): <span class="k">View</span> shows a form or CHIRP file in the browser (no script); on the station PC <span class="k">Open</span> (asks first) · <span class="k">Show in folder</span><small>Program files get a <span class="mono">.blocked</span> ending and are never opened. A <span class="mono">.hsadhoc</span> file: <span class="k">★ Install</span>. <span class="k">Modem setup…</span> → <b>Direct link</b>: Connect / CQ / Answer calls by hand.</small></div></div>
   </div>
 
-  <p class="card-part">Speed and reach <span>(under the chat with one station)</span></p>
+  <p class="card-part">Speed, reach and status <span>(under the chat with one station; the status line)</span></p>
   <table class="tier-table">
     <tr><td>Test link speed</td><td>30/60/120 s, only when pressed (frequency clear first): speed reached, S/N, time for 1 KB–1 MB; shown before a file goes</td></tr>
     <tr><td>🛰 Path to … (VARA FM)</td><td>≤ 2 digipeaters, nearest first → <span class="k">Save path</span> (learnt from its announcement) · <b>announce via</b> on the channel bar · each hop ≈ half speed</td></tr>
-  </table>
 
-  <p class="card-part">Taking turns with Winlink Express <span>(a Shared modem)</span></p>
-  <div class="steps">
-    <div class="step"><div class="step-num">6</div><div class="step-text"><b>Automatic:</b> open Express → the station lets go (after your chat) → close Express → it takes VARA back. By hand: <span class="k">Modem setup…</span> → <span class="k">Hand to Winlink Express now</span> / <span class="k">Take it back</span></div></div>
-  </div>
-
-  <p class="card-part">The status line</p>
-  <table class="tier-table">
-    <tr><td>Winlink Express's turn</td><td>A Shared modem while Express is open</td></tr>
+    <tr><td>Winlink Express's turn</td><td>Shared modem: Express open → it lets go; closed → takes VARA back (<span class="k">Modem setup…</span> by hand)</td></tr>
     <tr><td>"VARA is not answering"</td><td>Is the copy it names open on that port? Reopen VARA after a port change</td></tr>
-    <tr><td>Nobody hears you</td><td>"keys the radio of …": that copy's PTT → RA-Board = its own sound card</td></tr>
-    <tr><td>Connect greyed</td><td>The amber line says why: Transmit switch, you at the PC, class, frequency</td></tr>
+  </table>
+
+  <p class="card-part">🤖 Einstein on the air <span>(the AI assistant at a call of its own; needs the internet)</span></p>
+  <table class="tier-table">
+    <tr><td>Switch on</td><td>The panel's 🤖 bar: its call is yours with another SSID (W9XYZ-15). Others see it under your call</td></tr>
+    <tr><td>Ask an AI station</td><td>Click its 🤖 row: ready questions (HELP, weather as ICS-213, a CHIRP file, band plan, ICS-205/309)</td></tr>
+    <tr><td>You away</td><td>Only its call answers, where 97.221 allows (6 m+, HF auto segments, else HF 500 Hz answering only)</td></tr>
+    <tr><td>From your other station</td><td>Same owner key: STATUS · MESSAGES · PAUSE · RESUME. <b>My stations</b> → Control from here (97.213)</td></tr>
   </table>
 
 
-  <p class="card-disclaimer"><b>Files need HAM Sidekick Station at both ends</b>; any other VARA keyboard program gets plain chat. You are the control operator for every transmission; Part 97: never encrypted, no relay or automatic reply. HAM Sidekick Station (MIT); format: docs/VARA.md; VARA is a separate product.</p>
+
+  <p class="card-disclaimer"><b>Files need HAM Sidekick Station at both ends</b> (other VARA programs: plain chat). Never encrypted, no relay; automatic replies only at Einstein's call (docs/EINSTEIN.md). Format: docs/VARA.md; VARA is a separate product.</p>
 </div>
 
 </div>

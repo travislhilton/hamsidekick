@@ -322,7 +322,7 @@ def test_forms_are_pages_without_script_and_winlink_data_reads_back():
 
 
 def test_weather_and_hf_conditions_as_ics213(tmp_path):
-    assert wx.place("EN52")["label"] == "grid EN52" and wx.place("39.8, -89.6")["lat"] == 39.8
+    assert wx.place("FN31")["label"] == "grid FN31" and wx.place("39.8, -89.6")["lat"] == 39.8
     p = wx.place("Springfield, IL", fetch=_fetch)
     assert p["us"] and p["label"].startswith("Springfield")
     w = wx.forecast(p, fetch=_fetch)
@@ -339,3 +339,47 @@ def test_weather_and_hf_conditions_as_ics213(tmp_path):
 def test_the_band_range_words():
     assert E._band_range("2 m")[:2] == (144.0, 148.0) and E._band_range("70cm")[:2] == (420.0, 450.0)
     assert E._band_range("146.52")[:2] == (144.0, 148.0) and E._band_range("banana")[0] is None
+
+
+# ---------------------------------------------------------------- over HTTP: View, Einstein, my other stations --------
+def test_view_einstein_and_my_other_stations_over_http(tmp_path):
+    import json as _j
+    import threading
+    import urllib.request
+    from station import remote
+    from station.server import serve
+    from tests.test_varalink import _post
+    st, rid, m, clk, e = _setup(tmp_path)
+    inbox = st.data / "vara" / "radios" / rid / "inbox"
+    inbox.mkdir(parents=True)
+    (inbox / "ICS213-weather.html").write_bytes(b"<p>Wind</p><script>alert(1)</script>")
+    (inbox / "CHIRP-plan.csv").write_bytes(b"Location,Name,Frequency\r\n1,SIMPLX,146.520000\r\n")
+    (inbox / "run.exe.blocked").write_bytes(b"MZ")
+    srv = serve(st, "127.0.0.1", 0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/api/vara/view/ICS213-weather.html") as r:
+            assert "sandbox" in r.headers["Content-Security-Policy"] and "default-src 'none'" in r.headers["Content-Security-Policy"]
+            assert r.headers["Content-Type"].startswith("text/html")
+        with urllib.request.urlopen(base + "/api/vara/view/CHIRP-plan.csv") as r:
+            assert b"SIMPLX" in r.read()
+        with pytest.raises(urllib.error.HTTPError):
+            urllib.request.urlopen(base + "/api/vara/view/run.exe.blocked")
+        with pytest.raises(urllib.error.HTTPError):
+            urllib.request.urlopen(base + "/api/vara/view/..%2Fvara.json")
+        v = _post(base, "/api/einstein/settings", {"radio": rid, "on": True})
+        assert v["radios"][rid]["state"] == "answering"
+        b = _j.loads(urllib.request.urlopen(base + "/api/station/brief").read())
+        assert b["radios"][0]["einstein"]["call"] == "W9XYZ-15" and b["present"]
+        # this station's "other station" is itself here: presence from it names who sent it
+        st.agent.sender.presence = lambda: {"present": True}
+        r = remote.Remote(st)
+        r.set_peers([base])
+        assert r.status()[0]["ok"] and r.status()[0]["calls"]
+        r.presence_all([0])
+        assert remote.brief(st)["controlled_from"]
+        with pytest.raises(ValueError):
+            r.set_peers(["not a url at all"])
+    finally:
+        srv.shutdown()

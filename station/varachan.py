@@ -832,6 +832,12 @@ class Channel:
                                linked=(s.get("session") == "connected" and (s.get("peer") or "").upper() == c),
                                waiting=sum(1 for it in th if it["dir"] == "out" and it["status"] in ("queued", "sent")),
                                failed=sum(1 for it in th if it["dir"] == "out" and it["status"] == "failed")))
+        by = {r["call"]: r for r in roster}
+        for r in roster:
+            r["working_s"] = max(0, round((r.get("working_until") or 0) - now))
+            par = by.get((r.get("ai") or {}).get("of") or "")
+            if par and r["state"] in ("unheard", "gone") and par["state"] in ("here", "quiet"):
+                r["state"] = par["state"]                         # an AI station is where its operator's station is
         order = {"here": 0, "quiet": 1, "unheard": 2, "gone": 3}
         roster.sort(key=lambda r: (not r["linked"], order[r["state"]], -(r.get("heard_at") or 0), r["call"]))
         nxt = None

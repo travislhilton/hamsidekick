@@ -53,6 +53,9 @@ header #nightBtn[aria-pressed=true]{background:#fff;color:var(--hdr)}
   /* the log keeps at least this much: on a busy evening (urgent box, pre-net alert, nets list) the radio card took the
      whole column and the log got 0 px, on an iPad in landscape and even on a 1080p screen (2026-11-15). Now the
      column grows and the radios scroll down to it instead. */
+  .vai{font-size:11px;background:#eef0ff;color:#334;border:1px solid #ccd;border-radius:8px;padding:0 5px;margin-left:2px;white-space:nowrap}
+  .vai.sm{opacity:.75}.vst.aikid{margin-left:18px;border-left:2px solid #99a}
+  .vbar.vein{flex-wrap:wrap}.vnotes{border:1px solid #ccd;border-radius:6px;padding:6px;margin:4px 0;max-height:12em;overflow:auto}
   .rcol{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
   .rcol>.logbox{flex:1;min-height:min(560px,70dvh);display:flex;flex-direction:column}
   .feed{flex:1;min-height:0;max-height:none}
@@ -628,6 +631,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <button id="openReadout" title="The EOC's situation report: approve it, then read it on the net from a large-type card" onclick="window.open('/readout','_blank')">Read-out</button>
   <span class="hsep" aria-hidden="true"></span>
   <button id="openRadios" title="Add, replace or remove a radio and choose its sound input">Radios…</button>
+  <button id="openRemote" hidden title="Your other stations (e.g. -7 from -8): see them, be their control operator from here, stop them">My stations<span id="remBadge"></span></button>
   <button id="openSettings" title="Your station, nets, Winlink, Einstein and AI, AI costs, this PC">Settings</button>
   <span class="hgrow" aria-hidden="true"></span>
   <label class="small hq" title="Explain Q-codes, prowords and abbreviations (Roger, QSO, QSY…) under each transmission"><input type="checkbox" id="explain" checked style="width:auto"> <span class="xl">Explain radio terms</span><span class="xs">Explain terms</span></label>
@@ -712,6 +716,8 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
     <div id="keySet" class="small"></div>
     <h4 class="sec">Station agent (Einstein) <span class="stag">own Save button</span> <a class="small" href="/help/sidekick" target="_blank" rel="noopener" style="font-weight:400">Einstein card</a></h4>
     <div id="agentSet" class="small"></div>
+    <h4 class="sec">Einstein on the air (VARA) <span class="stag">saved at once</span></h4>
+    <div id="einSet" class="small"></div>
     <h4 class="sec">Einstein's voice <span class="stag">own Save button</span></h4>
     <div id="voiceSet" class="small"></div>
     <h4 class="sec">Grok speech-to-text (compared) <span class="stag">own Save button</span></h4>
@@ -753,6 +759,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
 <dialog id="wl"><div id="wlBody"></div></dialog>
 <dialog id="bpDlg" aria-label="Band plan for your area"><div id="bpBody"></div></dialog>
 <dialog id="varaDlg" aria-label="VARA keyboard chat and files"><div id="varaBody"></div></dialog>
+<dialog id="remDlg" aria-labelledby="remTitle"><div class="dhead"><h3 id="remTitle">My other stations</h3><button class="x" aria-label="Close" onclick="$('remDlg').close()">✕</button></div><div id="remBody" class="dbody"></div></dialog>
 <dialog id="testDlg"><div id="testBody"></div></dialog>
 <dialog id="levelDlg"><div id="levelBody"></div></dialog>
 <dialog id="radiosDlg"><div id="radiosBody"></div></dialog>
@@ -1724,7 +1731,7 @@ async function openSettings(tab){
   $("wlNone").textContent=(op.installs||[]).length?"":"No Winlink Express found on this PC (looked in C:\\RMS Express and the installed-programs list).";
   fillAccounts(f);setClearErrs();SETWAS={};Object.keys(SETF).forEach(k=>SETWAS[k]=setVal(f,k));setDirty();
   let t=tab;if(!t)try{t=localStorage.getItem("hamsidekick.setTab")}catch(e){}setTab(t||"station");
-  loadPC();renderAlertSettings();renderLearned();renderKeys();loadCost();loadAgent().then(renderAgentSet);loadLocalNames();renderShare();loadVoice();loadGrok();renderWlListSet();
+  loadPC();renderAlertSettings();renderLearned();renderKeys();renderEinSet();loadCost();loadAgent().then(renderAgentSet);loadLocalNames();renderShare();loadVoice();loadGrok();renderWlListSet();
   if(!$("settings").open)$("settings").showModal();
 }
 $("openSettings").onclick=()=>openSettings();
@@ -2068,7 +2075,7 @@ function connect(){
     try{if($("bpDlg").open){BP.d=await api("/api/bandplan/area");renderBP()}await plansLoad();if(NV.tab==="plans"&&$("netsDlg").open)renderPlans()}catch(err){}});
   es.addEventListener("vara",e=>{const d=JSON.parse(e.data);
     if(d.modem&&VA.d){const i=VA.d.modems.findIndex(m=>m.radio===d.radio);if(i>=0)VA.d.modems[i]=Object.assign(d.modem,{transcript:VA.d.modems[i].transcript,inbox:VA.d.modems[i].inbox,channel:VA.d.modems[i].channel})}
-    const full=["chat","chat_sent","file_received","file_sent","file_failed","connected","disconnected","abort","cq_heard","listen_off","removed","channel","test_started","test_done","test_failed","test_received","file_sending","file_receiving","file_rejected","handshake","test_receiving"].includes(d.event)||(d.event==="buffer"&&d.modem&&d.modem.state&&!d.modem.state.buffer);
+    const full=["chat","chat_sent","file_received","file_sent","file_failed","connected","disconnected","abort","cq_heard","listen_off","removed","channel","test_started","test_done","test_failed","test_received","file_sending","file_receiving","file_rejected","handshake","test_receiving","peer_working"].includes(d.event)||(d.event==="buffer"&&d.modem&&d.modem.state&&!d.modem.state.buffer);
     (full||!VA.d?varaLoad():Promise.resolve()).then(()=>{const m=vModem(d.radio);if(d.event==="listen_off"&&m&&m.last&&VA.rid===d.radio)VA.msg={bad:true,text:"Stopped listening: "+(m.last.why||"")};if($("varaDlg").open)renderVara();renderRadios()})});
   es.addEventListener("pc",e=>{const d=JSON.parse(e.data);S.pc=Object.assign(S.pc||{},"slow" in d?{slow:d.slow}:{},d.awake?{awake:d.awake}:{});renderPCNote();renderEngine();if($("settings").open&&d.checks)renderPC(d)});
   es.addEventListener("schedule",e=>{const d=JSON.parse(e.data);S.schedule=d.schedule;S.net=d.net;if(d.unheard)S.unheard=d.unheard;renderRadios();renderNet();if($("netsDlg").open&&NV.tab==="schedule")renderSchedule(false)});
@@ -2174,9 +2181,11 @@ function vXfer(x,what,cancel){if(!x||!x.size)return"";const done=Math.min(x.size
     <div class="small"><b>${pc}%</b> · ${vKb(done)} of ${vKb(x.size)} · ${x.bps?vBps(x.bps):"speed: measuring…"} · ${x.eta_s!=null?"about "+vDur(x.eta_s)+" left":"time left: measuring…"} · ${vDur(x.elapsed_s||0)} so far ${cancel}</div></div>`}
 // a received file: its name downloads it; on the station PC itself, Open and Show in folder work on its own screen
 const V_LOCAL=["localhost","127.0.0.1","[::1]"].includes(location.hostname);
+const V_VIEW=/\.(html?|xml|csv|txt|md|json|hsadhoc|log)$/i;
 function vFileActs(name){const prog=/\.blocked$/i.test(name||"");
-  return V_LOCAL?` ${prog?'<span class="muted small">a program file: kept, never opened from here</span>':`<button class="small" data-vopen="file" data-vname="${esc(name)}" title="Open it on this PC with its usual program. It came over the air from another station: open it only if you expected it.">Open</button>`} <button class="small" data-vopen="folder" data-vname="${esc(name)}" title="Open the folder it was saved in, with the file selected">Show in folder</button>`
-    :' <span class="muted small">click the name to download it · Open and Show in folder work in the browser on the station PC</span>'}
+  const view=V_VIEW.test(name||"")?` <a class="btn small" href="/api/vara/view/${enc(name)}" target="_blank" rel="noopener noreferrer" title="Show it in the browser: forms (ICS-213, ICS-205, ICS-309, Winlink form data) as the form, a CHIRP file as a table. It came over the air: shown without any script or outside link.">View</a>`:"";
+  return view+(V_LOCAL?` ${prog?'<span class="muted small">a program file: kept, never opened from here</span>':`<button class="small" data-vopen="file" data-vname="${esc(name)}" title="Open it on this PC with its usual program. It came over the air from another station: open it only if you expected it.">Open</button>`} <button class="small" data-vopen="folder" data-vname="${esc(name)}" title="Open the folder it was saved in, with the file selected">Show in folder</button>`
+    :' <span class="muted small">click the name to download it · Open and Show in folder work in the browser on the station PC</span>')}
 function vTestBubble(it,call,ch){const r=it.result||{};
   if(it.dir==="in")return `📶 <b>${esc(call)} tested the link to you:</b> ${vKb(r.bytes||0)} in ${vDur(r.s||0)} (${vBps(r.bps)}). Nothing was kept.`;
   if(it.status==="sending"){const g=ch&&ch.testing;return `📶 <b>Testing the link to ${esc(call)}…</b> ${g?`${vKb(g.bytes||0)} in ${g.s||0} s of ${g.max_s} s${ch.bitrate&&ch.bitrate.tx?" · VARA now at "+vBps(ch.bitrate.tx):""}`:"starting"}<div class="small muted">Random test data goes out for ${it.seconds||60} s; the other station throws it away. <button class="small danger" data-vcancel="${it.id}" data-vconfirm="Stop the link test? The link is dropped.">Cancel</button></div>`}
@@ -2198,7 +2207,8 @@ function vBubble(it,call){const t=new Date(it.at*1000).toTimeString().slice(0,5)
   const body=it.kind==="note"?`<span class="muted">ℹ Telling ${esc(call)} that you cancelled ${esc(it.name||"the file")} (so it knows the link did not fail)</span>`:it.kind==="test"?vTestBubble(it,call,VA.ch):it.kind==="file"&&it.dir==="in"&&it.status==="receiving"?`📥 <b>Receiving ${esc(it.name||"file")}</b> <span class="muted">${it.size?vKb(it.size):""}</span>`+(VA.ch&&VA.ch.receiving?vXfer(VA.ch.receiving,"Receiving "+(it.name||"file"),'<button class="small danger" data-vstoprx title="Stops the file by dropping the link; nothing is kept">Cancel</button>'):"")
     :it.kind==="file"&&it.dir==="in"&&it.status!=="received"?`📎 ${esc(it.name||"file")} <b class="bad">${it.status==="cancelled"?"cancelled: not received":"not received"}</b> <span class="muted">${it.size?(it.done!=null?vKb(it.done)+" of ":"")+vKb(it.size)+" had arrived; nothing was kept":""}</span>`:it.kind==="file"?(it.dir==="in"?`📎 <a href="/api/vara/inbox/${enc(it.name)}">${esc(it.name)}</a>${/\.hsadhoc$/i.test(it.name||"")?` <button class="small primary" data-vadinst="${esc(it.name)}">★ Install</button>`:""}${vFileActs(it.name)}`:`📎 ${esc(it.name)}`)+` <span class="muted">${it.size?Math.max(1,Math.round(it.size/1024))+" KB":""}${it.took_s?" · took "+vDur(it.took_s):""}</span>`+(it.dir==="out"&&it.status==="sending"&&VA.ch&&VA.ch.sending&&VA.ch.sending.name===it.name?vXfer(VA.ch.sending,"Sending "+it.name,`<button class="small danger" data-vcancel="${it.id}" data-vconfirm="Stop sending ${esc(it.name)}? The link is dropped; what was sent so far is thrown away at the other end. You can Retry later." title="Stops the file by dropping the link">Cancel</button>`):""):esc(it.text||"");
   const act=it.dir==="out"&&it.status==="failed"?` <button class="linkish small" data-vretry="${it.id}">Retry</button>`:it.dir==="out"&&it.status==="queued"?` <button class="linkish small" data-vcancel="${it.id}">Cancel</button>`:"";
-  return `<div class="vb ${it.dir} ${it.status}">${body}<span class="meta">${t}${stt?" · "+stt:""}${it.why&&it.status!=="delivered"?" · "+esc(it.why):""}${act}</span></div>`}
+  const eg=it.by==="einstein"?"🤖 Einstein answered · ":it.to==="einstein"?"to your Einstein · ":"";
+  return `<div class="vb ${it.dir} ${it.status}${it.by==="einstein"?" ein":""}">${body}<span class="meta">${eg}${t}${stt?" · "+stt:""}${it.why&&it.status!=="delivered"?" · "+esc(it.why):""}${act}</span></div>`}
 function vAir(st){   // owner 2026-11-18: announced on both PCs, neither showed the other: say whether VARA keyed, and heard anything
   if(!st||!st.cq_at)return"";const now=Date.now()/1000,keyed=st.ptt_at&&st.ptt_at>=st.cq_at-1,wait=now-st.cq_at<10;
   return `<div class="small" style="flex-basis:100%">Last announced ${vHm(st.cq_at)}: ${keyed?"✓ VARA keyed the transmitter":wait?"sending…":'<b class="bad">⚠ VARA did not say it keyed the transmitter</b> (check VARA Settings → PTT, and the radio\'s TX light)'}
@@ -2208,9 +2218,12 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
   const bar=ch.on?`<div class="vbar on" role="status"><span class="pd"></span><b>On the channel</b> <span class="small"><span class="nw">${f}${kind}</span> · <span class="nw">keep-alive every <select data-vevery aria-label="Minutes between keep-alives">${[5,10,15,20,30,60].map(n=>`<option${n===ch.every_min?" selected":""}>${n}</option>`).join("")}</select> min</span> ${m.cfg.kind!=="hf"?`· <span class="nw" title="Send your announcements through a VARA FM digipeater too, so stations that cannot hear you directly see you. Empty = direct only.">announce via <input data-vannvia value="${esc((ch.announce_via||[]).join(" "))}" placeholder="direct" aria-label="Digipeaters for your announcements, at most two" style="width:9em;text-transform:uppercase;min-height:0;padding:1px 4px" autocomplete="off"></span> `:""}· <span class="nw">next in <span data-vnext="${Date.now()/1000+ch.next_announce_s}">${vClock(ch.next_announce_s)}</span></span></span>
      ${vAir(st)}<span style="flex:1"></span><button class="small" data-vann${ok&&st.session==="idle"?"":" disabled"} title="Send your announcement (a VARA CQ frame) now">Announce now</button><button class="small quiet" data-vleave>Leave</button><button class="small danger" data-vact="abort" title="Drop any link at once and let go of the transmitter">Abort</button></div>`
    :`<div class="vbar"><div style="flex:1;min-width:14em"><b>Join the channel</b>${f?" on "+f:""}<div class="small muted">Announces your call (a VARA CQ frame), answers calls, and says you are still here every ${ch.every_min} min, only while you are at this PC. Stations heard show up on the left.</div></div><button class="primary" data-vjoin${ok?"":" disabled"}>Join the channel</button></div>`;
-  const ros=ch.roster||[],grp=k=>ros.filter(r=>k==="gone"?r.state==="gone":r.state!=="gone");
-  const row=r=>{const spd=(r.speed?" · "+vBps(r.speed.bps):"")+((r.via||[]).length?" · via "+r.via.join(" › "):"");const sub=r.linked?"🔗 linked"+(r.sn!=null?" · S/N "+r.sn+" dB":""):r.state==="here"?"here · "+vAge(r.age_s)+spd:r.state==="quiet"?"quiet · last heard "+vAge(r.age_s):r.state==="unheard"?"not heard yet":"last heard "+vAge(r.age_s);
-    return `<div class="vst ${r.state}${sel.includes(r.call)?" sel":""}" data-vpick="${esc(r.call)}" role="button" tabindex="0" aria-pressed="${sel.includes(r.call)}" title="${r.state==="quiet"?"No keep-alive heard: may have left the channel":""}"><input type="checkbox" data-vmulti="${esc(r.call)}"${sel.includes(r.call)?" checked":""} aria-label="Also send to ${esc(r.call)}"><span class="pd ${r.linked?"linked":r.state}"></span><span class="grow"><span class="c">${esc(r.call)}</span><span class="sub">${sub}</span></span>${r.unread?`<span class="vbadge" title="unread">${r.unread}</span>`:""}${r.waiting?`<span class="vbadge w" title="waiting to go">⏳${r.waiting}</span>`:""}${r.failed?`<span class="vbadge f" title="not sent">⚠${r.failed}</span>`:""}</div>`};
+  const ros0=ch.roster||[],kids=c=>ros0.filter(x=>x.ai&&x.ai.of===c);
+  const ros=[];for(const r of ros0){if(r.ai&&r.ai.of&&ros0.some(x=>x.call===r.ai.of))continue;ros.push(r,...kids(r.call))}  // an AI station sits under its operator's
+  const grp=k=>ros.filter(r=>k==="gone"?r.state==="gone":r.state!=="gone");
+  const row=r=>{const spd=(r.speed?" · "+vBps(r.speed.bps):"")+((r.via||[]).length?" · via "+r.via.join(" › "):"");const sub=r.working_s?"🤖 working on your answer…":r.linked?"🔗 linked"+(r.sn!=null?" · S/N "+r.sn+" dB":""):r.state==="here"?"here · "+vAge(r.age_s)+spd:r.state==="quiet"?"quiet · last heard "+vAge(r.age_s):r.state==="unheard"?"not heard yet":"last heard "+vAge(r.age_s);
+    const ai=r.ai?`<span class="vai" title="An AI assistant answering automatically${r.ai.of?" for "+esc(r.ai.of):""}: ask it anything, ask for files (CHIRP, ICS forms, weather). Type HELP for its list.">🤖 ${esc(r.ai.name||"AI")}</span>`:r.einstein?`<span class="vai sm" title="This operator's AI assistant answers at ${esc(r.einstein)}">🤖 at ${esc(r.einstein)}</span>`:"";
+    return `<div class="vst ${r.state}${r.ai&&r.ai.of?" aikid":""}${sel.includes(r.call)?" sel":""}" data-vpick="${esc(r.call)}" role="button" tabindex="0" aria-pressed="${sel.includes(r.call)}" title="${r.state==="quiet"?"No keep-alive heard: may have left the channel":""}"><input type="checkbox" data-vmulti="${esc(r.call)}"${sel.includes(r.call)?" checked":""} aria-label="Also send to ${esc(r.call)}"><span class="pd ${r.linked?"linked":r.state}"></span><span class="grow"><span class="c">${esc(r.call)}</span> ${ai}<span class="sub">${sub}</span></span>${r.unread?`<span class="vbadge" title="unread">${r.unread}</span>`:""}${r.waiting?`<span class="vbadge w" title="waiting to go">⏳${r.waiting}</span>`:""}${r.failed?`<span class="vbadge f" title="not sent">⚠${r.failed}</span>`:""}</div>`};
   const here=ros.filter(r=>r.state==="here"&&!r.linked||r.linked);
   const roster=`<div class="vros" aria-label="Stations on the channel"><h5>On the channel (${grp("here").filter(r=>r.state==="here"||r.linked).length})</h5>${grp("here").map(row).join("")||'<p class="small muted" style="margin:4px">Nobody heard yet. Join, or wait for a station to announce.</p>'}
     ${here.length>1?`<button class="small linkish" data-vall>Select everyone here (${here.length})</button>`:""}
@@ -2222,7 +2235,8 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
     const lk=one&&r&&r.linked?`<div class="small">🔗 <b>Linked with ${esc(one)}</b>${st.sn!=null?" · S/N "+esc(String(st.sn))+" dB":""} · ${ch.pinned===one?`kept open <button class="small" data-vunpin>Let it close when quiet</button> <button class="small quiet" data-vclose>Close the link now</button>`:`closes after ${ch.linger_s} s of quiet <button class="small" data-vpin="${esc(one)}">Keep the link open</button>`}</div>`
       :one?`<div class="small muted">${r&&r.state==="quiet"?"⚠ No keep-alive heard from "+esc(one)+" lately: it may have left. ":""}Not linked: messages go out by themselves when the frequency is clear.</div>`
       :`<div class="small"><b>To ${sel.length} stations:</b> ${sel.map(esc).join(", ")} <span class="muted">· each gets its own link, one after another</span></div>`;
-    const presets=(ch.presets||[]).map((p,i)=>(/\{name\}/.test(p)&&!ch.me.name)||(/\{grid\}/.test(p)&&!ch.me.grid)?`<button class="small" disabled title="Set your name and grid square in Settings → Station to use this one">${esc(p.replace(/\{\w+\}/g,"…").slice(0,34))}</button>`:`<button class="small" data-vpreset="${i}" title="${esc(vFill(p,ch,one||"",m))}">${esc(vFill(p,ch,one||"ALL",m).slice(0,34))}${vFill(p,ch,one||"",m).length>34?"…":""}</button>`).join("");
+    const isAI=one&&r&&r.ai;
+    const presets=isAI?V_ASK.map(q=>`<button class="small" data-vask="${esc(q)}" title="Put it in the message box (edit, then Send)">${esc(q.length>40?q.slice(0,38)+"…":q)}</button>`).join(""):(ch.presets||[]).map((p,i)=>(/\{name\}/.test(p)&&!ch.me.name)||(/\{grid\}/.test(p)&&!ch.me.grid)?`<button class="small" disabled title="Set your name and grid square in Settings → Station to use this one">${esc(p.replace(/\{\w+\}/g,"…").slice(0,34))}</button>`:`<button class="small" data-vpreset="${i}" title="${esc(vFill(p,ch,one||"",m))}">${esc(vFill(p,ch,one||"ALL",m).slice(0,34))}${vFill(p,ch,one||"",m).length>34?"…":""}</button>`).join("");
     conv=`<div class="vconv"><div><b class="mono" style="font-size:16px">${one?esc(one):"Several stations"}</b></div>${lk}
       ${one?`<div class="vthread" id="vThread-${esc(rid)}" aria-live="polite">${th.map(it=>vBubble(it,one)).join("")||'<p class="small muted">No messages yet. A quick message below gets things going.</p>'}</div>`:""}
       <div class="vpre" aria-label="Quick messages">${presets} <button class="small linkish" data-vpedit>Edit</button></div>
@@ -2242,15 +2256,64 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
     :st.sending?`<div class="vrecv"><b>📤 Sending ${esc(st.sending.name)} to ${peer}</b><span class="small">${tied(st.sending)}</span>${vXfer(st.sending,"Sending "+st.sending.name,sit?`<button class="small danger" data-vcancel="${sit}" data-vconfirm="Stop sending ${esc(st.sending.name)}? The link is dropped; what was sent so far is thrown away at the other end. You can Retry later.">Cancel</button>`:"")}</div>`
     :st.testing?`<div class="vrecv"><b>📶 Testing the link speed to ${peer}</b> <span class="small">${vKb(st.testing.bytes||0)} in ${st.testing.s||0} s of ${st.testing.max_s} s · the frequency is in use until it ends</span></div>`
     :st.test_rx?`<div class="vrecv"><b>📶 ${peer} is testing the link speed to you</b> <span class="small">${vKb(st.test_rx.bytes||0)} of test data in ${st.test_rx.s||0} s so far (thrown away here) · ${st.test_rx.max_s?"it runs "+st.test_rx.max_s+" s, then the modem empties":"a test runs up to 3 minutes"}; the frequency is in use until it ends</span> <button class="small danger" data-vstoprx>Stop it</button></div>`:"";
-  return bar+xfer+`<div class="vchan">${roster}${conv}</div>`}
+  return vEinBar(m,ch)+bar+xfer+`<div class="vchan">${roster}${conv}</div>`}
+const V_ASK=["HELP","What can you do?","Weather here as an ICS-213","HF band conditions now","CHIRP file of the 2 m simplex channels for a Baofeng",
+  "The band plan for 70 cm for my license","An ICS-205 radio plan of the ad hoc channels","An ICS-309 log of this session","When are this station's nets?","Leave a message for the operator: "];
+// Einstein on the air (station/einstein.py): this radio's AI assistant at a call of its own
+function vEinBar(m,ch){const e=ch.einstein;if(!e)return"";const rid=m.radio,st=e.state,can=e.can_on||[false,""];
+  const dot={answering:"here",waiting:"quiet",paused:"quiet",off:"gone"}[st]||"gone";
+  const word={answering:`answering at <b class="mono">${esc(e.call)}</b>`,waiting:`switched on, <b>not answering now</b>`,paused:"paused",off:"off"}[st];
+  const ann=st==="answering"?(e.announce&&e.announce[0]?" · announces itself with your keep-alives":" · answers only (no announcements here: "+esc((e.announce||[])[1]||"")+")"):"";
+  const btn=e.on?`<button class="small" data-vein="off">Switch off</button>`:`<button class="small primary" data-vein="on"${can[0]?"":` disabled title="${esc(can[1])}"`}>Switch on</button>`;
+  return `<div class="vbar vein" role="status"><span class="pd ${dot}"></span><span>🤖 <b>Einstein on the air</b> ${word}${e.why?` <span class="small muted">(${esc(e.why)})</span>`:""}<span class="small muted">${ann}</span></span>
+    <span style="flex:1"></span>${e.unread?`<button class="small" data-veinnotes="${esc(rid)}" title="Notes stations left for you">✉ ${e.unread} note${e.unread===1?"":"s"}</button>`:`<button class="small quiet" data-veinnotes="${esc(rid)}">Notes</button>`}
+    <span class="nw small">call <input data-veincall value="${esc(e.call)}" aria-label="Einstein's own call (yours with another SSID)" style="width:7em;text-transform:uppercase;min-height:0" autocomplete="off"></span>${btn}
+    <details class="small" style="flex-basis:100%"><summary class="muted">${e.on?"":(can[0]?"":"Can't switch on now: "+esc(can[1])+" · ")}What Einstein does on the air</summary><p>Other stations see it as its own station, <b class="mono">${esc(e.call)}</b>, under yours. Linked to it, an amateur can ask it anything and ask for files: CHIRP channel files, the band plan for their license, weather or HF conditions as an ICS-213, an ICS-205 radio plan, an ICS-309 log. It says it is an automated assistant and names you as the control operator, gives its call every 10 minutes, answers licensed amateurs only, never passes traffic for others (it only takes notes for you), and turns away business, codes and bad language before anything is sent. Someone in danger is told to call 911 and you are alerted.</p>
+      <p><b>When you are away</b> (no keyboard or mouse here for 3 minutes, or at none of your stations' dashboards), only Einstein's call answers: that is automatic control, which Part 97 allows on 6 m and shorter, in the HF automatic-control data segments, and elsewhere on HF only answering at 500 Hz (97.221). It never calls anyone. With no internet it stops answering, and comes back by itself.</p>
+      <p>From another of your stations, link to <b class="mono">${esc(e.call)}</b>: with the same owner key on both (Settings → Einstein &amp; AI → Einstein on the air) you can also send STATUS, MESSAGES, PAUSE and RESUME.</p></details></div>
+    ${VA.notes&&VA.notes.rid===rid?`<div class="vnotes small"><b>Notes for you</b> <button class="small quiet" data-veinnotes="">Close</button>${(VA.notes.list||[]).slice().reverse().map(n=>`<div class="${n.kind==="alert"?"bad":""}">${vHm(n.at)} <b class="mono">${esc(n.from)}</b>: ${esc(n.text)}</div>`).join("")||'<p class="muted">None yet.</p>'}</div>`:""}`}
 setInterval(()=>{document.querySelectorAll("[data-vnext]").forEach(x=>{x.textContent=vClock(+x.dataset.vnext-Date.now()/1000)})},1000);
+// ----- Einstein on the air: owner key, library, my other stations (station/einstein.py, station/remote.py) -----
+async function renderEinSet(msg){const box=$("einSet");if(!box)return;let d,r;try{[d,r]=await Promise.all([api("/api/einstein"),api("/api/remote")])}catch(e){box.textContent=e.message;return}
+  box.innerHTML=`${msg?`<p class="${msg.bad?"bad":"ok"}">${esc(msg.text)}</p>`:""}
+  <p>Einstein answers other stations over VARA at a call of its own: switch it on in each VARA radio's panel (🤖 Einstein on the air). It needs the xAI key and the internet.</p>
+  <div class="srow"><span class="sl">Owner key</span><div class="sc">${d.owner_key_set?'<b class="ok">set</b>':'<span class="muted">not set</span>'}
+    <button type="button" class="small" data-einkey="new">Make a new key</button> <input id="einKey" placeholder="or type the key from your other station" style="width:18em" autocomplete="off"> <button type="button" class="small" data-einkey="set">Save</button>${d.owner_key_set?' <button type="button" class="small quiet" data-einkey="del">Remove</button>':""}
+    <div class="sh">The same key on each of your stations lets you, linked from one of them to another's Einstein, send STATUS, MESSAGES, PAUSE and RESUME. It never goes on the air: the station proves it holds it (in the clear, like Winlink's secure login).</div>
+    ${VA.newKey?`<p>New key: <b class="mono" style="user-select:all">${esc(VA.newKey)}</b> — type it on your other stations now; it is not shown again.</p>`:""}</div></div>
+  <div class="srow"><span class="sl">Library</span><div class="sc"><label><input type="checkbox" id="einLib"${d.share_library?" checked":""} style="width:auto"> Einstein may search this station's library (manual and your documents) for other stations</label><div class="sh">Off: only you (with the owner key) get answers from the library.</div></div></div>
+  <div class="srow"><span class="sl">My other stations</span><div class="sc"><textarea id="remPeers" rows="3" style="width:100%" placeholder="http://192.168.1.20:8091 (one per line)">${esc((r.peers||[]).map(p=>p.url).join("\n"))}</textarea>
+    <button type="button" class="small" data-remsave>Save</button><div class="sh">Their dashboard addresses (LAN or Tailscale). Then <b>My stations</b> (top) shows them and lets you be their control operator from here.</div></div></div>`}
+document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.closest("#einSet"))return;
+  const k=t.closest("[data-einkey]");if(k){try{const w=k.dataset.einkey,body=w==="new"?{new:true}:w==="del"?{key:""}:{key:$("einKey").value.trim()};
+      if(w==="del"&&!confirm("Remove the owner key from this station?"))return;const d=await post("/api/einstein/ownerkey",body);VA.newKey=d.key||null;renderEinSet({text:w==="del"?"Removed.":"Saved."})}catch(err){renderEinSet({bad:true,text:err.message})}return}
+  if(t.closest("[data-remsave]")){try{await post("/api/remote/peers",{urls:$("remPeers").value.split(/\s+/).filter(Boolean)});renderEinSet({text:"Saved."});remPoll()}catch(err){renderEinSet({bad:true,text:err.message})}return}});
+document.addEventListener("change",e=>{if(e.target.id==="einLib")post("/api/einstein/settings",{share_library:e.target.checked}).catch(err=>renderEinSet({bad:true,text:err.message}))});
+// My stations: control another of your stations from here (remote control, 97.213). The ticks live in THIS browser only:
+// they are the person at this keyboard, never a setting the server keeps.
+const REM={d:null,ctl:new Set(JSON.parse(localStorage.getItem("hamsidekick.remctl")||"[]"))};
+const remSaveCtl=()=>localStorage.setItem("hamsidekick.remctl",JSON.stringify([...REM.ctl]));
+async function remPoll(){try{REM.d=await api("/api/remote")}catch(e){return}
+  const n=(REM.d.peers||[]).length;$("openRemote").hidden=!n;$("remBadge").textContent=REM.ctl.size?` · controlling ${REM.ctl.size}`:"";if($("remDlg").open)renderRemote()}
+function renderRemote(){const d=REM.d||{peers:[],status:[]};
+  $("remBody").innerHTML=`<p class="small">Be the control operator of another of your stations from this one (remote control, 47 CFR 97.213). While <b>Control from here</b> is ticked and you use this dashboard, that station counts you as present: its VARA chat, its voice Send and Einstein at your call work as if you were at it. Stop using this dashboard for 3 minutes and it stops transmitting by itself. You must be able to monitor it: its text shows here; for voice you need its audio too.</p>
+  ${(d.status||[]).map((s,i)=>!s.ok?`<div class="rrow"><b class="mono">${esc(s.url||"")}</b> <span class="bad">${esc(s.why||"")}</span></div>`:`<div class="rrow"><div><b class="mono">${esc((s.calls||[]).join(", ")||s.call||"")}</b> <span class="small muted">${esc(s.url)}</span>
+      ${s.present?(s.controlled_from?` · <span class="ok">control operator present (from ${esc(s.controlled_from)})</span>`:' · <span class="ok">control operator present</span>'):' · <span class="muted">no control operator</span>'}</div>
+      <ul class="small">${(s.radios||[]).map(r=>`<li>${esc(r.name)}${r.freq_mhz?" · "+bpMhz(r.freq_mhz)+" MHz":""} · Transmit ${r.tx_on?"on":"off"}${r.on_air?' · <b class="bad">ON THE AIR</b>':""}${r.vara&&r.vara.session&&r.vara.session!=="idle"?` · VARA ${esc(r.vara.session)}${r.vara.peer?" with "+esc(r.vara.peer):""}`:""}${r.einstein&&r.einstein.state&&r.einstein.state!=="off"?` · 🤖 ${esc(r.einstein.call)} ${esc(r.einstein.state)}`:""}</li>`).join("")}</ul>
+      <label><input type="checkbox" data-remctl="${i}"${REM.ctl.has(i)?" checked":""} style="width:auto"> <b>Control from here</b></label> <button class="small danger" data-remstop="${i}" title="Drops any transmission and VARA link on that station now">⏹ Stop it transmitting</button> <a class="small" href="${esc(s.url)}/" target="_blank" rel="noopener">Open its dashboard</a></div>`).join("")||'<p class="muted">No other stations yet: Settings → Einstein &amp; AI → Einstein on the air → My other stations.</p>'}`}
+$("openRemote").onclick=()=>{remPoll().then(()=>{renderRemote();$("remDlg").showModal()})};
+$("remBody").addEventListener("change",e=>{const c=e.target.closest("[data-remctl]");if(!c)return;const i=+c.dataset.remctl;c.checked?REM.ctl.add(i):REM.ctl.delete(i);remSaveCtl();remBeat(true);remPoll()});
+$("remBody").addEventListener("click",async e=>{const b=e.target.closest("[data-remstop]");if(!b)return;b.disabled=true;try{await post("/api/remote/stop",{i:+b.dataset.remstop});b.textContent="Stopped"}catch(err){b.textContent=err.message}remPoll()});
+let remSeen=0;const remBeat=force=>{if(!REM.ctl.size)return;const now=Date.now();if(!force&&now-remSeen<30000)return;remSeen=now;post("/api/remote/presence",{idx:[...REM.ctl]}).catch(()=>{})};
+for(const ev of ["pointermove","pointerdown","keydown","wheel","touchstart"])document.addEventListener(ev,()=>remBeat(false),{passive:true});
+remPoll();setInterval(()=>{remPoll()},30000);
 // ----- Settings sections fold (owner 2026-11-18: "sections are collapsed by default so that users don't have to scroll
 // through long lists"). Each tab with several sections is a short list of rows: the first is open, the rest closed,
 // each with a line saying what is inside; what you open stays open in this browser. -----
 const SSEC_HINT={"You and your station":"callsign, name, grid square","Display":"colours, clock","Net alerts":"reminders before each net",
   "Logging nets":"VHF/UHF reach, AI net summary","Learned fixes":"corrections the station has learned","Local names":"names and places for the transcription",
   "Winlink Express on this PC":"folder, Send as","Winlink gateway lists":"gateways from Winlink Express","xAI key":"the key for Einstein, net summaries and Find nets",
-  "Station agent (Einstein)":"enable it, on-air name, check-in line, license class","Einstein's voice":"how Einstein sounds on the air",
+  "Station agent (Einstein)":"enable it, on-air name, check-in line, license class","Einstein on the air (VARA)":"owner key, share the library, your other stations","Einstein's voice":"how Einstein sounds on the air",
   "Grok speech-to-text (compared)":"a second transcription to compare","Power and speed":"full speed and screen on during nets","This PC":"what the station changes on this PC"};
 (()=>{const dlg=$("settings");if(!dlg)return;
   dlg.querySelectorAll("section.spanel").forEach(pan=>{const heads=[...pan.querySelectorAll("h4.sec")];if(heads.length<2)return;
@@ -2352,6 +2415,7 @@ document.addEventListener("submit",async e=>{const f=e.target.closest&&e.target.
   VA.sel[VA.rid]=[c];VA.msg=null;const m=vModem(VA.rid);if(m&&m.channel&&!(m.channel.roster||[]).some(r=>r.call===c))m.channel.roster.push({call:c,state:"unheard",unread:0});f.querySelector("input").blur();renderVara();const x=vI("vMsg");if(x)x.focus()});
 document.addEventListener("change",e=>{const t=e.target;if(!t.closest)return;{const vp=t.closest("[data-vpanel]");if(vp)VA.rid=vp.dataset.vpanel;else if(!t.closest("#varaDlg"))return}
   if(t.matches("[data-vannvia]")){const vp=t.closest("[data-vpanel]");if(vp)VA.rid=vp.dataset.vpanel;t.blur();varaAct("channel",{announce_via:t.value});return}
+  if(t.matches("[data-veincall]")){t.blur();post("/api/einstein/settings",{radio:VA.rid,call:t.value.trim().toUpperCase()}).then(()=>{VA.msg=null}).catch(err=>{VA.msg={bad:true,text:err.message}}).then(()=>varaLoad()).then(()=>renderVara());return}
   if(t.matches("[data-vtests]")){VA.tests=+t.value;t.blur();return}
   if(t.matches("[data-vevery]")){varaAct("channel",{every_min:+t.value});return}
   if(t.dataset.vset){const k=t.dataset.vset;let v=t.value;if(k==="cmd_port"||k==="bw")v=v===""?null:Number(v);varaSet({[k]:v});return}
@@ -2366,6 +2430,10 @@ document.addEventListener("click",async e=>{const t=e.target;if(!t.closest)retur
   if(t.closest("[data-vleave]")){if(!confirm("Leave the channel? Keep-alives and answering calls stop; other stations see you go grey after a while."))return;await varaAct("leave",{});return}
   if(t.closest("[data-vann]")){await varaAct("announce",{});return}
   const mu=t.closest("[data-vmulti]");if(mu){const s=vSel(VA.rid),c=mu.dataset.vmulti;VA.sel[VA.rid]=mu.checked?[...new Set([...s,c])]:s.filter(x=>x!==c);renderVara();return}
+  const ve=t.closest("[data-vein]");if(ve){post("/api/einstein/settings",{radio:VA.rid,on:ve.dataset.vein==="on"}).then(()=>varaLoad()).then(()=>renderVara()).catch(err=>{VA.msg={bad:true,text:err.message};renderVara()});return}
+  const vn=t.closest("[data-veinnotes]");if(vn){if(!vn.dataset.veinnotes){VA.notes=null;renderVara();return}
+    post("/api/einstein/notes",{radio:vn.dataset.veinnotes,read:null}).then(d=>{VA.notes={rid:vn.dataset.veinnotes,list:d.notes};return varaLoad()}).then(()=>renderVara());return}
+  const vq=t.closest("[data-vask]");if(vq){const x=vI("vMsg");if(x){x.value=vq.dataset.vask;VA.draft[VA.rid]=x.value;x.focus()}return}
   const pk=t.closest("[data-vpick]");if(pk){VA.sel[VA.rid]=[pk.dataset.vpick];renderVara();const x=vI("vMsg");if(x)x.focus();return}
   if(t.closest("[data-vall]")){const ch=(vModem(VA.rid)||{}).channel||{};VA.sel[VA.rid]=(ch.roster||[]).filter(r=>r.state==="here"||r.linked).map(r=>r.call);renderVara();return}
   const pr=t.closest("[data-vpreset]");if(pr){const m=vModem(VA.rid),ch=m.channel,s=vSel(VA.rid),one=s.length===1?s[0]:"";const txt=vFill(ch.presets[+pr.dataset.vpreset],ch,one,m);const x=vI("vMsg");if(x){x.value=(x.value.trim()?x.value.trim()+" ":"")+txt;VA.draft[VA.rid]=x.value;x.focus()}return}

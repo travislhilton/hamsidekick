@@ -61,7 +61,8 @@ SIDEKICK_BUTTON_ROWS = ("i checked in myself", "mute for this net")
 CONVERSATION_PARTS = (("a ·", "before"), ("b ·", "during"), ("c ·", "done"), ("find", "find"), ("use", "use"),
                       ("when something", "wrong"))
 VARA_PARTS = (("what each modem", "use"), ("two ways", "ways"), ("set up each", "modem"), ("join", "join"),
-              ("chat and files", "chat"), ("speed", "speed"), ("taking turns", "turns"), ("the status", "status"))
+              ("chat and files", "chat"), ("speed", "speed"), ("taking turns", "turns"), ("the status", "status"),
+              ("🤖 einstein", "einstein"))
 BANDPLAN_PARTS = (("a ·", "needs"), ("b ·", "find"), ("c ·", "keep"), ("open it", "open"), ("the columns", "cols"),
                   ("who speaks", "order"), ("⚠ what", "check"), ("your say", "say"))
 ADHOC_PARTS = (("what the arrl", "open"), ("reading", "read"), ("a ·", "reserve"), ("name and", "name"), ("b ·", "share"),
