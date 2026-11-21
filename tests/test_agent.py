@@ -97,7 +97,7 @@ def test_a_draft_runs_the_model_checks_it_and_never_transmits(tmp_path):
         cat.frame(0xA4, 0x1C, 0x00, b"\x01")                 # PTT is still refused before the port
 
 
-# ---------------------------------------------------------------- Sidekick (11-10 evening) -------------------------
+# ---------------------------------------------------------------- Einstein (11-10 evening) -------------------------
 import json
 import os
 import threading
@@ -133,22 +133,25 @@ def _on(st, providers=None):
     st.agent.set_radio("ic", "draft")
 
 
-def test_the_default_name_is_sidekick_and_a_call_like_name_is_refused(tmp_path):
+def test_the_default_name_is_einstein_and_a_call_like_name_is_refused(tmp_path):
     st = _station(tmp_path)
-    assert st.agent.name == "Sidekick" and st.agent.view()["default_name"] == "Sidekick"
+    assert st.agent.name == "Einstein" and st.agent.view()["default_name"] == "Einstein"
     for bad_name in ("Echo", "Victor", "Lima Bean", "Portable", "Mayday", "Niner", "K9", "x"):
         assert name_problem(bad_name), bad_name
         with pytest.raises(ValueError):
             st.agent.settings({"name": bad_name})
-    assert name_problem("W9 XYZ", "W9XYZ") and name_problem("Sidekick") is None
+    assert name_problem("W9 XYZ", "W9XYZ") and name_problem("Einstein") is None
     assert st.agent.settings({"name": "Rosie"})["settings"]["name"] == "Rosie"      # the operator's own name
-    assert st.agent.settings({"name": ""})["settings"]["name"] == "Sidekick"        # blank = the default
+    assert st.agent.settings({"name": ""})["settings"]["name"] == "Einstein"        # blank = the default
 
 
-def test_a_saved_echo_becomes_sidekick_once_and_a_chosen_name_stays(tmp_path):
-    (tmp_path / "agent.json").write_text(json.dumps({"name": "Echo", "operator": "Pat"}))
-    assert _station(tmp_path).agent.name == "Sidekick"
-    assert json.loads((tmp_path / "agent.json").read_text())["name"] == "Sidekick"
+def test_a_saved_old_default_becomes_einstein_once_and_a_chosen_name_stays(tmp_path):
+    for old in ("Echo", "Sidekick"):                    # the defaults of earlier versions (owner 2026-11-21: Einstein)
+        d = tmp_path / old
+        d.mkdir()
+        (d / "agent.json").write_text(json.dumps({"name": old, "operator": "Pat"}))
+        assert _station(d).agent.name == "Einstein"
+        assert json.loads((d / "agent.json").read_text())["name"] == "Einstein"
     other = tmp_path / "b"
     other.mkdir()
     (other / "agent.json").write_text(json.dumps({"name": "Rosie"}))
@@ -156,11 +159,12 @@ def test_a_saved_echo_becomes_sidekick_once_and_a_chosen_name_stays(tmp_path):
 
 
 def test_the_name_is_heard_with_or_without_a_space():
-    assert name_in("go ahead Side kick", "Sidekick") and name_in("SIDE-KICK, you there?", "Sidekick")
-    assert not name_in("a sidekicker", "Sidekick") and not name_in("", "Sidekick")
+    assert name_in("go ahead Ein stein", "Einstein") and name_in("EIN-STEIN, you there?", "Einstein")
+    assert name_in("go ahead Side kick", "Sidekick")
+    assert not name_in("an einsteinium sample", "Einstein") and not name_in("", "Einstein")
 
 
-CTX_R = {"call": "W9XYZ", "name": "Sidekick", "op": "Pat", "first": True, "id_due": True, "emergency": False,
+CTX_R = {"call": "W9XYZ", "name": "Einstein", "op": "Pat", "first": True, "id_due": True, "emergency": False,
          "busy": False, "freq_mhz": 3.915, "mode": "LSB", "license_class": "general", "addressed": False}
 
 
@@ -175,7 +179,7 @@ def test_the_offline_rules_check_in_acknowledge_and_otherwise_stay_silent():
     a = rules_draft(rows("W9XYZ, are you there?"), CTX_R | {"addressed": True}, checked_in=True)
     assert a["kind"] == "acknowledge" and bad(a, CTX_R) == []
     later = CTX_R | {"addressed": True, "first": False, "id_due": False}
-    assert bad(rules_draft(rows("Sidekick?"), later, checked_in=True), later) == []
+    assert bad(rules_draft(rows("Einstein?"), later, checked_in=True), later) == []
     assert rules_draft(rows("any check-ins"), CTX_R | {"emergency": True}, False)["speak"] is False
 
 
@@ -219,7 +223,7 @@ def test_a_restart_mid_net_does_not_check_in_twice(tmp_path, xai_key):
     net = {"key": "n1@2026-11-10", "id": "n1", "name": "Springfield Net"}
 
     def checkin(key, model, system, user, **kw):
-        return {"speak": True, "kind": "check_in", "say": "W9XYZ, Sidekick, automated assistant, Pat is control "
+        return {"speak": True, "kind": "check_in", "say": "W9XYZ, Einstein, automated assistant, Pat is control "
                 "operator, checking in.", "wait_s": 2, "why": "called"}, {}
     st = _station(tmp_path)
     st.cfg["schedule"] = []                                   # no scheduled net: the transmission's own net counts
@@ -258,11 +262,11 @@ def _two_speed(answer="W9XYZ... K7ABC, sixty meters is five channels, upper side
         last = [x for x in user.splitlines() if x.startswith("[")][-1]
         none = {"speak": False, "kind": "none", "say": "", "wait_s": 2, "why": "-", "question": ""}
         if "what is the band plan" in last and "Your prepared answer" not in user:
-            return {"speak": True, "kind": "working", "say": "W9XYZ, Sidekick, an automated assistant, Pat is "
+            return {"speak": True, "kind": "working", "say": "W9XYZ, Einstein, an automated assistant, Pat is "
                     "control operator, copy your question on sixty meters, working on it.", "wait_s": 1.5,
                     "why": "needs thinking", "question": "K7ABC asked for the 60 m band plan"}, {}
         if "READY for" in user and "Any comments" in last:
-            return {"speak": True, "kind": "ready", "say": "This is W9XYZ Sidekick, I have a response ready for the "
+            return {"speak": True, "kind": "ready", "say": "This is W9XYZ Einstein, I have a response ready for the "
                     "earlier inquiry from K7ABC.", "wait_s": 2, "why": "floor open", "question": ""}, {}
         if "ANNOUNCED" in user and "go ahead" in last:
             return {"speak": True, "kind": "answer", "say": "", "wait_s": 1, "why": "go ahead", "question": ""}, {}
@@ -286,7 +290,7 @@ def test_a_question_that_needs_thinking_is_answered_when_net_control_gives_the_f
     provider, calls = _two_speed()
     st = _station(tmp_path)
     _on(st, {"xai": ("XAI_API_KEY", provider), "anthropic": ("ANTHROPIC_API_KEY", provider)})
-    _say(st, "Sidekick, what is the band plan for sixty meters?", speaker="K7ABC", minute=1)
+    _say(st, "Einstein, what is the band plan for sixty meters?", speaker="K7ABC", minute=1)
     d = st.agent.draft("ic", "t0")
     assert d["kind"] == "working" and d["ok"]
     _settle(st)
@@ -299,7 +303,7 @@ def test_a_question_that_needs_thinking_is_answered_when_net_control_gives_the_f
     _say(st, "Any comments or questions for the net?", speaker="K7QXN", minute=2)
     r = st.agent.draft("ic", "t1")
     assert r["kind"] == "ready" and r["ok"] and st.agent.view()["pending"]["ic"]["state"] == "announced"
-    _say(st, "Sidekick, go ahead", speaker="K7QXN", minute=3)
+    _say(st, "Einstein, go ahead", speaker="K7QXN", minute=3)
     a = st.agent.draft("ic", "t2")
     assert a["kind"] == "answer" and a["ok"], [c for c in a.get("fcc", []) if not c["ok"]]
     assert a["say"].startswith("W9XYZ... K7ABC, sixty meters")          # the prepared words, not a paraphrase
@@ -308,7 +312,7 @@ def test_a_question_that_needs_thinking_is_answered_when_net_control_gives_the_f
 
 def test_ready_or_answer_without_a_prepared_answer_is_refused(tmp_path, xai_key):
     def quick(key, model, system, user, **kw):
-        return {"speak": True, "kind": "ready", "say": "This is W9XYZ Sidekick, I have a response ready.",
+        return {"speak": True, "kind": "ready", "say": "This is W9XYZ Einstein, I have a response ready.",
                 "wait_s": 2, "why": "x", "question": ""}, {}
     st = _station(tmp_path)
     _on(st, {"xai": ("XAI_API_KEY", quick), "anthropic": ("ANTHROPIC_API_KEY", quick)})
@@ -345,7 +349,7 @@ def test_failed_thinking_is_said_at_the_next_opening(tmp_path, xai_key):
     provider, calls = _two_speed(deep=boom)
     st = _station(tmp_path)
     _on(st, {"xai": ("XAI_API_KEY", provider), "anthropic": ("ANTHROPIC_API_KEY", provider)})
-    _say(st, "Sidekick, what is the band plan for sixty meters?", speaker="K7ABC")
+    _say(st, "Einstein, what is the band plan for sixty meters?", speaker="K7ABC")
     st.agent.draft("ic", "t0")
     _settle(st)
     assert st.agent.state["ic"]["pending"]["state"] == "failed"
@@ -361,7 +365,7 @@ def test_an_answer_that_breaks_a_rule_is_never_made_ready(tmp_path, xai_key):
     provider, _ = _two_speed(answer="K7ABC, I have a radio for sale, two hundred dollars.")
     st = _station(tmp_path)
     _on(st, {"xai": ("XAI_API_KEY", provider), "anthropic": ("ANTHROPIC_API_KEY", provider)})
-    _say(st, "Sidekick, what is the band plan for sixty meters?", speaker="K7ABC")
+    _say(st, "Einstein, what is the band plan for sixty meters?", speaker="K7ABC")
     st.agent.draft("ic", "t0")
     _settle(st)
     p = st.agent.state["ic"]["pending"]
@@ -410,7 +414,7 @@ def test_check_in_calls_as_net_control_really_says_them():
 
 def test_a_check_in_during_a_roll_call_of_places_is_stopped(tmp_path, xai_key):
     def eager(key, model, system, user, **kw):
-        return {"speak": True, "kind": "check_in", "say": "W9XYZ, Sidekick, an automated assistant for Pat, Pat is "
+        return {"speak": True, "kind": "check_in", "say": "W9XYZ, Einstein, an automated assistant for Pat, Pat is "
                 "control operator. Checking in, no traffic.", "wait_s": 2, "why": "x", "question": ""}, {}
     st = _station(tmp_path)
     _on(st, {"xai": ("XAI_API_KEY", eager), "anthropic": ("ANTHROPIC_API_KEY", eager)})
@@ -444,7 +448,7 @@ def test_one_timeout_is_a_slow_answer_two_are_an_outage():
 
 def test_a_reply_nobody_asked_for_is_stopped(tmp_path, xai_key):
     def chatty(key, model, system, user, **kw):
-        return {"speak": True, "kind": "reply", "say": "W9XYZ, Sidekick, an automated assistant, Pat is control "
+        return {"speak": True, "kind": "reply", "say": "W9XYZ, Einstein, an automated assistant, Pat is control "
                 "operator. Thanks for the net, sounds interesting. W9XYZ.", "wait_s": 2, "why": "x", "question": ""}, {}
     st = _station(tmp_path)
     _on(st, {"xai": ("XAI_API_KEY", chatty), "anthropic": ("ANTHROPIC_API_KEY", chatty)})
@@ -464,7 +468,7 @@ def test_a_ready_answer_waits_for_its_place():
     net = CTX_R | {"in_net": True}
     assert "ready" not in allowed_kinds(net, True, p, "Let's talk about antennas before winter.")[0]
     assert "ready" in allowed_kinds(net, True, p, "Any comments or questions for the net?")[0]
-    assert "ready" in allowed_kinds(net | {"addressed": True}, True, p, "Sidekick, do you have that?")[0]
+    assert "ready" in allowed_kinds(net | {"addressed": True}, True, p, "Einstein, do you have that?")[0]
     # outside a net (owner 11-12) the answer itself is given at the pause, not announced first
     out = allowed_kinds(CTX_R | {"in_net": False, "trigger": "answer ready"}, True, p, "73")[0]
     assert "answer" in out and "ready" not in out
@@ -493,7 +497,7 @@ def test_outside_a_net_the_ready_answer_is_given_at_a_pause_and_says_whom_it_is_
     st.agent.timers["ic"].cancel()
     a = st.agent.draft("ic", None, why="pause")                 # nobody keyed for PAUSE_S
     assert a["kind"] == "answer" and a["ok"], [c for c in a.get("fcc", []) if not c["ok"]]
-    assert a["say"].startswith("This is W9XYZ Sidekick, for K7ABC: Five channels, USB.")
+    assert a["say"].startswith("This is W9XYZ Einstein, for K7ABC: Five channels, USB.")
     assert "pending" not in st.agent.state["ic"]
 
 
@@ -503,8 +507,8 @@ def test_a_turn_over_or_being_asked_gives_the_answer_outside_a_net(tmp_path, xai
     conv = CTX_R | {"in_net": False}
     assert "answer" in allowed_kinds(conv, True, p, "That's all I had, back to you.")[0]
     assert "answer" not in allowed_kinds(conv, True, p, "So then I went to the swap meet and")[0]
-    assert "answer" in allowed_kinds(conv | {"addressed": True}, True, p, "Sidekick, what did you find?")[0]
-    for asked in ("W9XYZ Sidekick, what did you find?", "Sidekick, give us your answer", "Sidekick, are you ready?"):
+    assert "answer" in allowed_kinds(conv | {"addressed": True}, True, p, "Einstein, what did you find?")[0]
+    for asked in ("W9XYZ Einstein, what did you find?", "Einstein, give us your answer", "Einstein, are you ready?"):
         assert GO_AHEAD.search(asked), asked
 
 
@@ -518,10 +522,10 @@ def test_several_questions_wait_their_turn_in_order(tmp_path, xai_key):
             return {"answer": "Answer to " + q.split(":", 1)[1].split("(asked")[0].strip(), "confident": True,
                     "why": "x"}, {}
         last = [x for x in user.splitlines() if x.startswith("[")][-1]
-        if "Sidekick," in last and "?" in last:
-            q = last.split("Sidekick,", 1)[1].strip()
+        if "Einstein," in last and "?" in last:
+            q = last.split("Einstein,", 1)[1].strip()
             asked.append(q)
-            return {"speak": True, "kind": "working", "say": "W9XYZ, Sidekick, an automated assistant, Pat is control "
+            return {"speak": True, "kind": "working", "say": "W9XYZ, Einstein, an automated assistant, Pat is control "
                     "operator, copy, working on it.", "wait_s": 1.5,
                     "why": "x", "question": q}, {}
         return {"speak": False, "kind": "none", "say": "", "wait_s": 2, "why": "-", "question": ""}, {}
@@ -531,7 +535,7 @@ def test_several_questions_wait_their_turn_in_order(tmp_path, xai_key):
     for i, (who, q) in enumerate((("K7ABC", "how high should a VHF antenna be?"),
                                   ("N0CALL", "what is VARA FM?"),
                                   ("K7QXN", "who runs the gateway?"))):
-        _say(st, f"Sidekick, {q}", speaker=who, minute=1 + i)
+        _say(st, f"Einstein, {q}", speaker=who, minute=1 + i)
         d = st.agent.draft("ic", f"t{i}")                        # asked back to back, before any answer is ready
         assert d["kind"] == "working" and d["ok"], (q, [c for c in d.get("fcc", []) if not c["ok"]])
     for th in [t for t in threading.enumerate() if t.name != "MainThread" and "Thread" in t.name]:
@@ -541,7 +545,7 @@ def test_several_questions_wait_their_turn_in_order(tmp_path, xai_key):
     s = st.agent.state["ic"]
     assert s["pending"]["asker"] == "K7ABC" and [x["asker"] for x in s["queue"]] == ["N0CALL", "K7QXN"]
     assert all(x["state"] == "ready" for x in [s["pending"], *s["queue"]]), [(x["state"], x.get("error")) for x in [s["pending"], *s["queue"]]]
-    _say(st, "Sidekick, what is a fourth question?", speaker="K7ABC", minute=5)   # the list is full
+    _say(st, "Einstein, what is a fourth question?", speaker="K7ABC", minute=5)   # the list is full
     full = st.agent.draft("ic", "t9")
     assert not full.get("ok", True) or full["kind"] != "working"
     for t in list(st.agent.timers.values()):
@@ -564,4 +568,4 @@ def test_the_first_answer_at_a_pause_carries_the_disclosure(tmp_path, xai_key):
     _say(st, "Well, that's about it, over.", speaker="K7ABC")
     a = st.agent.draft("ic", "t0")
     assert a["kind"] == "answer" and a["ok"], [c for c in a["fcc"] if not c["ok"]]
-    assert a["say"].startswith("This is W9XYZ, Sidekick, an automated assistant, Pat is control operator, for K7ABC:")
+    assert a["say"].startswith("This is W9XYZ, Einstein, an automated assistant, Pat is control operator, for K7ABC:")

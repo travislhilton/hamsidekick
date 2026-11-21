@@ -1,4 +1,4 @@
-"""Sidekick's Send mode (station/sender.py): a draft is said on the air only under the control operator's eye."""
+"""Einstein's Send mode (station/sender.py): a draft is said on the air only under the control operator's eye."""
 import time
 import urllib.error
 
@@ -44,7 +44,7 @@ def _down(key, model, system, user, **kw):
 
 def _speak(st):
     """A call to this station by name: the offline rules acknowledge it (a draft that speaks)."""
-    _say(st, "Sidekick, are you on frequency?", speaker="K7ABC")
+    _say(st, "Einstein, are you on frequency?", speaker="K7ABC")
     st.radios["ic"]["freq_mhz"] = 146.52
     return st.agent.draft("ic", "t0")
 
@@ -152,7 +152,7 @@ def test_unknown_frequency_is_never_sent(tmp_path, xai_key):
     _on(st, {"xai": ("XAI_API_KEY", _down), "anthropic": ("ANTHROPIC_API_KEY", _down)})
     st.agent.set_radio("ic", "send")
     st.agent.sender.presence()
-    _say(st, "Sidekick, are you on frequency?", speaker="K7ABC")
+    _say(st, "Einstein, are you on frequency?", speaker="K7ABC")
     st.radios["ic"]["freq_mhz"] = None
     d = st.agent.draft("ic", "t0")
     assert d["send"]["state"] == "held" and "frequency is not known" in d["send"]["why"] and dev.events == []

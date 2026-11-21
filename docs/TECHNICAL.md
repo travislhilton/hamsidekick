@@ -184,9 +184,9 @@ net 5–7 minutes).
   .\.venv\Scripts\python.exe -m hamkit.qrz set-login     # asks for callsign + password, then tests
   ```
 
-## Sidekick's knowledge library
+## Einstein's knowledge library
 
-`station/knowledge.py` gives Sidekick material to answer questions and give prepared talks from ("present this
+`station/knowledge.py` gives Einstein material to answer questions and give prepared talks from ("present this
 project and how to use it", "explain our EOC's Winlink setup"), with the source of every piece, instead of guessing.
 
 **Where it lives** (all under the data folder, which git ignores; nothing in it is ever committed):
@@ -247,7 +247,7 @@ Before this (2026-11-15) one decode ran 30 hours while `/health` said ok, and ev
 
 ## VHF/UHF path analysis (`hamkit/pathprofile.py`)
 
-Sidekick is asked things like "can the EOC reach the shelters on 2 m, and how should we set up Winlink?". It must
+Einstein is asked things like "can the EOC reach the shelters on 2 m, and how should we set up Winlink?". It must
 not guess terrain, so it calls this module and treats its numbers as the answer.
 
 - **Terrain**: the great-circle path is sampled every `step_m` (100 m) up to `max_samples` (600; longer paths are

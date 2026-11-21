@@ -166,7 +166,7 @@ def make_handler(station):
                 return self._json(station.readout.view())
             if u.path == "/api/scan":                            # HF scan: each radio's mode + antenna, remembered spots
                 return self._json(station.scan.view())
-            if u.path == "/api/tts":                             # Sidekick's voice: the list, the choice, auditions
+            if u.path == "/api/tts":                             # Einstein's voice: the list, the choice, auditions
                 return self._json(station.tts.view())
             if u.path == "/api/tts/say.mp3":                     # any saved words, heard here before they are sent
                 try:

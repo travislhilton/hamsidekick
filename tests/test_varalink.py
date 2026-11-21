@@ -352,7 +352,7 @@ def test_two_copies_of_vara_keying_one_radio_are_named(tmp_path):
 
 def test_each_modem_can_add_an_ssid_to_the_stations_callsign(tmp_path):
     """Owner 2026-11-17: "My call sign is <call>, but I want to use <call>-8 on the -8 station" - per modem, the
-    station's own callsign (net logs, Sidekick, IDs) unchanged."""
+    station's own callsign (net logs, Einstein, IDs) unchanged."""
     FakeVara.made.clear()
     st, a, b = _two(tmp_path)
     st.me = "W9XYZ"

@@ -1,4 +1,4 @@
-"""Sidekick's voice: xAI text-to-speech (POST /v1/tts), for the OPERATOR to hear — the voice audition in Settings and
+"""Einstein's voice: xAI text-to-speech (POST /v1/tts), for the OPERATOR to hear — the voice audition in Settings and
 "Hear it" on a draft. The sound plays in the dashboard's browser, never on a radio: nothing here can reach a radio's
 audio or PTT (station/cat.py refuses PTT).
 
@@ -110,7 +110,7 @@ class Voice:
 
     def _audition_words(self) -> str:
         s = self._settings()
-        name = s.get("name") or "Sidekick"
+        name = s.get("name") or "Einstein"
         return audition_text(self.st.me or "N0CALL", name, s.get("operator") or "the operator")
 
     @staticmethod
@@ -169,7 +169,7 @@ class Voice:
             return
         if not self.st.costs.allow_background():                     # this month's AI budget is spent
             return
-        name, op = (a.name if a else "Sidekick"), s.get("operator") or "the operator"
+        name, op = (a.name if a else "Einstein"), s.get("operator") or "the operator"
         lines = list(fixed_lines(call, name, op).values()) + [
             f"This is {call}, a transmitter test into a dummy load. {call}."]
 

@@ -234,7 +234,7 @@ if (-not $SkipCallbook) {
   & $vpy -m hamkit.dxcc update
   if ($LASTEXITCODE -ne 0) { Write-Host "  The country file did not download this time: country names for DX calls come with the weekly update." -ForegroundColor Yellow }
   Run { & $vpy -m hamkit.zipgeo update }    # ZIP centres (1 MB, once): VHF/UHF callsign distances
-  Run { & $vpy -m hamkit.places update }    # US state names (2 KB): Sidekick hears a roll call by place
+  Run { & $vpy -m hamkit.places update }    # US state names (2 KB): Einstein hears a roll call by place
   Pop-Location
 }
 

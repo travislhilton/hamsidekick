@@ -52,7 +52,7 @@ def _prepared(st, n_paras=3):
     script = "\n\n".join(f"Paragraph {i}. The station writes down every transmission." for i in range(n_paras))
     st.agent.topics.prepare(t["id"], lambda system, user: {"title": "Logging a net", "script": script,
                                                            "sources": ["[README.md › Install]"]},
-                            None, {"call": "W9XYZ", "name": "Sidekick", "op": "Pat"})
+                            None, {"call": "W9XYZ", "name": "Einstein", "op": "Pat"})
     return st.agent.topics.get(t["id"])
 
 
@@ -81,7 +81,7 @@ def test_on_the_air_present_then_continue(tmp_path, xai_key):
     st.agent.topics.arm("ic", t["id"])
     _say(st, "We'll take the training topic now.", speaker="K7QXN", minute=1)
     assert st.agent.draft("ic", "t0")["kind"] != "present"               # not asked to present
-    _say(st, "W9XYZ Sidekick, please present the training topic.", calls=["W9XYZ"], speaker="K7QXN", minute=2)
+    _say(st, "W9XYZ Einstein, please present the training topic.", calls=["W9XYZ"], speaker="K7QXN", minute=2)
     d = st.agent.draft("ic", "t1")
     assert d["kind"] == "present" and d["ok"], [c for c in d["fcc"] if not c["ok"]]
     assert "an automated assistant" in d["say"] and "Part one words" in d["say"]   # disclosed first

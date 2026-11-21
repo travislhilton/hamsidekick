@@ -5,7 +5,7 @@ HAM Sidekick Station: keep this PC's settings in ONE zip file, and put them back
   settings_bundle.ps1 -Restore C:\Users\you\hamsidekick-admin\backups\settings.zip   [-InstallDir C:\HAM-Sidekick-Station]
 
 What is kept (settings, never the heavy or rebuildable parts): config\station.yaml, local.yaml, secrets.env and the other
-hand-edited config; data\*.json (net schedule, radios, Sidekick settings, local names, scan spots, alerts, the operator's
+hand-edited config; data\*.json (net schedule, radios, Einstein settings, local names, scan spots, alerts, the operator's
 choices); data\knowledge, chat, voice, tts, grok_stt, sidekick_replay; capture\config.yaml; setup\; deploy\windows\ssh-keys.txt.
 NOT kept: history.db and recordings (the re-install script moves those back separately), the callbook, the OpenVINO cache,
 models, logs, and config\engine.yaml (this PC is measured again; pass -WithEngine to put the old measurement back).

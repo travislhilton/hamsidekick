@@ -1,6 +1,6 @@
 """VHF/UHF radio path analysis over real terrain: can site A reach site B, how well, and what would fix it.
 
-Built for Sidekick (the station's assistant) to call as a tool when it is asked to plan a net or Winlink links
+Built for Einstein (the station's assistant) to call as a tool when it is asked to plan a net or Winlink links
 ("analyze the paths between the EOC and the shelters"): the model must not guess terrain, so every number it gives
 comes from here.
 

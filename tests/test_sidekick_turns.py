@@ -1,5 +1,5 @@
-"""Sidekick's turn: who net control called, read the way the 2026-11-12 review of real nets found it misread
-(phrasings from real nets; calls and places made up). Plus Sidekick with no internet and with no xAI key."""
+"""Einstein's turn: who net control called, read the way the 2026-11-12 review of real nets found it misread
+(phrasings from real nets; calls and places made up). Plus Einstein with no internet and with no xAI key."""
 import os
 import urllib.error
 

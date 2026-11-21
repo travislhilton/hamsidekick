@@ -1,4 +1,4 @@
-"""Sidekick's prepared topics (a training talk on a net) and the operator's sites (for radio path questions).
+"""Einstein's prepared topics (a training talk on a net) and the operator's sites (for radio path questions).
 
 Owner 2026-11-12: "after the check-ins the net asks W9XYZ to share the training topic … I then ask W9XYZ Sidekick to
 present the topic. The topic might be to explain this project and how to use it … how do we feed the AI assistant
@@ -9,12 +9,12 @@ support Winlink traffic."
 * SITES (data/sites.json, never committed): the places the operator cares about: name, lat/lon, antenna height,
   a note ("EOC", "shelter"). A question that names two of them gets the terrain path computed first
   (hamkit/pathprofile.py), and the model must use those numbers.
-* TOPICS (data/topics.json): what to explain, in the operator's words. "Prepare" writes a script from Sidekick's
+* TOPICS (data/topics.json): what to explain, in the operator's words. "Prepare" writes a script from Einstein's
   library (station/knowledge.py: this project's docs plus the operator's own files, notes and pages) and, for the sites
   ticked, the path table. The script is split into SEGMENTS that each fit one transmission (the radio's transmit time
   limit; a repeater's time-out). The operator reads, edits and APPROVES it before the net; an edit after approval
   un-approves it (the approval is bound to the words).
-* ON THE AIR: an approved topic is ARMED on a radio. "Sidekick, present the topic" (or "share the training topic")
+* ON THE AIR: an approved topic is ARMED on a radio. "Einstein, present the topic" (or "share the training topic")
   gives segment 1; each segment ends handing the frequency back ("I'll pause there; back to net control"). "Continue"
   / "go ahead" gives the next. The last ends "That concludes the topic." Questions go through the usual answers.
 """
@@ -288,7 +288,7 @@ class Topics:
         paths = path_facts(chosen, float(t.get("mhz") or 146.0), analyze=analyze) if len(chosen) > 1 else []
         site_lines = [f"- {s['name']}: {s['lat']:.4f}, {s['lon']:.4f}, antenna {round(s['height_m'] / 0.3048)} ft"
                       + (f" ({s['note']})" if s.get("note") else "") for s in chosen]
-        system = TOPIC_SYSTEM.format(name=ctx.get("name", "Sidekick"), call=ctx.get("call", "N0CALL"),
+        system = TOPIC_SYSTEM.format(name=ctx.get("name", "Einstein"), call=ctx.get("call", "N0CALL"),
                                      op=ctx.get("op", "the operator"), request=t["request"], minutes=t["minutes"],
                                      words=words, seg_words=seg_words)
         user = "\n".join([*(["The operator's sites:", *site_lines] if site_lines else []), *paths,
@@ -299,7 +299,7 @@ class Topics:
         segs = segment(str(out.get("script") or ""), seg_words)
         if not segs:
             raise ValueError("the model wrote no script")
-        call, name = ctx.get("call", "N0CALL"), ctx.get("name", "Sidekick")
+        call, name = ctx.get("call", "N0CALL"), ctx.get("name", "Einstein")
         for i in range(len(segs)):                          # the hand-offs and the ID, in code
             last = i == len(segs) - 1
             segs[i] = segs[i].rstrip() + (f" That concludes the topic. Back to net control. {call}." if last else

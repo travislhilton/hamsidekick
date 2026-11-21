@@ -20,7 +20,7 @@ the ARES and RACES EMCOMM communication plans and band plans", then "build both"
   kept, so ticking it again is free). A search never reads anything by itself. A plan file the operator adds is read
   when it is added and goes in at once (adding it was the choice).
 * USED BY THE STATION. label(freq) names a kept channel and the band plan's use of a frequency (station/bandplan.py):
-  the radio cards show it, and Sidekick's context includes it. A channel with a published net schedule can be added
+  the radio cards show it, and Einstein's context includes it. A channel with a published net schedule can be added
   to the schedule in one step.
 
 Not automatic: a re-check costs money, so the page says when the last search is over a month old; it never searches
@@ -694,7 +694,7 @@ class Plans:
         if not doc.get("public"):
             raise ValueError("that plan is members-only: it is never fetched. If you have it, add it below as a file")
         if not self.key():
-            raise ValueError("set the xAI key first (Settings -> Sidekick & AI): it reads the plans")
+            raise ValueError("set the xAI key first (Settings -> Einstein & AI): it reads the plans")
         shown = next((x for x in self.state()["documents"] if x["url"] == key), None)
         if shown and shown["band"].get("dup"):
             raise ValueError(f"that is the same document as “{shown['band']['dup']}”: tick that one instead")

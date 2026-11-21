@@ -5,7 +5,7 @@ Owner 2026-11-15 ("capture any amateur radio band plans for the local area"): th
 frequency coordinator refines VHF/UHF (repeater pairs, simplex channels, links) and the area's ARES / RACES plans
 name the frequencies used locally: both come from Nets -> Local plans (station/localplans.py) and sit on top.
 
-privileges(f, kind, cls) is the check every transmit path goes through: Sidekick's voice (kind "phone") and VARA chat
+privileges(f, kind, cls) is the check every transmit path goes through: Einstein's voice (kind "phone") and VARA chat
 and files (kind "data"). US rules only (97.301 / 97.305 / 97.303(h) for 60 m); elsewhere set no class and nothing is
 checked. Since 2024 (FCC 23-93) HF data has no symbol-rate limit, only 2.8 kHz bandwidth: VARA HF fits (2.3 / 2.75 kHz).
 """

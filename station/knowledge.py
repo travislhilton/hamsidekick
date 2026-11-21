@@ -1,4 +1,4 @@
-"""Sidekick's knowledge library: material it answers questions and gives prepared talks from, with sources.
+"""Einstein's knowledge library: material it answers questions and gives prepared talks from, with sources.
 
 Where it lives (the data folder is git-ignored; nothing here is ever committed):
 

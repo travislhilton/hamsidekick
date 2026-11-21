@@ -1,10 +1,10 @@
-"""Sidekick's Send mode: a draft that would speak is said on the air, under the control operator's eye.
+"""Einstein's Send mode: a draft that would speak is said on the air, under the control operator's eye.
 
 Owner 2026-11-12: "Sidekick would then reply immediately" and "do them all" (the send step, the speed work, the
 dummy-load test). Part 97 does not allow automatic control of a voice station answering people (97.109(d) is for
 repeaters, beacons, some data), so the control operator stays at the control point and can stop every transmission:
 
-* A radio's Sidekick switch has a third position, **Send**, offered only on a radio whose Transmit switch is on
+* A radio's Einstein switch has a third position, **Send**, offered only on a radio whose Transmit switch is on
   (station/ptt.py; off by default).
 * A draft that would speak (and passed every check) is shown with a countdown, "Sending in 3… (Esc to stop)".
   The voice clip is made during the countdown (no time lost).
@@ -285,7 +285,7 @@ class Sender:
             timing["on_air_s"] = round(self.clock() - k0, 2)
             if ev.is_set():
                 return self._end(rid, rec, "stopped", rec.get("stop_why") or "stopped on the air: PTT dropped", timing)
-            return self._end(rid, rec, "sent", "", timing)      # a test never moves Sidekick's ID clock
+            return self._end(rid, rec, "sent", "", timing)      # a test never moves Einstein's ID clock
         except Exception as e:  # noqa: BLE001
             return self._end(rid, rec, "failed", f"{type(e).__name__}: {e}", timing)
 

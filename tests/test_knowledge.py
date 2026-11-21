@@ -1,4 +1,4 @@
-"""Sidekick's knowledge library (station/knowledge.py): offline, temp folders, a fake fetch for URLs."""
+"""Einstein's knowledge library (station/knowledge.py): offline, temp folders, a fake fetch for URLs."""
 import io
 import os
 import threading

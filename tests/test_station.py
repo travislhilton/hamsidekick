@@ -540,10 +540,10 @@ def test_a_missing_input_that_windows_has_now_is_rescanned_once_a_minute(tmp_pat
 def test_sidekick_card_is_served_and_linked():
     from station.server import STATIC
     html = (STATIC / "sidekick_card.html").read_text(encoding="utf-8")
-    assert "side 1 of 2" in html and "side 2 of 2" in html and "<title>Sidekick Card</title>" in html
-    assert "Use Sidekick" in html and "Set up once" in html and "Transmit test" in html and "Your region" in html
+    assert "side 1 of 2" in html and "side 2 of 2" in html and "<title>Einstein Card</title>" in html
+    assert "Use Einstein" in html and "Set up once" in html and "Transmit test" in html and "Your region" in html
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert idx.count('href="/help/sidekick"') == 2                 # Settings -> Station agent, and Sidekick's card
+    assert idx.count('href="/help/sidekick"') == 2                 # Settings -> Station agent, and Einstein's card
     from station.server import HELP_CARDS
     assert HELP_CARDS["/help/sidekick"] == "sidekick_card.html"
 

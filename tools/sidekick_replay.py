@@ -1,4 +1,4 @@
-"""Replay a day's real traffic through Sidekick (the station agent) and report what it would have said.
+"""Replay a day's real traffic through Einstein (the station agent) and report what it would have said.
 
     python -m tools.sidekick_replay 20261110 --radio net --from 19:30 --to 20:30 [--model rules] [--deep]
     python -m tools.sidekick_replay --script docs/sidekick/rehearsal.json --deep     (a made-up net: the two speeds)

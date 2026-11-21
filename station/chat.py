@@ -16,7 +16,7 @@ transmitted."
   check-ins with names and towns, traffic, stations heard), the last transmissions heard (speech recognition), the
   earlier sessions of the same net (who usually checks in, the last minutes), the library's passages for the question
   (station/knowledge.py) and, when two of the operator's sites are named, the computed terrain path.
-* Words for the air are checked in code like every Sidekick draft (station/agent.py fcc_check): ID, no music, codes,
+* Words for the air are checked in code like every Einstein draft (station/agent.py fcc_check): ID, no music, codes,
   business or relayed messages, inside privileges, one transmission long.
 """
 from __future__ import annotations
@@ -263,7 +263,7 @@ class Chat:
         return {"asked": q}
 
     def check(self, rid: str, say: str) -> list[dict]:
-        """The Part 97 content checks on words for the air (the same as every Sidekick draft)."""
+        """The Part 97 content checks on words for the air (the same as every Einstein draft)."""
         from .agent import fcc_check
         a = self.agent
         r = self.st.radios.get(rid) or {}

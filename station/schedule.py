@@ -119,7 +119,7 @@ def validate(body: dict, radios: dict) -> dict:
            "offset_mhz": offset, "tone_hz": tone, "reach_km": int(reach) if reach else None,             # CAT: set on the radio with the frequency (station/cat.py)
            "beats": sorted(set(beats)) or None,              # clashes settled: these nets lose to this one
            "checkins": "none" if body.get("checkins") == "none" else None,
-           "source": src}   # Sidekick: never check in (members/mobiles/traffic only)
+           "source": src}   # Einstein: never check in (members/mobiles/traffic only)
     return {k: v for k, v in out.items() if v is not None}
 
 

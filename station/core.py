@@ -197,7 +197,7 @@ class Station:
         from .grokstt import GrokSTT
         self.grokstt = GrokSTT(self)                             # Grok speech-to-text, compared (off until chosen)
         from .tts import Voice
-        self.tts = Voice(self)                                   # Sidekick's voice, for the operator's ears only
+        self.tts = Voice(self)                                   # Einstein's voice, for the operator's ears only
         from .scan import Scanner
         self.scan = Scanner(self)                                # HF scan between nets (station/scan.py), receive only
         from .readout import Readout

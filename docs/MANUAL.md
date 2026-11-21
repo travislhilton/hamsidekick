@@ -172,14 +172,14 @@ you chose is remembered. Each column shows:
     your area; they **Import** it (a file or an https address) or put it beside `install.cmd`
     (`install.ps1 -AreaPack <file or address>` also works). Kept in `data\local_names.json`.
   - **Share settings with another station** (Settings → the section of that name; `station/portable.py`): **Export
-    settings…** saves one file with this station's **net schedule**, **Sidekick's choices** and **local names**. A net
+    settings…** saves one file with this station's **net schedule**, **Einstein's choices** and **local names**. A net
     names its radio by a hint (the radio's name, band and mode), because a radio's id means nothing on another PC.
-    Tick *include my Sidekick identity* to take the on-air name, your check-in line, first name and region too (leave
+    Tick *include my Einstein identity* to take the on-air name, your check-in line, first name and region too (leave
     it off for a file you give to other people). On the other station choose the file and press **Preview import…**:
     it lists what would be added or updated, suggests which of that station's radios each radio becomes (the same
     name, else the only one of the same band and mode; pick another or *none*), and **Import these settings** applies
     it. A net left on *none* stays on the schedule and is not recorded until you give it a radio (Nets). Never in the
-    file: keys, call sign, radios, sound inputs, PTT, history, which radios Sidekick is on, whether it is switched on.
+    file: keys, call sign, radios, sound inputs, PTT, history, which radios Einstein is on, whether it is switched on.
     Importing never deletes (a net with the same name and start time is updated and keeps its clash settings), and the
     files it replaces are first copied to `data\settings_backups\<time>\`. For a whole-PC backup (including keys) use
     `tools\settings_bundle.ps1 -Backup` instead.
@@ -293,7 +293,7 @@ you chose is remembered. Each column shows:
   **Move to Not heard** / **Keep it**. **Find nets** lists a found net that matches a Not heard one (same frequency and
   start, or same name) apart, under "not heard here", and adds it only with **Add anyway** (it then leaves Not heard).
   Kept in `data/nets_unheard.json`.
-- **Settings** (header → Settings; on a phone ☰ Menu → Settings) has seven tabs: Station, Nets, Winlink, Sidekick & AI,
+- **Settings** (header → Settings; on a phone ☰ Menu → Settings) has seven tabs: Station, Nets, Winlink, Einstein & AI,
   AI costs, This PC, Share. A tab with several sections shows them as rows: the first is open, the others are closed
   with a line saying what is inside; click a row to open it, and it stays open in that browser. Each section says how
   it saves ("Save below", "own Save button", "changes at once"). Every reference card (Help) has a QR code to the
@@ -312,7 +312,7 @@ you chose is remembered. Each column shows:
   - **Call** (2026-11-17, Modem setup at the bottom of the VARA window, or click the call at its top): the call this
     VARA uses on the air, typed whole as in Winlink Express: W9XYZ-7 at one station, W9XYZ-8 at another, so your own
     stations can reach each other. Empty = the station's callsign. It is kept apart from the Winlink account (Settings →
-    Winlink → Send as) and from the station's callsign in Settings (net logs, Sidekick, spoken IDs), which do not
+    Winlink → Send as) and from the station's callsign in Settings (net logs, Einstein, spoken IDs), which do not
     change. The station gives VARA this call (MYCALL) each time it connects; the window shows it ("VARA FM as W9XYZ-8").
 
   **The channel** (owner 2026-11-16; Help → VARA chat and files, side 2): **Join the channel** announces your call (a
@@ -347,7 +347,7 @@ you chose is remembered. Each column shows:
   digipeater in between relays the link. A digipeater is simply another station's VARA FM with its digipeater call
   set: in VARA FM, **Settings → VARA Setup → Digipeater**, a callsign with its own SSID (for example W9XYZ-4,
   different from the call that station chats with); VARA FM needs its licence key for this. Nothing is set in HAM
-  Sidekick on the digipeater itself: VARA FM relays by itself while it is running on the frequency.
+  Einstein on the digipeater itself: VARA FM relays by itself while it is running on the frequency.
   To use one: choose the station, and under the chat fill **🛰 Path to …** with the digipeater's call (two calls for
   two hops, the one nearest to you first; VARA FM allows at most two) and **Save path**. Every message, file and
   link test to that station then goes `CONNECT … via …`, and the station waits longer for the answer (each hop
@@ -388,7 +388,7 @@ you chose is remembered. Each column shows:
   Type a callsign and **Connect** (VARA FM can go via a digipeater), or **Call CQ**; tick **Answer calls** to accept
   calls. Type and press Enter to chat; **File** sends a file (up to 5 MB, checked on arrival). A modem transmits only
   when its radio's Transmit switch is on (Radios…), you are at the dashboard, and your license class (Settings →
-  Sidekick & AI) has data privileges at that radio's frequency; the window says why when it will not. **Abort** drops
+  Einstein & AI) has data privileges at that radio's frequency; the window says why when it will not. **Abort** drops
   the link at once. **Band plan → Ad hoc VARA → Use** sets a chat modem's radio to an open range (one button per
   modem that fits). "VARA is not answering" means that copy of VARA is not open on those ports, or another program
   (Winlink Express?) holds it. Files received are listed under the chat; the station opens one only when you press Open on the station PC.
@@ -451,7 +451,7 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   VARA chat) to the middle of a range that fits its modem (VARA HF or VARA FM): a CAT radio is tuned, otherwise its
   card is set and you set the radio. Both lists run from the highest band down, as the table does. Listen first.
 - **Plans** (Nets → Plans, owner 2026-11-15): the **band plan** is built in (your privileges for phone, data and CW
-  by license class, set in Settings → Sidekick & AI → Station agent, and what the ARRL band plan sets each segment aside for) and
+  by license class, set in Settings → Einstein & AI → Station agent, and what the ARRL band plan sets each segment aside for) and
   works with no internet. **Find local plans** searches for the clubs and EMCOMM groups within the distance you set,
   your state coordinator's band plan, and the public ARES, RACES and ICS-205 plans, and lists the frequencies they
   assign with a link to each source. Tick the ones that are right and **Keep** them: a kept channel names a radio's
@@ -478,7 +478,7 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   minute and an open band plan or Plans tab refreshes by itself.
 - **"Niner" for 9** (owner 2026-11-16): whenever the station says a digit on its own (a call phonetically, "Whiskey
   Niner…"; a frequency's digits, "point niner four"; a clock time, "zero niner zero five"; a signal report, "five
-  niner") the 9 is **Niner**; Sidekick is told the same. Counts stay words ("nineteen", "ninety"). A call heard with
+  niner") the 9 is **Niner**; Einstein is told the same. Counts stay words ("nineteen", "ninety"). A call heard with
   "Nine" is still recognised, and still counts as an ID.
 - **Find nets around the world** (owner 2026-11-14): in Nets → Find nets, **What you can hear around the world today**
   lists, for your antenna, height, power and today's solar flux, each part of the world (Japan, China, Russia,
@@ -509,44 +509,44 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   hour (night 80/40/160 m, morning 40/80/20, midday 20/17/15/40/12/10, late afternoon 20/40/17/15, evening 40/80/160/20)
   among the bands the antenna works on (**Inverted V…** on the card: its name and bands), tries frequencies
   remembered for this hour first, then sweeps the band's phone segment — cut to your license class's phone
-  privileges (Settings → Sidekick & AI → Station agent → license class; a General scans 3.800–4.000, 7.175–7.300, 14.225–14.350,
+  privileges (Settings → Einstein & AI → Station agent → license class; a General scans 3.800–4.000, 7.175–7.300, 14.225–14.350,
   21.275–21.450, and all of 160/17/12 m and 28.300–28.850) — in 3 kHz steps reading the S-meter, parks on
   anything about 2 S-units over the noise for 30 s, and stays while speech is transcribed there (until 2 minutes
   quiet). Frequencies with conversations are **remembered** (hours, days, count, calls heard; Pin or Hide them) in
   `data\scan_spots.json`. Turning the dial yourself pauses the scan for 30 minutes; when it stops, the radio goes
   back to where it was. Receive only: the only CAT commands are frequency, mode and the S-meter read.
-- **Sidekick, the station agent (Draft mode)**: an optional AI operator's assistant. Its own two-sided card (using it; its card, sending, set up) opens from **Help → Sidekick, the AI assistant**, **Settings → Sidekick & AI → Station agent → Sidekick card**, from **Card** on Sidekick's card, or at `/help/sidekick`; the PDF is `docs/HAM_Sidekick_Assistant_Quick_Reference_Card.pdf`. Its on-air name is yours to
-  choose (**Settings → Sidekick & AI → Station agent → On-air name**, default **Sidekick**); a name that is a phonetic-alphabet word
+- **Einstein, the station agent (Draft mode)**: an optional AI operator's assistant. Its own two-sided card (using it; its card, sending, set up) opens from **Help → Einstein, the AI assistant**, **Settings → Einstein & AI → Station agent → Einstein card**, from **Card** on Einstein's card, or at `/help/sidekick`; the PDF is `docs/HAM_Sidekick_Assistant_Quick_Reference_Card.pdf`. Its on-air name is yours to
+  choose (**Settings → Einstein & AI → Station agent → On-air name**, default **Einstein**); a name that is a phonetic-alphabet word
   (Echo, Victor…), a number or a procedure word (Portable, Mobile, Break, Over) is refused, because it is said right
   after the call and listeners would hear it as part of the call. **Off by default**: the operator turns it on in
-  **Settings → Sidekick & AI → Station agent → Enable the station agent**; then each radio's card has an Off / Draft switch, also Off
+  **Settings → Einstein & AI → Station agent → Enable the station agent**; then each radio's card has an Off / Draft switch, also Off
   until chosen. Switch it to **Draft** on a radio's card: after each transmission (once the frequency has been quiet
   1.2 s) it decides whether your station should speak and drafts exactly what it would say and how long it would
   wait, shown at the top of that radio's column; **What would you say now?** asks on demand, 👍/👎 rates a draft,
-  **▶ Hear it** plays the draft in Sidekick's voice in your browser. Draft never transmits; only **Send** (below), on a
+  **▶ Hear it** plays the draft in Einstein's voice in your browser. Draft never transmits; only **Send** (below), on a
   radio whose Transmit switch you turned on, says anything on the air.
-  - **Its turn, read by the station.** Like an operator on a net, Sidekick has a turn only when net control opens
+  - **Its turn, read by the station.** Like an operator on a net, Einstein has a turn only when net control opens
     check-ins to a station like yours, when someone calls it by call or name, or when it holds an answer and the floor
     opens. Outside those the station drafts "silent" itself, at once, without asking a model; when it asks, the model
     is offered only the moves that turn allows (replays of four real nets: the quick model, offered every move, tried
     to check in on 29 turns of one roll call).
-  - **Chat & prepared…** (the link on Sidekick's card) opens a window with four tabs:
+  - **Chat & prepared…** (the link on Einstein's card) opens a window with four tabs:
     - **Chat**: ask Grok anything, privately; nothing in the chat is transmitted. It is told this radio's frequency,
       band and your license privileges, the net on now (net control, who checked in with names and towns, traffic,
-      regulars not heard yet), the last transmissions heard, the last session of the same net, Sidekick's Library and,
+      regulars not heard yet), the last transmissions heard, the last session of the same net, Einstein's Library and,
       when you name two of your Sites, the terrain path between them. Tick **Think** for analysis (the thinking model,
       up to a minute). Ask it for words to say and it writes them for the air, checked against Part 97: **▶ Hear**
       them, then **Save to Prepared**.
     - **Prepared**: words ready to say. **New talk…** writes a training topic from the Library (a minute or two),
       split into parts that each fit one transmission and end "Back to net control" with your call. Read it, edit it,
       **▶ Hear** it (on this PC only), then **Approve these words** (an edit un-approves). With the radio on **Send**,
-      **Send now** says one part after the countdown, or **Arm on this radio** and on the net say "Sidekick, present
-      the topic", then "continue" for each next part: Sidekick says exactly the approved words.
-    - **Library**: what Sidekick reads: this station's manual and cards, plus your files, notes and web pages (kept on
+      **Send now** says one part after the countdown, or **Arm on this radio** and on the net say "Einstein, present
+      the topic", then "continue" for each next part: Einstein says exactly the approved words.
+    - **Library**: what Einstein reads: this station's manual and cards, plus your files, notes and web pages (kept on
       this PC only). **Search** shows what it would find for a question.
     - **Sites**: your EOC, shelters, repeaters, gateways, one a line: `Name | lat, lon | antenna height | note`.
   - **Send (says it on the air)**: a radio whose **Transmit** switch is on (Radios… → Transmit; off by default) gets a
-    third position on its Sidekick switch, **Send**. A draft that would speak (and passed every check) is shown with
+    third position on its Einstein switch, **Send**. A draft that would speak (and passed every check) is shown with
     **Sending in 3… Stop (Esc)**; the voice clip is made during the countdown. It is sent only while you are at the
     station: the dashboard must have seen your keyboard or mouse in the last 3 minutes (otherwise the card says
     "You are not at the station: Draft only"); Part 97 needs the control operator at the control point for a voice
@@ -564,20 +564,20 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
     station ("Any station holding traffic, traffic only. Check in now."; maritime or mobiles only; members; EOCs),
     when net control says check-ins come later ("Before I start taking check-ins…"), or when only "Please call now."
     was heard and the start of the call was lost. **Roll calls by place** ("Stations Colorado, check in now"): it
-    checks in only when the place is in **Settings → Sidekick & AI → Station agent → Your region**; with no region set it never
+    checks in only when the place is in **Settings → Einstein & AI → Station agent → Your region**; with no region set it never
     answers one. A net named after its state is not a roll call. **Emergency or priority traffic** ("break break",
     "emergency traffic") silences it on every net, flagged or not. In the net's own settings (Nets → the net →
-    **Sidekick on this net**) a members-, mobiles- or traffic-only net can be set to **never check in**.
+    **Einstein on this net**) a members-, mobiles- or traffic-only net can be set to **never check in**.
   - **Checked in, by what it hears**: when net control logs your call ("W9XYZ, thank you, you're in the log") or
     your own call is heard checking in (you on the air yourself, heard on another receiver), the radio counts as
     checked in to this net, even if the next station keys at once. Net control's "thank you" is not a question:
-    Sidekick does not answer it. Your own transmission is never a call to answer.
+    Einstein does not answer it. Your own transmission is never a call to answer.
   - **The card**: a **YOUR TURN** chip says where things stand (Check-ins open to you / CALLED: what was said /
     Answer ready / Checked in ✓ time and how / Listening: why not), with **I checked in myself** (or **Not checked
     in**), **Mute for this net** and **What would you say now?**. The last draft that would have spoken stays in
     view with its age and 👍/👎; the silent ones are counted, with the latest reason.
   - **No xAI key, or no internet**: the card says so in an amber band ("Offline rules: no xAI key on this PC…" with
-    **Add a key**, or "Offline rules: xAI not reachable…"), and Sidekick keeps taking its turns with the offline
+    **Add a key**, or "Offline rules: xAI not reachable…"), and Einstein keeps taking its turns with the offline
     rules below: it checks in when check-ins are open to it and acknowledges a call ("your control operator will
     answer you personally"); it cannot answer questions or think. Nothing waits for the network. With a key, the
     station checks every 2 minutes that xAI answers (one free request, the model list), so the card says "not
@@ -586,14 +586,14 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   - **Two speeds.** The **model** (Grok 4.20 fast by default: measured 1.0 s median on real nets) decides the turn:
     check-ins, acknowledgements, short answers. A question that needs thinking gets a short "copy your question, working on
     it, I'll report back" and goes to the **thinking model** (Grok 4.5 by default) while the net carries on. When the
-    answer is ready Sidekick waits for its place: when net control next asks for comments, questions or further
-    business it says "This is W9XYZ Sidekick, I have a response ready for the earlier inquiry from K7ABC"; told to go
+    answer is ready Einstein waits for its place: when net control next asks for comments, questions or further
+    business it says "This is W9XYZ Einstein, I have a response ready for the earlier inquiry from K7ABC"; told to go
     ahead, it reads the prepared answer word for word (the code puts the prepared words in; at most 70 words, checked
     against the FCC rules before it is ever offered). Outside a net it offers the answer once the frequency is open
     after the station that asked. Up to three questions are worked on at once and answered in the order asked (the card shows the next ones);
     if the thinking fails it says so at the next opening and that you will follow up. **Outside a net** (a conversation) a
     ready answer is given at a pause, not announced: after 3.5 s of quiet, when a station turns it over, or when someone
-    asks for it ("Sidekick, what did you find?"): "This is W9XYZ Sidekick, for K7ABC: …". The card shows the answer's state (working, ready, announced, failed).
+    asks for it ("Einstein, what did you find?"): "This is W9XYZ Einstein, for K7ABC: …". The card shows the answer's state (working, ready, announced, failed).
   - **Offline it keeps working, nothing waits.** When the model cannot be reached (no internet, a timeout of 8 s)
     fixed rules write the draft at once: check in when net control opens check-ins to a station like yours (also at
     "next station, please" during open check-ins; not when the call is for maritime, mobile, city or county stations,
@@ -610,13 +610,13 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
     (97.113(a)(2),(3)); no relayed messages (97.115); silent during emergency or priority traffic unless net control
     calls it, and while anyone transmits (97.101); under about 30 seconds; inside your license class's phone
     privileges (97.301/97.305); and the answer steps (no "response ready" without one, the prepared words only). A
-    draft that fails any check is shown struck through, **Would not send**, with the rule. Settings → Sidekick & AI → Station agent
+    draft that fails any check is shown struck through, **Would not send**, with the rule. Settings → Einstein & AI → Station agent
     holds the name, your first name, your check-in line, license class, the model, the thinking model and up to two
     models to compare on the same traffic. Drafts are kept in `data\agent_drafts.jsonl` (never committed).
   - **Replay a real net**: `python -m tools.sidekick_replay 20261110 --radio net --from 19:30 --to 20:30` (on the
     station; `--model rules` = the offline rules only; `--deep` also runs the thinking model) prints every draft it
     would have sent after the transmission it followed, every draft the checks stopped, and the model's latency.
-- **Sidekick's voice** (Settings → Sidekick's voice): xAI text-to-speech, **heard only in your browser, never on a
+- **Einstein's voice** (Settings → Einstein's voice): xAI text-to-speech, **heard only in your browser, never on a
   radio** — ▶ on each of xAI's voices plays the same audition (a check-in, "working on it", "I have a response ready",
   the answer); choose one and a speed (0.7–1.5), saved in the station's settings; **▶ Hear it** on a draft uses it.
   Your call is spoken letter by letter. Each clip is made once (xAI bills by characters) and kept in `data\tts\`;
@@ -631,13 +631,13 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   --from 21:00 --to 22:00 --limit 60`. The recordings leave the PC; xAI's price (2026-11-14) is $0.10 an hour of
   audio, and the minutes cap bounds the spend.
 - **AI costs** (Settings → AI costs; `station/aicost.py`): what this station spends on xAI (and the optional Anthropic
-  comparison). Every paid call (Sidekick's drafts and chat, net summaries, Find nets, Grok speech-to-text, Sidekick's
+  comparison). Every paid call (Einstein's drafts and chat, net summaries, Find nets, Grok speech-to-text, Einstein's
   voice) is kept in `data\ai_cost\<YYYY-MM>.jsonl`: today, the last 7 days and the month, by feature, and the last
   calls with their tokens, searches or audio. The cost is xAI's own figure from each answer when it gives one, else
   xAI's price list (marked *est*); a call with no known price is counted, not priced. Each station counts only its
   own calls; the bill in the xAI console is the true total.
   - **Monthly budget** (this station, optional): a header warning at 80%; at 100% the background features (net
-    summaries, Grok speech-to-text, the voice's pre-made clips) stop until the 1st. What you start (Sidekick replies,
+    summaries, Grok speech-to-text, the voice's pre-made clips) stop until the 1st. What you start (Einstein replies,
     chat, Find nets) still runs.
   - **The account** (optional): with an xAI **management key** (xAI console → Settings → Management Keys, made for
     your team; paste it under AI costs) the station reads the account's **credit left** and **this month's spend
@@ -804,7 +804,7 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   many words the live text and the accurate pass got wrong (0% = all right) and keeps a history, so a change
   to the radio, the cable or the settings can be judged by a number (`data\tests.jsonl`).
 - **Help** (top right): opens the reference cards in a new tab (`/help`, from `station/static/card.html`); the bar at
-  the top of each card reaches the other five (Sidekick, recording a conversation, VARA chat and files, the band plan,
+  the top of each card reaches the other five (Einstein, recording a conversation, VARA chat and files, the band plan,
   ad hoc channels). Print a card double-sided on letter paper (flip on the long edge) and keep it by the radio.
   **Business card ↗** at the end of that bar (needs the internet) opens the business card to hand out, kept in the
   Church of Jesus Christ EMCOMM project so both projects share one card: HAM Sidekick Station on one side, Church of
@@ -818,7 +818,7 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
     system); the **AI net summary**; **Learned fixes** (your ✎ Fix corrections); **Local names**.
   - **Winlink**: which Winlink Express folder (found automatically: `C:\RMS Express` and any other install) and
     which callsign account sends.
-  - **Sidekick & AI**: the xAI key, the **Station agent** (Sidekick), **Sidekick's voice**, **Grok speech-to-text**.
+  - **Einstein & AI**: the xAI key, the **Station agent** (Einstein), **Einstein's voice**, **Grok speech-to-text**.
   - **AI costs**, **This PC** (full speed and screen on, how many weeks of recordings and history to keep, what the
     station changes on this PC) and **Share** (settings with another station).
 

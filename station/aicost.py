@@ -2,14 +2,14 @@
 costing them" ... "can we see how many credits remain on the user's xAI account ... a link pointing to where they
 buy/up the credits").
 
-1. The ledger: every paid call the station makes (Sidekick's drafts and chat, the net summary, Find nets, Grok
-   speech-to-text, Sidekick's voice, the optional Anthropic comparison) is written to data/ai_cost/<YYYY-MM>.jsonl:
+1. The ledger: every paid call the station makes (Einstein's drafts and chat, the net summary, Find nets, Grok
+   speech-to-text, Einstein's voice, the optional Anthropic comparison) is written to data/ai_cost/<YYYY-MM>.jsonl:
    when, which feature, which model, the tokens / searches / audio seconds / characters, and the cost. The cost is
    xAI's own (`usage.cost_in_usd_ticks`, 1e10 ticks to the dollar) when the answer carries it, else estimated from
    PRICES (xAI's published prices, 2026-11-14) and marked "est". A call with no known price is counted, not priced.
 2. A monthly budget (optional, this station's own spend): a warning at WARN_AT of it; at 100% the background features
    (net summaries, Grok speech-to-text, the voice's pre-made clips) stop until the month turns. What the operator
-   starts (a Sidekick reply, chat, Find nets) still runs.
+   starts (a Einstein reply, chat, Find nets) still runs.
 3. The account (optional): with an xAI *management* key (Settings -> AI costs; console -> Settings -> Management
    Keys), every REFRESH_S the station reads the team's prepaid credit and this month's spend for the whole account
    (all stations) from xAI's Management API, and warns below the low-credit line. Only these read calls are ever
@@ -51,9 +51,9 @@ WEB_SEARCH_USD = 5.0 / 1000          # per web_search call
 STT_USD_PER_HOUR = 0.10              # Speech to Text (REST)
 TTS_USD_PER_MCHAR = 15.0             # Text to Speech, per 1M characters
 
-FEATURES = {"draft": "Sidekick drafts", "answer": "Sidekick (thinking model)", "chat": "Sidekick chat",
-            "topic": "Sidekick prepared topics", "net_summary": "Net summaries", "find_nets": "Find nets", "local_plans": "Local plans",
-            "speech_to_text": "Grok speech-to-text", "text_to_speech": "Sidekick's voice"}
+FEATURES = {"draft": "Einstein drafts", "answer": "Einstein (thinking model)", "chat": "Einstein chat",
+            "topic": "Einstein prepared topics", "net_summary": "Net summaries", "find_nets": "Find nets", "local_plans": "Local plans",
+            "speech_to_text": "Grok speech-to-text", "text_to_speech": "Einstein's voice"}
 BACKGROUND = ("net summaries", "Grok speech-to-text", "the voice's pre-made clips")
 
 _current: "Costs | None" = None
@@ -327,7 +327,7 @@ class Costs:
                         "say": f"This station's AI spend this month is ${spent:.2f} of its ${b:.2f} budget."})
         if self.out_of_credit:
             out.append({"kind": "credit", "level": "bad", "buy": BUY_URL,
-                        "say": "xAI refused a request: the account looks out of credit. Summaries, Sidekick and Find "
+                        "say": "xAI refused a request: the account looks out of credit. Summaries, Einstein and Find "
                                "nets need credit to work."})
         low = float(self.cfg.get("low_credit_usd") or 0)
         cr = self.account.get("credit_usd")

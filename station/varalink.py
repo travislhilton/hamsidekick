@@ -17,7 +17,7 @@ separate radios/services. We may have multiple VARA sessions".
   Every modem runs on its own: several chat sessions at once, each with its own log and received files.
 * TRANSMITTING (Part 97): every transmission a modem can make for us passes its tx_allowed():
     - its radio's own Transmit switch (Radios... -> Transmit, station/ptt.py),
-    - the operator at the dashboard (keyboard or mouse in the last few minutes, as Sidekick's Send mode),
+    - the operator at the dashboard (keyboard or mouse in the last few minutes, as Einstein's Send mode),
     - the license class's data privileges and the band plan at that radio's frequency (station/bandplan.py).
   Listening (VARA answers calls by itself) is switched off the moment any of those fails. No beacon, no automatic
   relay, no auto-reply: a CQ or a connect is the operator's click. Never encrypted (97.113).
@@ -183,7 +183,7 @@ class Modem:
             return False, "you are not at the dashboard (VARA transmits only with you here)"
         cls = ((getattr(agent, "cfg", None) or {}).get("license_class") or "").lower() or None
         if not cls:
-            return False, "set your license class (Settings → Sidekick & AI)"
+            return False, "set your license class (Settings → Einstein & AI)"
         f = r.get("freq_mhz")
         if not f:
             return False, "set the radio's frequency so its privileges can be checked"

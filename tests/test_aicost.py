@@ -60,7 +60,7 @@ def test_every_xai_call_goes_in_the_ledger(tmp_path, monkeypatch):
     netfind._post("xai-k", {"model": "grok-4.20-0309-non-reasoning"}, 10)
     v = c.view()
     by = {x["what"]: x for x in v["by"]}
-    assert by["Sidekick drafts"]["usd"] == pytest.approx(0.003) and not by["Sidekick drafts"]["est"]
+    assert by["Einstein drafts"]["usd"] == pytest.approx(0.003) and not by["Einstein drafts"]["est"]
     assert by["Find nets"]["est"] == 1 and by["Find nets"]["usd"] == pytest.approx(
         (9000 * 1.25 + 800 * 2.5) / 1e6 + 0.1, abs=1e-4)
     assert v["calls"] == 2 and v["month"] == pytest.approx(v["today"])

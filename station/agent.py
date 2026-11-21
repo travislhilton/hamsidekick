@@ -1,10 +1,11 @@
-"""The station agent ("Sidekick" by default; the operator names it), DRAFT mode: it listens to a radio and writes, on
+"""The station agent ("Einstein" by default; the operator names it), DRAFT mode: it listens to a radio and writes, on
 screen, what it would say and when. It never transmits (station/cat.py still refuses PTT; nothing here can key a radio).
 
-The on-air name is the operator's (Settings → Station agent → On-air name). It is checked before it is saved: a name
+The on-air name is the operator's (Settings → Einstein & AI → Station agent → On-air name). It is checked before it is saved: a name
 that is a phonetic-alphabet word ("Echo"), a number, or a word that changes a call's meaning on the air ("Portable",
 "Mobile", "Mayday", "Break") is refused, because "W9XYZ Echo" is heard as a different call (owner 2026-11-10: the
-first name, Echo, sounded like a call with an extra E; renamed Sidekick, saved "Echo" settings migrate once).
+first name, Echo, sounded like a call with an extra E; renamed Sidekick, then Einstein (owner 2026-11-21); a saved "Echo"
+or "Sidekick" default migrates once).
 
 Interactive, never queued (owner 2026-11-10): a draft is written as the frequency goes quiet. When the model cannot be
 reached (no internet, a timeout) the OFFLINE RULES write the draft at once instead (check in when net control calls
@@ -15,7 +16,7 @@ Per radio the agent remembers, across a restart (data/agent_state.json), when it
 disclosed itself in the current net and whether it has checked in, so a restart mid-net does not check in twice.
 TWO SPEEDS (owner 2026-11-10). The quick model decides every turn in well under a second: check-ins, acknowledgements,
 short answers. A question that needs thinking gets a short "working on it" (kind working) and goes to a slower
-reasoning model in the background while the net carries on. When the answer is ready, Sidekick waits for its place in
+reasoning model in the background while the net carries on. When the answer is ready, Einstein waits for its place in
 the net: when net control next asks for input ("any comments", "anything further for the net") it says "This is
 <call> <name>, I have a response ready for the earlier inquiry from <station>" (kind ready); told to go ahead, it reads
 the prepared answer word for word (kind answer; the code puts the prepared words in, the quick model never
@@ -62,8 +63,8 @@ from datetime import datetime, timedelta, timezone
 from . import aicost, secrets
 from .online import Online, is_network_error
 
-DEFAULT_NAME = "Sidekick"
-OLD_DEFAULT_NAMES = {"echo"}       # names an earlier version saved as its default: migrated once to DEFAULT_NAME
+DEFAULT_NAME = "Einstein"
+OLD_DEFAULT_NAMES = {"echo", "sidekick"}   # names an earlier version saved as its default: migrated once to DEFAULT_NAME
 RULES = "rules"                    # the offline drafter's model id
 DEFAULT_MODEL = "grok-4.20-0309-non-reasoning"     # measured 2026-11-10: 0.55 s; grok-4.3..4.7 took 3-11 s
 MODELS = {
@@ -233,7 +234,7 @@ _CODE = re.compile(r"\b[A-Z0-9]{5}(\s+[A-Z0-9]{5}){2,}\b")      # five-letter gr
 
 
 def privileges(freq_mhz, mode, license_class) -> tuple[bool | None, str]:
-    """(ok, why) for Sidekick's voice. None = can't tell (no frequency or no class set). The rules live in
+    """(ok, why) for Einstein's voice. None = can't tell (no frequency or no class set). The rules live in
     station/bandplan.py (phone, data and CW for every class); a 60 m channel is USB only."""
     from . import bandplan
     ok, why = bandplan.privileges(freq_mhz, "phone", license_class)
@@ -537,7 +538,7 @@ def facts() -> list[str]:
 
 
 def allowed_kinds(ctx: dict, checked_in: bool, pending: dict | None, text: str) -> tuple[list[str], str]:
-    """The moves open to the station after this transmission, read by the station itself (owner 11-10: Sidekick fits
+    """The moves open to the station after this transmission, read by the station itself (owner 11-10: Einstein fits
     the net's protocol). Only these are offered to the model; none = the station stays silent without asking it.
     11-10 replays of four real nets: offered every move, the quick model tried to check in on 29 turns of one roll
     call although told check-ins were not open."""
@@ -672,7 +673,7 @@ class Agent:
         except (OSError, ValueError):
             pass
         if saved is not None and str(self.cfg.get("name") or "").strip().lower() in OLD_DEFAULT_NAMES | {""}:
-            self.cfg["name"] = DEFAULT_NAME                     # the old default, never chosen: becomes Sidekick
+            self.cfg["name"] = DEFAULT_NAME                     # the old default, never chosen: becomes Einstein
             try:
                 self._save()
             except OSError:
@@ -693,11 +694,11 @@ class Agent:
         self._lib_lock = threading.Lock()
         self._to_send: dict[str, tuple] = {}
 
-    # ----- is the model reachable? (Sidekick's card says so before a turn needs it) -----
+    # ----- is the model reachable? (Einstein's card says so before a turn needs it) -----
     PROBE_EVERY_S = 120
 
     def probe(self) -> dict | None:
-        """One free request (the model list) when Sidekick is on, a key is set and a radio is in Draft; updates the
+        """One free request (the model list) when Einstein is on, a key is set and a radio is in Draft; updates the
         online state the card shows. Returns the new mode_now when it changed."""
         if not self.cfg.get("enabled") or not any(self.mode(r) in ("draft", "send") for r in self.st.radios):
             return None
@@ -866,15 +867,15 @@ class Agent:
                 "mode_now": self._mode_now(keys)}
 
     def _mode_now(self, keys: dict) -> dict:
-        """How Sidekick writes its drafts now, in plain words: with the model, or with its offline rules and why."""
+        """How Einstein writes its drafts now, in plain words: with the model, or with its offline rules and why."""
         prov = MODELS.get(self.cfg.get("model") or DEFAULT_MODEL, {}).get("provider", "xai")
         if not keys.get(prov):
-            return {"how": "rules", "why": "no xAI key", "say": "Offline rules: no xAI key on this PC. Sidekick checks in "
+            return {"how": "rules", "why": "no xAI key", "say": "Offline rules: no xAI key on this PC. Einstein checks in "
                     "when check-ins are open to it and acknowledges a call; it cannot answer questions."}
         o = self.online.get(prov)
         if o is not None and o.online is False:
             return {"how": "rules", "why": "offline", "say": f"Offline rules: xAI not reachable ({o.last_error}). "
-                    "Sidekick checks in and acknowledges a call; questions wait for the operator. It tries again by itself."}
+                    "Einstein checks in and acknowledges a call; questions wait for the operator. It tries again by itself."}
         return {"how": "model", "why": "", "say": ""}
 
     # ----- hearing -----
@@ -975,7 +976,7 @@ class Agent:
         ln, entries, lrules = self._local_names(net.get("name"))
         invited, inv_why = checkin_invited(rows, self.cfg.get("region") or "", net.get("name") or "")
         if invited and net.get("checkins") == "none":
-            invited, inv_why = False, "this net is set to never check in (Nets → the net → Sidekick)"
+            invited, inv_why = False, "this net is set to never check in (Nets → the net → Einstein)"
         lastrow0 = rows[-1] if rows else {}
         if (not speculate and rows and call in (lastrow0.get("callsigns") or []) and acknowledged(lastrow0.get("text", ""))
                 and st.get("checked_in") != contact):            # net control logged this station: checked in
@@ -1155,7 +1156,7 @@ class Agent:
         self.st.bus.publish("agent", {"turn": {rid: self.turn(rid)}})
 
     def library(self):
-        """Sidekick's knowledge library (station/knowledge.py): this project's docs + the operator's own material."""
+        """Einstein's knowledge library (station/knowledge.py): this project's docs + the operator's own material."""
         with self._lib_lock:                                # several answers think at once: one library
             if self._lib is None:
                 from .knowledge import Library
@@ -1600,7 +1601,7 @@ class Agent:
         elif a == "send":                                       # the operator sends one prepared part now
             rid, tid, i = str(body.get("radio") or ""), str(body.get("id") or ""), int(body.get("seg") or 0)
             if self.mode(rid) != "send":
-                raise ValueError("switch this radio's Sidekick to Send first (it needs the radio's Transmit switch)")
+                raise ValueError("switch this radio's Einstein to Send first (it needs the radio's Transmit switch)")
             t = T.get(tid)
             from .topics import fingerprint
             if t.get("approved") != fingerprint(t.get("segments") or []):

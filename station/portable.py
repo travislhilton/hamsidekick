@@ -6,11 +6,11 @@ Owner 2026-11-13: set a second station up like the first by exporting its settin
 What travels (schema hamsidekick-settings/1, one JSON file):
 * the net schedule, each net with the radio it used named by a HINT (the source radio's name, band and mode), because a
   radio's id means nothing on another PC;
-* Sidekick's choices (license class, models, voice, speed) and, only when the exporter ticks "include my Sidekick
+* Einstein's choices (license class, models, voice, speed) and, only when the exporter ticks "include my Einstein
   identity", its on-air name, check-in line, operator name, station and region;
 * the local names (the area pack).
 What never travels: API keys, the call sign, radios and their sound inputs / PTT / CAT, history, recordings, which
-radios Sidekick is on, and whether Sidekick is switched on.
+radios Einstein is on, and whether Einstein is switched on.
 
 Importing never deletes: a net with the same name and start time is updated (it keeps its id, its clash settings and, when
 the import names no radio for it, its radio), other nets are added, nets only here stay. The current files are copied to

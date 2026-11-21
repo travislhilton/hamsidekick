@@ -54,7 +54,7 @@ def items(card: str) -> list[dict]:
     return out
 
 
-# Sidekick's card: each card part (its letter or title) -> the id group
+# Einstein's card: each card part (its letter or title) -> the id group
 SIDEKICK_PARTS = (("a ·", "switch"), ("b ·", "itself"), ("c ·", "ask"), ("the your turn", "chip"), ("set up", "setup"),
                   ("when something", "wrong"))
 SIDEKICK_BUTTON_ROWS = ("i checked in myself", "mute for this net")

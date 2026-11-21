@@ -1,4 +1,4 @@
-"""Grok speech-to-text as a compared engine (never queued) and Sidekick's voice (for the operator's ears only)."""
+"""Grok speech-to-text as a compared engine (never queued) and Einstein's voice (for the operator's ears only)."""
 import copy
 import json
 import os

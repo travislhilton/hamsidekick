@@ -69,8 +69,8 @@ header #nightBtn[aria-pressed=true]{background:#fff;color:var(--hdr)}
   main{flex:1;min-height:0;padding:8px 12px 10px;display:flex;flex-direction:column}
   #radios{flex:1;min-height:0;display:flex;flex-direction:column;align-items:stretch}
   .rcol{display:none;flex:1;min-height:0}.rcol.sel{display:flex;overflow-y:auto;overscroll-behavior:contain}
-  /* the column scrolls as a whole when what sits above the log (the power notice, nets, Sidekick's card) is taller
-     than the screen: before 2026-11-12 the tabs under Sidekick's card were out of reach on a phone */
+  /* the column scrolls as a whole when what sits above the log (the power notice, nets, Einstein's card) is taller
+     than the screen: before 2026-11-12 the tabs under Einstein's card were out of reach on a phone */
   .rcol>.logbox{flex:1 0 auto;min-height:55dvh;display:flex;flex-direction:column}
 
   .feed{flex:1;min-height:0;max-height:none}
@@ -628,13 +628,13 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
   <button id="openReadout" title="The EOC's situation report: approve it, then read it on the net from a large-type card" onclick="window.open('/readout','_blank')">Read-out</button>
   <span class="hsep" aria-hidden="true"></span>
   <button id="openRadios" title="Add, replace or remove a radio and choose its sound input">Radios…</button>
-  <button id="openSettings" title="Your station, nets, Winlink, Sidekick and AI, AI costs, this PC">Settings</button>
+  <button id="openSettings" title="Your station, nets, Winlink, Einstein and AI, AI costs, this PC">Settings</button>
   <span class="hgrow" aria-hidden="true"></span>
   <label class="small hq" title="Explain Q-codes, prowords and abbreviations (Roger, QSO, QSY…) under each transmission"><input type="checkbox" id="explain" checked style="width:auto"> <span class="xl">Explain radio terms</span><span class="xs">Explain terms</span></label>
   <button id="nightBtn" class="hq" aria-pressed="false" title="Night colours: all red on black, to keep your night vision (again for normal colours)" onclick="setDisplay('theme',DISP.theme==='night'?(DISP.prevTheme||'auto'):(DISP.prevTheme=DISP.theme,'night'))">☾ Night</button>
   <button id="fullScr" class="hq" type="button" aria-pressed="false" title="Fill the whole screen with the dashboard (Esc or this button again to leave)" hidden>Full screen</button>
   <button id="openPhone" class="hq" title="Show a QR code: point a phone's camera at it to open this dashboard on the phone">Open on phone</button>
-  <a class="helpbtn" href="/help" target="_blank" rel="noopener" title="How to use the station: the reference cards (the station, Sidekick, recording a conversation, VARA chat and files, the band plan, ad hoc channels; printable) and the business card to hand out">Help</a>
+  <a class="helpbtn" href="/help" target="_blank" rel="noopener" title="How to use the station: the reference cards (the station, Einstein, recording a conversation, VARA chat and files, the band plan, ad hoc channels; printable) and the business card to hand out">Help</a>
   </span>
   </div>
 </header>
@@ -652,7 +652,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
     <button type="button" role="tab" data-stab="station">Station</button>
     <button type="button" role="tab" data-stab="nets">Nets</button>
     <button type="button" role="tab" data-stab="winlink">Winlink</button>
-    <button type="button" role="tab" data-stab="ai">Sidekick &amp; AI</button>
+    <button type="button" role="tab" data-stab="ai">Einstein &amp; AI</button>
     <button type="button" role="tab" data-stab="costs">AI costs</button>
     <button type="button" role="tab" data-stab="pc">This PC</button>
     <button type="button" role="tab" data-stab="share">Share</button>
@@ -663,7 +663,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
     <h4 class="sec">You and your station <span class="stag">Save below</span></h4>
     <div class="srow"><label class="sl" for="setCall">Your callsign</label><div class="sc">
       <input id="setCall" name="callsign" maxlength="11" autocomplete="off"><span class="ferr" data-ferr="callsign"></span>
-      <div class="sh">The station's name at the top of the page, and the call Sidekick identifies with.</div></div></div>
+      <div class="sh">The station's name at the top of the page, and the call Einstein identifies with.</div></div></div>
     <div class="srow"><label class="sl" for="setName">Your name</label><div class="sc">
       <input id="setName" name="name" maxlength="80" style="text-transform:none"><span class="ferr" data-ferr="name"></span>
       <div class="sh">The operator's name on the Winlink forms.</div></div></div>
@@ -687,7 +687,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
       <details class="why"><summary>Why?</summary><div>On a repeater or simplex net, a callsign licensed farther away than this, heard only once, that the two transcription passes did not read alike and that has no name or earlier check-in with it is shown struck through and not counted.</div></details></div></div>
     <div class="srow"><span class="sl">AI net summary</span><div class="sc">
       <label class="chk"><input type="checkbox" name="ai_summary"> A short AI paragraph at the top of each net's minutes</label>
-      <div class="sh">Needs the xAI key (Sidekick &amp; AI). Well under a cent a net.</div>
+      <div class="sh">Needs the xAI key (Einstein &amp; AI). Well under a cent a net.</div>
       <details class="why"><summary>Why?</summary><div>Written about 10 minutes after each net ends, from its minutes and transcript, shown above the summary lines and put in the ICS-213. Off: the summary lines only (written by the station, no internet).</div></details></div></div>
     <h4 class="sec">Learned fixes <span class="stag">changes at once</span></h4>
     <div id="learnSet" class="small"></div>
@@ -707,12 +707,12 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
     <div id="wlListSet" class="small"></div>
   </section>
 
-  <section class="spanel" data-spanel="ai" role="tabpanel" aria-label="Sidekick and AI" hidden>
+  <section class="spanel" data-spanel="ai" role="tabpanel" aria-label="Einstein and AI" hidden>
     <h4 class="sec">xAI key <span class="stag">own Save button</span></h4>
     <div id="keySet" class="small"></div>
-    <h4 class="sec">Station agent (Sidekick) <span class="stag">own Save button</span> <a class="small" href="/help/sidekick" target="_blank" rel="noopener" style="font-weight:400">Sidekick card</a></h4>
+    <h4 class="sec">Station agent (Einstein) <span class="stag">own Save button</span> <a class="small" href="/help/sidekick" target="_blank" rel="noopener" style="font-weight:400">Einstein card</a></h4>
     <div id="agentSet" class="small"></div>
-    <h4 class="sec">Sidekick's voice <span class="stag">own Save button</span></h4>
+    <h4 class="sec">Einstein's voice <span class="stag">own Save button</span></h4>
     <div id="voiceSet" class="small"></div>
     <h4 class="sec">Grok speech-to-text (compared) <span class="stag">own Save button</span></h4>
     <div id="grokSet" class="small"></div>
@@ -760,7 +760,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
 <nav id="netsTabs" class="ntabs" role="tablist" aria-label="Nets"><button role="tab" data-ntab="schedule">Schedule</button><button role="tab" data-ntab="history">History</button><button role="tab" data-ntab="analysis">Analysis</button><button role="tab" data-ntab="minutes">Minutes</button><button role="tab" data-ntab="open">Still open</button><button role="tab" data-ntab="plans" title="Band plans, the area's clubs and the ARES / RACES communications plans">Plans</button></nav>
 <div id="netsBody" class="dbody" role="tabpanel"></div></dialog>
 <dialog id="searchDlg" class="big" aria-labelledby="searchTitle"><div class="dhead"><h3 id="searchTitle">Search</h3><button id="searchClose" class="x" aria-label="Close">✕</button></div><div id="searchBody" class="dbody"></div></dialog>
-<dialog id="skDlg" class="big" aria-labelledby="skTitle"><div class="dhead"><h3 id="skTitle">Sidekick</h3><label class="small">Radio <select id="skRadio"></select></label><button id="skClose" class="x" aria-label="Close">✕</button></div>
+<dialog id="skDlg" class="big" aria-labelledby="skTitle"><div class="dhead"><h3 id="skTitle">Einstein</h3><label class="small">Radio <select id="skRadio"></select></label><button id="skClose" class="x" aria-label="Close">✕</button></div>
 <div class="tabs" id="skTabs" style="padding:0 16px" role="tablist"><button data-sktab="chat" role="tab">Chat</button><button data-sktab="prep" role="tab">Prepared</button><button data-sktab="lib" role="tab">Library</button><button data-sktab="sites" role="tab">Sites</button></div>
 <div id="skBody" class="dbody"></div></dialog>
 <dialog id="phoneDlg"><div id="phoneBody"></div><div class="row"><button onclick="$('phoneDlg').close()">Close</button></div></dialog>
@@ -1145,7 +1145,7 @@ function txBlock(r){const t=r.tx||{ptt:"none"},p=t.ptt||"none";
    ${p==="rts"||p==="dtr"?`<label title="Its own COM port, never the CAT port.">PTT port ${sel("port",t.port,catOpt(t.port))}</label>`:""}
    ${p!=="none"?`<label title="Where the transmitted audio goes: the interface's output (speaker) side.">Audio out ${sel("out",t.out,`<option value="">— choose —</option>${t.out&&!os.includes(t.out)?`<option selected>${esc(t.out)}</option>`:""}${os.map(o=>`<option${o===t.out?" selected":""}>${esc(o)}</option>`).join("")}`)}</label>
      <label title="The transmitter is let go after this long, whatever happens.">Time limit, s <input data-tx="max_s" value="${esc(t.max_s||60)}" inputmode="numeric" style="width:4em"></label>
-     <label class="txsw" title="Off by default. While off, nothing can key this radio. Sidekick still only drafts; this switch is what a future 'send' will need."><input type="checkbox" data-tx="enabled"${t.enabled?" checked":""}> Allow transmitting on this radio</label>
+     <label class="txsw" title="Off by default. While off, nothing can key this radio. Einstein still only drafts; this switch is what a future 'send' will need."><input type="checkbox" data-tx="enabled"${t.enabled?" checked":""}> Allow transmitting on this radio</label>
      <label title="How loud the radio is driven (0.02-1.0). Set it with the test tone into a dummy load, watching deviation / ALC on the radio or a service monitor.">Drive level <input data-tx="level" value="${esc(t.level??0.5)}" inputmode="decimal" style="width:4em"></label>
      <label title="PTT on, then the voice: the transmitter's ramp and a repeater's receiver.">Lead, s <input data-tx="lead_s" value="${esc(t.lead_s??0.35)}" inputmode="decimal" style="width:4em"></label>
      <label title="After the voice, before PTT lets go.">Tail, s <input data-tx="tail_s" value="${esc(t.tail_s??0.25)}" inputmode="decimal" style="width:4em"></label>`:""}
@@ -1153,7 +1153,7 @@ function txBlock(r){const t=r.tx||{ptt:"none"},p=t.ptt||"none";
      <button data-txtest="tone" data-rid="${esc(r.id)}" title="5 s 1 kHz tone, then your call sign by voice. Saved settings are used (Save first after changing them), except Drive level, which is taken from the box above.">Tone + ID</button>
      <button data-txtest="phrase" data-rid="${esc(r.id)}" title="Your call sign and a test phrase by voice.">Phrase + ID</button>
      <button data-txstop="1" data-rid="${esc(r.id)}">Stop</button> <span class="muted" id="txr-${esc(r.id)}"></span></div>
-     <p class="small muted">After a test: raise or lower Drive level until deviation is right (about 3 kHz on FM, ALC just touching on SSB), Save, test again. Saving restarts the station. The test needs this page open and in use (you at the PC); Esc stops it.</p>`:""}${p!=="none"?`<p class="small muted">Off by default: with the switch off nothing can key this radio. Sidekick still only drafts. A voice transmission needs a control operator at the station (FCC 97.109) and your call sign (97.119).</p>`:""}</details>`}
+     <p class="small muted">After a test: raise or lower Drive level until deviation is right (about 3 kHz on FM, ALC just touching on SSB), Save, test again. Saving restarts the station. The test needs this page open and in use (you at the PC); Esc stops it.</p>`:""}${p!=="none"?`<p class="small muted">Off by default: with the switch off nothing can key this radio. Einstein still only drafts. A voice transmission needs a control operator at the station (FCC 97.109) and your call sign (97.119).</p>`:""}</details>`}
 function renderRadiosDlg(){
   const ins=RD.inputs||[],used=new Set(RD.list.map(r=>r.device));
   const opt=(cur)=>{const have=ins.includes(cur);
@@ -1183,7 +1183,7 @@ function renderRadiosDlg(){
     if(el.dataset.cat==="port"){r.cat=el.value?{...(r.cat||{civ:"A4"}),port:el.value}:null;renderRadiosDlg()}else if(r.cat)r.cat.civ=el.value.trim().toUpperCase()};
   for(const el of $("radiosBody").querySelectorAll("[data-tx]"))el.onchange=()=>{const r=RD.list[+el.closest(".rad").dataset.i],k=el.dataset.tx;
     r.tx=r.tx||{ptt:"none",pin:3,max_s:60,enabled:false};
-    if(k==="enabled"){if(el.checked&&!confirm("Allow the station to key this radio's transmitter? Nothing sends yet (Sidekick only drafts), but once something does, it can transmit on this radio. A control operator must be at the station."))el.checked=false;r.tx.enabled=el.checked;renderRadiosDlg();return}
+    if(k==="enabled"){if(el.checked&&!confirm("Allow the station to key this radio's transmitter? Nothing sends yet (Einstein only drafts), but once something does, it can transmit on this radio. A control operator must be at the station."))el.checked=false;r.tx.enabled=el.checked;renderRadiosDlg();return}
     r.tx[k]=k==="pin"||k==="max_s"?+el.value:el.value;
     if(k==="ptt"){if(el.value==="none")r.tx.enabled=false;                 // same box as the radio's sound input: pick it
       const h=(RD.hids||[]).find(x=>x.sound&&x.sound===r.device);if(el.value==="cm108"&&!r.tx.hid&&h)r.tx.hid=h.path;
@@ -1793,7 +1793,7 @@ function renderCost(d){
     <div class="row" style="margin-top:6px"><label class="inl">Monthly budget for this station $<input id="costBudget" type="number" min="0" step="1" style="width:6em" value="${d.budget_usd||""}" placeholder="none"></label>
       <label class="inl">Warn when the account's credit is below $<input id="costLow" type="number" min="0" step="1" style="width:5em" value="${d.low_credit_usd||""}" placeholder="off"></label>
       <button type="button" id="costSave">Save</button> <span class="small" id="costMsg"></span></div>
-    ${howIt(`A warning at 80% of the budget. At 100%, ${esc(d.background.join(", "))} stop until the 1st; what you start yourself (Sidekick replies, chat, Find nets) still runs. Costs come from xAI's own figure on each answer where it gives one, otherwise from xAI's price list (“est”). The bill on the xAI console is the true total.`,"How the budget works")}`;
+    ${howIt(`A warning at 80% of the budget. At 100%, ${esc(d.background.join(", "))} stop until the 1st; what you start yourself (Einstein replies, chat, Find nets) still runs. Costs come from xAI's own figure on each answer where it gives one, otherwise from xAI's price list (“est”). The bill on the xAI console is the true total.`,"How the budget works")}`;
   $("costSave").onclick=async()=>{try{renderCost(await post("/api/aicost",{budget_usd:+$("costBudget").value||0,low_credit_usd:+$("costLow").value||0}));$("costMsg").innerHTML='<span class="ok">Saved.</span>'}catch(e){$("costMsg").innerHTML=`<span class="bad">${esc(e.message)}</span>`}};
   const r=$("costRefresh");if(r)r.onclick=async()=>{r.disabled=true;r.textContent="Asking xAI…";try{renderCost(await post("/api/aicost/refresh",{}))}catch(e){r.textContent=e.message}};
 }
@@ -2249,8 +2249,8 @@ setInterval(()=>{document.querySelectorAll("[data-vnext]").forEach(x=>{x.textCon
 // each with a line saying what is inside; what you open stays open in this browser. -----
 const SSEC_HINT={"You and your station":"callsign, name, grid square","Display":"colours, clock","Net alerts":"reminders before each net",
   "Logging nets":"VHF/UHF reach, AI net summary","Learned fixes":"corrections the station has learned","Local names":"names and places for the transcription",
-  "Winlink Express on this PC":"folder, Send as","Winlink gateway lists":"gateways from Winlink Express","xAI key":"the key for Sidekick, net summaries and Find nets",
-  "Station agent (Sidekick)":"enable it, on-air name, check-in line, license class","Sidekick's voice":"how Sidekick sounds on the air",
+  "Winlink Express on this PC":"folder, Send as","Winlink gateway lists":"gateways from Winlink Express","xAI key":"the key for Einstein, net summaries and Find nets",
+  "Station agent (Einstein)":"enable it, on-air name, check-in line, license class","Einstein's voice":"how Einstein sounds on the air",
   "Grok speech-to-text (compared)":"a second transcription to compare","Power and speed":"full speed and screen on during nets","This PC":"what the station changes on this PC"};
 (()=>{const dlg=$("settings");if(!dlg)return;
   dlg.querySelectorAll("section.spanel").forEach(pan=>{const heads=[...pan.querySelectorAll("h4.sec")];if(heads.length<2)return;
@@ -2497,12 +2497,12 @@ function renderBP(){
     const fitting=x=>vms.filter(m=>m.cfg.kind==="hf"?x.mode.startsWith("VARA HF"):x.mode==="VARA FM"&&(m.cfg.fm_width!=="wide"||x.wide));
     const useNote=k!=="data"?"":vms.length?`<p class="small"><b>Use</b> sets that radio to the middle of the range (a CAT radio is tuned; otherwise set the radio by hand), then open its <b>VARA chat</b>. Your chat modems: ${vms.map(m=>`<b>${esc(m.name)}</b> (VARA ${m.cfg.kind==="hf"?"HF":"FM "+(m.cfg.fm_width==="wide"?"wide":"narrow")})`).join(", ")}. VARA FM <b>wide</b> needs about 25 kHz of room: only the channels marked <b>narrow &amp; wide</b> fit it.</p>`:'<p class="small muted">To tune from here, set up a VARA modem for chat on a data radio first (its card → VARA…).</p>';
     const intro=`<p class="small">${k==="voice"?"Where you can call for an <b>ad hoc voice</b> contact":"Where you can start an <b>ad hoc VARA</b> session"} within your ${esc(cls||"")} privileges: no plan sets it aside for anything else${k==="data"?" (a plan sets it aside for data, or no plan names any use: <b>unplanned</b>)":""}, and it stays clear of every channel in the band plan, your local plans' included. Each range is where your dial goes. <b>Unplanned</b>: no plan names any use there. Listen first and ask if the frequency is in use.</p><details class="small muted"><summary>How it is worked out</summary>Every stretch of the band plan table is checked. It is left out when any plan sets it aside for beacons, satellites, repeater inputs or outputs, links, ATV or experiments; ${k==="voice"?"for data; or, on VHF/UHF, for weak-signal SSB / CW; or for CW only":"for CW or weak signal on HF; or for any use other than data (a stretch no plan names is kept: unplanned)"}. Every channel (calling frequencies, FT8, beacons, APRS, repeaters, your plans' channels) is cut out with 3 kHz either side on HF, 15 kHz on 2 m and 1.25 m, 25 kHz on 70 cm. On HF, 3 kHz is kept from each edge so the whole ${k==="voice"?"SSB":"2.75 kHz VARA"} signal stays inside. 60 m (channels only), 33 cm and 23 cm are not covered.</details>`;
-    if(!cls)return `<p class="warnc">Set your license class (Settings → Sidekick &amp; AI) to see where you may transmit.</p>`;
+    if(!cls)return `<p class="warnc">Set your license class (Settings → Einstein &amp; AI) to see where you may transmit.</p>`;
     const mine=adMine(k,fitting);
     if(!rows.length)return intro+mine+'<p class="muted">Nothing open on these bands.</p>';
     const by={};rows.forEach(x=>(by[x.band]=by[x.band]||[]).push(x));
     return intro+useNote+mine+Object.entries(by).map(([band,xs])=>`<div class="bpband"><h4>${esc(band)}</h4><span class="small muted">${xs.length} open</span></div><div class="nlistwrap"><table class="nlist bpt bpopen"><thead><tr><th>MHz · mode</th><th>What the plans say there</th></tr></thead><tbody>${xs.map(x=>{const on=tuned.filter(t=>bpRangeHit(x,t));return `<tr class="${on.length?"tuned":""}"${on.length?` data-bptuned="${esc(on.map(t=>t.id).join(" "))}"`:""}><td class="f">${bpOpenF(x)}<div class="small muted">${esc(x.mode)} · ${bpOpenW(x)}</div></td><td class="small">${on.length?`<div class="noprint">${on.map(t=>bpTag(t,false)).join(" ")}</div>`:""}${x.unplanned?'<span class="np k-ready" style="padding:0 6px">unplanned</span>':esc(x.uses.join("; "))}${x.auto?`<div class="warnc">${esc(x.note)}</div>`:x.shared?`<div class="small muted">${esc(x.note)}</div>`:""}${adChips(x,k)}${k==="data"?fitting(x).map((m,_,a)=>` <button class="small" data-bpuse="${bpDial(x)}" data-radio="${esc(m.radio)}" data-mode="${x.mode==="VARA FM"?"FM":"USB"}" title="Set ${esc(m.name)} to ${bpMhz(bpDial(x))} MHz for VARA">Use ${bpMhz(bpDial(x))}${a.length>1?" on "+esc(m.name):""}</button>`).join(""):""}</td></tr>`}).join("")}</tbody></table></div>`).join("")})():"";
-  const full=BP.view==="all"?(()=>{if(!cls)return `<p class="warnc">Set your license class (Settings → Sidekick &amp; AI) to see what is open to you.</p>`;
+  const full=BP.view==="all"?(()=>{if(!cls)return `<p class="warnc">Set your license class (Settings → Einstein &amp; AI) to see what is open to you.</p>`;
     const ov=(x,r)=>x.from<=r.to+1e-6&&x.to>=r.from-1e-6;
     const fit=(x,r)=>({...x,from:Math.max(x.from,r.from),to:Math.min(x.to,r.to)});
     const cell=(xs,r)=>xs.filter(x=>ov(x,r)).map(x=>x.channel?x:fit(x,r)).map(x=>`<div><b>${bpOpenF(x)}</b> <span class="muted">${esc(x.mode)}${x.mode==="VARA FM"?(x.wide?" narrow &amp; wide":" narrow only"):""}${x.channel&&x.count>1?" · every "+Math.round(x.step*1000)+" kHz":""}</span>${x.unplanned?' <span class="np k-ready" style="padding:0 6px">unplanned</span>':""}${x.shared?' <span class="np" style="padding:0 6px" title="'+esc(x.note)+'">shared</span>':""}</div>`).join("")||'<span class="muted">—</span>';
@@ -2516,7 +2516,7 @@ function renderBP(){
   const bands=`<option value="all">All bands</option><option value="hf"${BP.band==="hf"?" selected":""}>HF</option><option value="vu"${BP.band==="vu"?" selected":""}>VHF / UHF</option>${d.bands.slice().reverse().map(b=>`<option${BP.band===b.band?" selected":""}>${esc(b.band)}</option>`).join("")}`;
   const nflags=d.bands.reduce((n,b)=>n+b.flags,0);
   box.innerHTML=`<h3><a class="small noprint" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;float:right">Card (printable)</a>Band plan${d.location?` <span class="muted small">near ${esc(d.location)}</span>`:""}</h3>
-   <p class="small muted"${BP.view==="table"?"":" hidden"}>One table from every plan: the FCC rules (what is legal${cls?` for a ${esc(cls)}`:""}), the ARRL band plan, your state coordinator's plan and the local ARES / RACES / club plans. Where plans say different things the row is marked ⚠, with each plan's words. The state coordinator's words come first, then local plans, then the ARRL's.${cls?"":' <span class="warnc">Set your license class (Settings → Sidekick & AI → Station agent) to see your privileges.</span>'}</p>
+   <p class="small muted"${BP.view==="table"?"":" hidden"}>One table from every plan: the FCC rules (what is legal${cls?` for a ${esc(cls)}`:""}), the ARRL band plan, your state coordinator's plan and the local ARES / RACES / club plans. Where plans say different things the row is marked ⚠, with each plan's words. The state coordinator's words come first, then local plans, then the ARRL's.${cls?"":' <span class="warnc">Set your license class (Settings → Einstein & AI → Station agent) to see your privileges.</span>'}</p>
    <nav class="ntabs noprint" role="tablist" aria-label="View" style="margin:6px 0;flex-wrap:wrap">${[["table","Band plan"],["all","Full spectrum"],["voice","Ad hoc voice"],["data","Ad hoc VARA"],["radio","💾 Radio channels"]].map(([v,l])=>`<button role="tab" class="${BP.view===v?"on":""}" aria-selected="${BP.view===v}" data-bpview="${v}">${l}</button>`).join("")}</nav>
    <div class="row nfrow small noprint"><label>Show <select data-bpband>${bands}</select></label>
      ${BP.view!=="table"?"":cls?`<label class="chk"><input type="checkbox" data-bpmine${BP.mine?" checked":""}> Only where I may transmit</label>`:""}
@@ -2598,9 +2598,9 @@ async function renderPlans(full){
   const newIds=new Set((d.changes||{}).new||[]),goneIds=new Set((d.changes||{}).gone||[]);
   const found=(d.frequencies||[]).filter(f=>!f.kept);
   for(const id of [...PL.sel])if(!found.some(f=>f.id===id))PL.sel.delete(id);
-  const head=`<h4>Plans <a class="small" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;text-transform:none;letter-spacing:0">Card (printable)</a> <button class="linkish small" data-bpfromplans style="text-transform:none;letter-spacing:0">Open the band plan</button></h4><p class="small muted">The band plan below is built in and works offline. Local plans come from a web search (or a file you add): nothing is used until you keep it, and every frequency links to where it was found.${d.license_class?"":' <span class="warnc">Set your license class (Settings → Sidekick & AI → Station agent) to see your privileges.</span>'}</p>`;
+  const head=`<h4>Plans <a class="small" href="/help/bandplan" target="_blank" rel="noopener" style="font-weight:400;text-transform:none;letter-spacing:0">Card (printable)</a> <button class="linkish small" data-bpfromplans style="text-transform:none;letter-spacing:0">Open the band plan</button></h4><p class="small muted">The band plan below is built in and works offline. Local plans come from a web search (or a file you add): nothing is used until you keep it, and every frequency links to where it was found.${d.license_class?"":' <span class="warnc">Set your license class (Settings → Einstein & AI → Station agent) to see your privileges.</span>'}</p>`;
   const busy=PL.busy||d.busy;
-  const search=!d.key?'<p>Searching needs the xAI key (Settings → Sidekick & AI → Station agent). You can still add a plan file once the key is set, and the band plan works without it.</p>'
+  const search=!d.key?'<p>Searching needs the xAI key (Settings → Einstein & AI → Station agent). You can still add a plan file once the key is set, and the band plan works without it.</p>'
     :`<div class="row nfrow"><span>${d.location?`Near <b>${esc(d.location.label)}</b>`:'<span class="bad">Set the station\'s location first (Nets → Find nets).</span>'}</span>
       <label>Within <input id="plKm" type="number" min="5" max="400" value="${d.km}" style="width:5em"> km</label>
       <button class="primary" data-plgo${busy||!d.location?" disabled":""}>${busy?"Searching… clubs, the coordinator's band plan, ARES / RACES plans (up to two minutes)":d.at?"Search again":"Find local plans"}</button></div>
@@ -2783,7 +2783,7 @@ async function renderFind(){
   let d=NF.d;
   if(!d.location&&!NF.geoTried){box.innerHTML='<p class="muted">Finding this PC\'s location… (your browser may ask)</p>';await nfGeo();d=NF.d}
   const back='<p><button type="button" class="linkish" data-nfback>← Back to the schedule</button></p>';
-  if(!d.key){box.innerHTML=back+`<h4>Find nets near you</h4><p>This needs the xAI key: Settings → Sidekick & AI → xAI key. One search costs about $0.10–0.30 and takes up to a minute.</p>`;return}
+  if(!d.key){box.innerHTML=back+`<h4>Find nets near you</h4><p>This needs the xAI key: Settings → Einstein & AI → xAI key. One search costs about $0.10–0.30 and takes up to a minute.</p>`;return}
   const R=d.reach,both=R.HF&&R.VU,bands=NF.bands||(both?"":R.HF?"HF":"VU");
   const loc=d.location;
   const where=loc?`Near <b>${esc(loc.label)}</b>${loc.source==="grid"?"":""}. <span class="small muted">Only a rounded position (about 10 km) is sent, never a street address.</span>
@@ -2904,7 +2904,7 @@ function netForm(n){
    <label>Reach (km) <input name="reach_km" type="number" min="50" max="5000" step="10" value="${esc(n.reach_km??"")}" placeholder="the station's"><span class="hint">a linked system or intertie: how far its stations can be (a call licensed farther is set aside as probably misheard)</span></label>
    <label>Alert, minutes before <input name="alert_min" type="number" min="0" max="120" value="${esc(n.alert_min??5)}"><span class="hint">0 = no alert</span></label>
    <label class="chk wide"><input type="checkbox" name="emergency"${n.emergency?" checked":""}> Emergency or priority net: keep an Urgent board for it</label>
-   <label class="wide">Sidekick on this net <select name="checkins"><option value=""${n.checkins!=="none"?" selected":""}>May check in when check-ins are open to this station</option><option value="none"${n.checkins==="none"?" selected":""}>Never checks in (a members-, mobiles- or traffic-only net)</option></select></label>
+   <label class="wide">Einstein on this net <select name="checkins"><option value=""${n.checkins!=="none"?" selected":""}>May check in when check-ins are open to this station</option><option value="none"${n.checkins==="none"?" selected":""}>Never checks in (a members-, mobiles- or traffic-only net)</option></select></label>
    <fieldset class="wide rep"><legend>Repeats</legend>
     <div class="seg" role="radiogroup" aria-label="Repeats">${[["once","Once"],["daily","Daily"],["weekly","Weekly"],["monthly","Monthly"],["yearly","Yearly"]].map(([v,l])=>`<label><input type="radio" name="rfreq" value="${v}"${v===f?" checked":""}><span>${l}</span></label>`).join("")}</div>
     <div class="rline" data-for="daily weekly monthly yearly">Every <input name="interval" type="number" min="1" max="99" value="${esc(r.interval||1)}" class="num"> <span class="unit"></span></div>
@@ -3455,7 +3455,7 @@ async function openScan(rid,v){
    <p class="small muted">Between nets the station sweeps the HF phone bands open at this hour (on the bands your antenna works on), parks on signals above the noise, and keeps listening while there's a conversation. A net always comes first; turning the dial yourself pauses the scan for 30 minutes. Receive only.</p>
    <label>Antenna <input id="scAnt" value="${esc(ant.name||"")}" maxlength="40" placeholder="Inverted V"></label>
    <div class="bands small">Works on: ${Object.keys(v.bands).map(b=>`<label><input type="checkbox" data-scb="${b}"${(ant.bands||[]).includes(b)?" checked":""}>${b} m</label>`).join("")}</div>
-   <p class="small">${v.license_class?`Scans ${esc(v.license_class[0].toUpperCase()+v.license_class.slice(1))} phone only: ${Object.entries(v.bands).map(([b,x])=>`${b} m ${Number(x.from).toFixed(3)}–${Number(x.to).toFixed(3)}`).join(" · ")}`:"License class not set (Settings → Sidekick & AI → Station agent): scans the whole phone segment of each band."}</p>
+   <p class="small">${v.license_class?`Scans ${esc(v.license_class[0].toUpperCase()+v.license_class.slice(1))} phone only: ${Object.entries(v.bands).map(([b,x])=>`${b} m ${Number(x.from).toFixed(3)}–${Number(x.to).toFixed(3)}`).join(" · ")}`:"License class not set (Settings → Einstein & AI → Station agent): scans the whole phone segment of each band."}</p>
    <p class="small">Open now (by the hour): <b>${esc((v.now||[]).map(b=>b+" m").join(", "))}</b></p>
    <h4>Remembered frequencies</h4>${(v.spots||[]).length?`<table><tr><th>Frequency</th><th>Heard</th><th>Best hours</th><th>Calls</th><th></th></tr>${v.spots.map(s=>`<tr><td><b>${Number(s.freq_mhz).toFixed(3)}</b> ${esc(s.mode)}${s.pinned?" 📌":""}</td><td>${s.hits}× · ${esc((s.last||"").slice(5,16).replace("T"," "))}</td><td>${esc(Object.entries(s.hours||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]+":00").join(", "))}</td><td>${esc((s.calls||[]).slice(0,4).join(" "))}</td><td><button data-spot="${esc(s.key)}" data-do="${s.pinned?"unpin":"pin"}">${s.pinned?"Unpin":"Pin"}</button><button data-spot="${esc(s.key)}" data-do="hide">Hide</button></td></tr>`).join("")}</table>`:'<p class="small muted">None yet: frequencies with conversations are remembered here, by hour and day, and tried first next time.</p>'}
    <div class="row"><button id="scSave">Save</button> <button id="scClose">Close</button></div>`;
@@ -3465,7 +3465,7 @@ async function openScan(rid,v){
   if(!$("scanDlg").open)$("scanDlg").showModal()}
 // ---------- the station agent (Draft mode; station/agent.py) ----------
 let AG=null;
-const agName=()=>((AG||{}).settings||{}).name||(AG||{}).default_name||"Sidekick";
+const agName=()=>((AG||{}).settings||{}).name||(AG||{}).default_name||"Einstein";
 const agMode=rid=>(((AG||{}).settings||{}).radios||{})[rid]||"off";
 async function loadAgent(){try{AG=await api("/api/agent");renderRadios()}catch(e){}}
 async function agPost(url,body){try{AG=await post(url,body);renderRadios();if($("settings").open)renderAgentSet()}catch(err){alert(err.message)}}
@@ -3492,7 +3492,7 @@ function renderEcho(rid){
   const show=T.last_speak||null,sp=(L.filter(x=>x.speak)).length;
   const ago=x=>{const m=Math.round((Date.now()-new Date(x.at))/60000);return m<1?"just now":m+" min ago"};
   const chip=`<div class="turn ${TC}" role="status"><b>${T.state==="called"?"YOUR TURN · ":T.state==="open"?"YOUR TURN · ":""}${esc(T.say||"")}</b>${T.checked_in_at?` <span>✓ ${esc(new Date(T.checked_in_at).toLocaleTimeString([],TOPT()))}${T.checked_in_how?` (${esc(T.checked_in_how)})`:""}</span>`:""}</div>`;
-  const btns=`<div class="row small" style="margin:4px 0">${T.checked_in?`<button data-agmark="${esc(rid)}" data-v="not_checked_in" title="Sidekick will check in again when check-ins are open to it">Not checked in</button>`:`<button data-agmark="${esc(rid)}" data-v="checked_in" title="You checked in yourself: Sidekick won't draft a check-in on this net">I checked in myself</button>`} <button data-agmark="${esc(rid)}" data-v="${T.muted?"unmute":"mute"}">${T.muted?"Unmute":"Mute for this net"}</button> <button data-agask="${esc(rid)}">What would you say now?</button></div>`;
+  const btns=`<div class="row small" style="margin:4px 0">${T.checked_in?`<button data-agmark="${esc(rid)}" data-v="not_checked_in" title="Einstein will check in again when check-ins are open to it">Not checked in</button>`:`<button data-agmark="${esc(rid)}" data-v="checked_in" title="You checked in yourself: Einstein won't draft a check-in on this net">I checked in myself</button>`} <button data-agmark="${esc(rid)}" data-v="${T.muted?"unmute":"mute"}">${T.muted?"Unmute":"Mute for this net"}</button> <button data-agask="${esc(rid)}">What would you say now?</button></div>`;
   const SO=(((AG||{}).send||{}).out||{})[rid],sending=agMode(rid)==="send";
   const SN={counting:"Sending in",on_air:"ON THE AIR",sent:"Sent",stopped:"Not sent",held:"Not sent",failed:"Not sent"};
   const sendBand=!sending?"":SO&&["counting","on_air"].includes(SO.state)
@@ -3506,7 +3506,7 @@ function renderEcho(rid){
       <div class="rate meta">Right call? <button data-agrate="${esc(show.id)}" data-v="1" class="${(show.rating||{}).good===true?"on":""}" aria-label="Good draft">👍</button><button data-agrate="${esc(show.id)}" data-v="0" class="${(show.rating||{}).good===false?"on":""}" aria-label="Bad draft">👎</button></div>`
       +(show.alts||[]).map(a=>`<div class="alt">${draftHtml(a,true)}</div>`).join(""):"")
     +`<div class="meta">${sp} time${sp===1?"":"s"} it would have spoken · stayed silent ${T.silent||0} time${T.silent===1?"":"s"}${d&&!d.speak?` · last: ${esc(d.why||"")}`:""}</div>`}
-// ---------- Sidekick workspace: chat, prepared words and talks, library, sites (station/chat.py, topics.py) ----------
+// ---------- Einstein workspace: chat, prepared words and talks, library, sites (station/chat.py, topics.py) ----------
 let SK=null;
 const skTop=()=>((AG||{}).topics)||{topics:[],sites:[],armed:{}};
 function skArmedLine(rid){const a=skTop().armed[rid];if(!a)return"";const t=skTop().topics.find(x=>x.id===a.topic);if(!t)return"";
@@ -3569,7 +3569,7 @@ function skRender(){
     box.innerHTML=`<p class="muted small">What ${esc(agName())} reads before it answers, writes a talk or chats: this station's own manual and cards (built in), and anything you add (kept on this PC only, never in the project). Add your EOC plans, shelter lists, band plans, club procedures, equipment manuals, web pages.</p>${msg}
       <div class="row"><input id="skUrl" placeholder="https://… a web page or PDF" style="flex:1"> <button id="skAddUrl">Add page</button></div>
       <div class="row"><label class="small">A file (.pdf .docx .md .txt .html .csv, up to 20 MB) <input type="file" id="skFile" accept=".pdf,.docx,.md,.txt,.html,.htm,.csv" style="width:auto"></label></div>
-      <details><summary>Write a note</summary><input id="skNT" placeholder="Title"><textarea id="skNX" placeholder="What Sidekick should know" style="width:100%;min-height:6em"></textarea><button id="skAddNote">Save note</button></details>
+      <details><summary>Write a note</summary><input id="skNT" placeholder="Title"><textarea id="skNX" placeholder="What Einstein should know" style="width:100%;min-height:6em"></textarea><button id="skAddNote">Save note</button></details>
       <div class="row"><input id="skS" placeholder="Try a question: what would it find?" style="flex:1"> <button id="skSearch" class="quiet">Search</button></div>
       ${(SK.hits||[]).map(h=>`<div class="small" style="margin:4px 0"><b>${esc(h.name)}</b> › ${esc(h.section||"")}: ${esc((h.text||"").slice(0,240))}…</div>`).join("")}
       <table class="small" style="width:100%;margin-top:8px"><tr><th align="left">Source</th><th>Kind</th><th>Parts</th><th></th></tr>${L.map(x=>`<tr><td>${esc(x.name)}${x.error?` <span class="bad">${esc(x.error)}</span>`:""}</td><td>${esc(x.kind)}</td><td align="center">${x.chunks||0}</td>
@@ -3602,13 +3602,13 @@ $("skBody").addEventListener("click",e=>{
 $("skBody").addEventListener("toggle",e=>{const d=e.target.closest&&e.target.closest("[data-skdet]");if(d)SK.open[d.dataset.skdet]=d.open},true);
 const agLive=()=>Object.values((((AG||{}).send)||{}).out||{}).some(o=>o.state==="counting"||o.state==="on_air");
 const agStop=()=>fetch("/api/agent/stop/all",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).catch(()=>{});
-// the control operator's hand on the switch: Esc, Stop or ANY click on the page while Sidekick is sending drops it
+// the control operator's hand on the switch: Esc, Stop or ANY click on the page while Einstein is sending drops it
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&agLive()){e.preventDefault();agStop()}},true);
 document.addEventListener("pointerdown",()=>{if(agLive())agStop()},true);
-// presence: the dashboard in use at this PC (keyboard, mouse, touch) = the control operator is here; Sidekick's Send and
-// VARA (chat, the channel's keep-alives) transmit only then. A quiet heartbeat, every 30 s at most, whatever Sidekick is
+// presence: the dashboard in use at this PC (keyboard, mouse, touch) = the control operator is here; Einstein's Send and
+// VARA (chat, the channel's keep-alives) transmit only then. A quiet heartbeat, every 30 s at most, whatever Einstein is
 // set to (owner 2026-11-17: in front of both PCs, VARA said "you are not at the dashboard" - the heartbeat had gone out
-// only while a radio's Sidekick was on Send, and Sidekick was Off). An open VARA window is refreshed when it lands.
+// only while a radio's Einstein was on Send, and Einstein was Off). An open VARA window is refreshed when it lands.
 let agSeen=0;const agHere=()=>{const now=Date.now();if(now-agSeen<30000)return;agSeen=now;
   fetch("/api/agent/presence",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).then(()=>{if(AG&&AG.send&&!AG.send.present){AG.send.present=true;for(const rid of Object.keys(((AG||{}).settings||{}).radios||{}))renderEcho(rid)}
     const vm=((VA.d||{}).modems||[]).find(m=>m.radio===VA.rid);if($("varaDlg").open&&vm&&/not at the dashboard/.test(vm.tx_why||""))varaLoad().then(()=>{renderVara();renderRadios()})}).catch(()=>{})};
@@ -3624,7 +3624,7 @@ document.addEventListener("click",e=>{
   const r=e.target.closest("[data-agrate]");if(r){agPost(`/api/agent/rate/${enc(r.dataset.agrate)}`,{good:r.dataset.v==="1"});return}
   const h=e.target.closest("[data-tts]");if(h){playClip(`/api/tts/draft/${enc(h.dataset.tts)}.mp3`,h);return}
   const v=e.target.closest("[data-aud]");if(v){playClip(`/api/tts/audition/${enc(v.dataset.aud)}.mp3`,v);return}});
-// ----- Sidekick's voice (station/tts.py): heard here only, in this browser; never on a radio -----
+// ----- Einstein's voice (station/tts.py): heard here only, in this browser; never on a radio -----
 let TTS=null,VCLIP=null;
 async function playClip(url,btn){const was=btn.textContent;btn.textContent="…";
   try{const r=await fetch(url);if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||"not available")}
@@ -3672,13 +3672,13 @@ function renderGrok(msg){
         +c.items.slice(-40).reverse().map(i=>`<div class="meta">${esc((i.start||"").slice(11,19))} ${esc(i.radio)}${i.live_wer?` · this station ${pc(i.live_wer.wer)} · Grok ${pc(i.grok_wer.wer)}`:""}<br>station: ${esc(i.live||"")}<br>Grok: ${esc(i.grok||"")}${i.ref?`<br>${i.ref_from}: ${esc(i.ref)}`:""}</div>`).join(""):'<p class="muted">Nothing compared today yet.</p>'}
     catch(e){out.textContent=e.message}};
 }
-// ----- Settings -> Share settings (station/portable.py): export this station's schedule + Sidekick choices + local names, import another's -----
+// ----- Settings -> Share settings (station/portable.py): export this station's schedule + Einstein choices + local names, import another's -----
 let SH={doc:null,prev:null,map:{},msg:null};
 function renderShare(){
   const box=$("shareSet");if(!box)return;
   if(!$("shExport")){                                   // the static part: built once, so the chosen file survives redraws
-    box.innerHTML=`<p class="muted" style="margin:0">Move your <b>net schedule</b>, <b>Sidekick's choices</b> and <b>local names</b> to another station, or take another station's.</p>${howIt("The file holds no keys, no call sign and nothing about your radios; a net names its radio by a hint (name, band, mode) and you choose the matching radio here when you import. Importing never deletes: a net with the same name and start time is updated, new ones are added, and your current files are saved first.","What is in the file?")}
-     <div class="row"><label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="shIdent" style="width:auto"> include my Sidekick identity (its on-air name, my check-in line, my first name, region)</label></div>
+    box.innerHTML=`<p class="muted" style="margin:0">Move your <b>net schedule</b>, <b>Einstein's choices</b> and <b>local names</b> to another station, or take another station's.</p>${howIt("The file holds no keys, no call sign and nothing about your radios; a net names its radio by a hint (name, band, mode) and you choose the matching radio here when you import. Importing never deletes: a net with the same name and start time is updated, new ones are added, and your current files are saved first.","What is in the file?")}
+     <div class="row"><label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="shIdent" style="width:auto"> include my Einstein identity (its on-air name, my check-in line, my first name, region)</label></div>
      <div class="row"><button type="button" id="shExport">Export settings…</button>
       <input type="file" id="shFile" accept=".json,application/json"> <button type="button" id="shPrev">Preview import…</button> <span id="shMsg"></span></div>
      <div id="shBox"></div>`;
@@ -3695,7 +3695,7 @@ function renderShare(){
     h+=`<div class="rad"><b>What this import would do</b><ul>
       <li>Nets: <b>${n.add}</b> new, <b>${n.update}</b> updated, ${n.unchanged} already the same${n.invalid.length?`, <span class="bad">${n.invalid.length} skipped</span>`:""} (of ${n.total}).</li>
       <li>Local names: ${p.local_names.added} new, ${p.local_names.updated} updated.</li>
-      <li>Sidekick: ${p.sidekick.length?p.sidekick.map(c=>`<code>${esc(c.field)}</code>`).join(", ")+" would change":"nothing changes"}${p.identity?"":" (the file has no Sidekick identity)"}.</li></ul>
+      <li>Einstein: ${p.sidekick.length?p.sidekick.map(c=>`<code>${esc(c.field)}</code>`).join(", ")+" would change":"nothing changes"}${p.identity?"":" (the file has no Einstein identity)"}.</li></ul>
       ${p.radios.length?`<p class="small">Which radio here does each of the other station's radios become? <span class="muted">A net whose radio is left at “none” is kept on the schedule and not recorded until you pick one (Nets).</span></p>
       <table class="tier-table">${p.radios.map(r=>`<tr><td>${esc(r.name||r.key)} <span class="muted">${esc(r.freq_mhz||"")} ${esc(r.mode||"")} · ${r.nets} net${r.nets===1?"":"s"}</span></td>
         <td><select data-shmap="${esc(r.key)}"><option value="">none</option>${p.targets.map(t=>`<option value="${esc(t.id)}"${(SH.map[r.key]!==undefined?SH.map[r.key]:r.chosen)===t.id?" selected":""}>${esc(t.name||t.id)} (${esc(t.freq_mhz||"")} ${esc(t.mode||"")})</option>`).join("")}</select></td></tr>`).join("")}</table>`:""}
@@ -3708,7 +3708,7 @@ function renderShare(){
   const ap=$("shApply");if(ap)ap.onclick=async()=>{try{
     const map={};for(const r of SH.prev.radios)map[r.key]=SH.map[r.key]!==undefined?SH.map[r.key]:(r.chosen||"");
     const r=await post("/api/settings-pack/apply",{doc:SH.doc,radio_map:map});SH.prev=null;SH.doc=null;
-    SH.msg={text:`Imported: ${r.added} nets added, ${r.updated} updated${r.sidekick_fields.length?`; Sidekick: ${r.sidekick_fields.join(", ")}`:""}. Your earlier files are in ${r.backup||"(nothing to back up)"}.`};
+    SH.msg={text:`Imported: ${r.added} nets added, ${r.updated} updated${r.sidekick_fields.length?`; Einstein: ${r.sidekick_fields.join(", ")}`:""}. Your earlier files are in ${r.backup||"(nothing to back up)"}.`};
     $("shFile").value="";renderShare()}catch(e){SH.msg={text:e.message,bad:true};renderShare()}};
   const cn=$("shCancel");if(cn)cn.onclick=()=>{SH.prev=null;SH.doc=null;SH.msg=null;$("shFile").value="";renderShare()};
 }
@@ -3761,10 +3761,10 @@ function renderLocalNames(msg){
 function renderAgentSet(){
   const box=$("agentSet");if(!AG){box.innerHTML="";return}const s=AG.settings||{};
   const opt=(v,l,on)=>`<option value="${esc(v)}"${on?" selected":""}>${esc(l)}</option>`;
-  box.innerHTML=`<p class="muted" style="margin:0">Sidekick listens and <b>drafts</b> what it would say on each radio you switch to Draft (on the radio's card). Sending is a separate choice on each radio.</p>${howIt(`The station agent listens and <b>drafts</b> what it would say on each radio where you switch it to Draft (on the radio's card). Two speeds: the <b>model</b> decides each turn in under a second (check-ins, acknowledgements, short answers); a question that needs thinking gets “working on it” and goes to the <b>thinking model</b> while the net carries on, and when net control next asks for comments it says it has a response ready, then reads it when told to go ahead. Offline, fixed rules keep the same steps (check in, acknowledge, announce and read an answer already made). Every draft is checked against FCC Part 97 in the station's own code (identification every 10 minutes and at the end of a contact, saying it is automated, no business, music, codes or relayed messages, emergency traffic first, your license privileges); a draft that breaks one is marked <b>Would not send</b>.`)}
+  box.innerHTML=`<p class="muted" style="margin:0">Einstein listens and <b>drafts</b> what it would say on each radio you switch to Draft (on the radio's card). Sending is a separate choice on each radio.</p>${howIt(`The station agent listens and <b>drafts</b> what it would say on each radio where you switch it to Draft (on the radio's card). Two speeds: the <b>model</b> decides each turn in under a second (check-ins, acknowledgements, short answers); a question that needs thinking gets “working on it” and goes to the <b>thinking model</b> while the net carries on, and when net control next asks for comments it says it has a response ready, then reads it when told to go ahead. Offline, fixed rules keep the same steps (check in, acknowledge, announce and read an answer already made). Every draft is checked against FCC Part 97 in the station's own code (identification every 10 minutes and at the end of a contact, saying it is automated, no business, music, codes or relayed messages, emergency traffic first, your license privileges); a draft that breaks one is marked <b>Would not send</b>.`)}
   <label style="display:block;margin:6px 0"><input type="checkbox" id="agOn"${s.enabled?" checked":""} style="width:auto"> <b>Enable the station agent</b> <span class="muted">(off by default; when on, each radio's card gets a ${esc(agName())} Off / Draft switch, also off until you choose Draft)</span></label>
   <div class="agentform">
-    <label for="agName">On-air name</label><span><input id="agName" value="${esc(s.name||"")}" maxlength="24" placeholder="${esc(AG.default_name||"Sidekick")}"><br><span class="muted">Your choice; it is said right after the call (“${esc(AG.call||"N0CALL")} ${esc(agName())}”), so a phonetic-alphabet word (Echo, Victor…), a number or a procedure word (Portable, Mobile, Break, Over) is refused: listeners would hear it as part of the call.</span></span>
+    <label for="agName">On-air name</label><span><input id="agName" value="${esc(s.name||"")}" maxlength="24" placeholder="${esc(AG.default_name||"Einstein")}"><br><span class="muted">Your choice; it is said right after the call (“${esc(AG.call||"N0CALL")} ${esc(agName())}”), so a phonetic-alphabet word (Echo, Victor…), a number or a procedure word (Portable, Mobile, Break, Over) is refused: listeners would hear it as part of the call.</span></span>
     <label for="agOp">Your first name</label><input id="agOp" value="${esc(s.operator||"")}" maxlength="24" placeholder="(said as control operator)">
     <label for="agCheck">Your check-in line</label><input id="agCheck" value="${esc(s.checkin||"")}" maxlength="120" placeholder="This is ${esc(AG.call||"N0CALL")}, …">
     <label for="agSta">This station is</label><input id="agSta" value="${esc(s.station||"")}" maxlength="120" placeholder="a fixed home station on land (not mobile, not maritime), no traffic">
@@ -3777,7 +3777,7 @@ function renderAgentSet(){
   $("agSave").onclick=()=>agPost("/api/agent/settings",{enabled:$("agOn").checked,name:$("agName").value,operator:$("agOp").value,checkin:$("agCheck").value,station:$("agSta").value,region:$("agReg").value,license_class:$("agClass").value,model:$("agModel").value,deep_model:$("agDeep").value,
     compare:[...box.querySelectorAll("[data-agcmp]:checked")].map(x=>x.dataset.agcmp)})}
 const MGMT="XAI_MANAGEMENT_KEY";
-const KEYINTRO={XAI_API_KEY:`Sidekick, the net summaries and Find nets use <b>your own xAI key</b>. Create one at <b>console.x.ai</b> → API Keys → Create API Key (add a little credit under Billing first: <a href="${BUY}" target="_blank" rel="noopener">Buy credits</a>), copy it, and paste it here. It is kept only on this PC, in config\\secrets.env.`,
+const KEYINTRO={XAI_API_KEY:`Einstein, the net summaries and Find nets use <b>your own xAI key</b>. Create one at <b>console.x.ai</b> → API Keys → Create API Key (add a little credit under Billing first: <a href="${BUY}" target="_blank" rel="noopener">Buy credits</a>), copy it, and paste it here. It is kept only on this PC, in config\\secrets.env.`,
   [MGMT]:`<b>Optional: the account's credit and spend.</b> In the xAI console open Settings → Management Keys, create a key for your <b>team</b>, and paste it here. The station uses it only to read the credit balance and this month's spend (every 30 minutes), never to buy anything. It can do more than read in xAI's console, so keep it on one station only.`};
 async function renderKeys(msg){
   const box=$("keySet");let d;try{d=await api("/api/secrets")}catch(e){box.textContent=e.message;return}

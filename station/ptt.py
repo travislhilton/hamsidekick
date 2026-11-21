@@ -15,10 +15,10 @@ A radio's `tx:` (Radios… → Transmit):
 * `out` — the sound OUTPUT the transmitted audio goes to (the interface's speaker side).
 * `max_s` — the transmitter is let go after this long whatever happens (a watchdog, 5-180 s).
 * `enabled` — the switch. False (the default, and anything that is not exactly True) refuses every key-up before any
-  device is opened. Nothing in the station keys a radio yet: Sidekick still only drafts. When it is allowed to send,
+  device is opened. Nothing in the station keys a radio yet: Einstein still only drafts. When it is allowed to send,
   it goes through Transmitter.key(), and only on a radio whose switch is on.
 
-Part 97: a voice transmission like Sidekick's needs a control operator (97.109: automatic control is for repeaters,
+Part 97: a voice transmission like Einstein's needs a control operator (97.109: automatic control is for repeaters,
 beacons and some data), and the station's ID (97.119) — the code that sends will have to carry both.
 """
 from __future__ import annotations

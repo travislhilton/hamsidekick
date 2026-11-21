@@ -366,15 +366,15 @@ class Walk:
         seg = self.p.locator("[data-agmode]")
         if seg.count() == 0:
             if self.mode == "sandbox":
-                raise AssertionError("no Sidekick switch on the radio's card although the agent is enabled")
-            return "no Sidekick switch on the radio's card: the station agent is off on this station (the card says it is off by default)"
+                raise AssertionError("no Einstein switch on the radio's card although the agent is enabled")
+            return "no Einstein switch on the radio's card: the station agent is off on this station (the card says it is off by default)"
         if self.mode != "sandbox":
-            return "the radio's card has the Sidekick Off / Draft switch (not changed)"
+            return "the radio's card has the Einstein Off / Draft switch (not changed)"
         self.p.locator("[data-agmode][data-v=draft]").first.click()
         self.p.wait_for_timeout(1500)
         modes = self.api("api/agent")["settings"]["radios"]
         assert "draft" in modes.values(), modes
-        return "Sidekick switched Off → Draft on the radio's card"
+        return "Einstein switched Off → Draft on the radio's card"
 
     def _never_checks_in(self):
         self.goto()
@@ -392,13 +392,13 @@ class Walk:
             self.p.wait_for_timeout(1000)
         else:
             self.p.click("#netCancel")
-        return "Nets → the net → Sidekick on this net offers 'Never checks in'" + (" (set and saved)" if self.mode == "sandbox" else " (not changed)")
+        return "Nets → the net → Einstein on this net offers 'Never checks in'" + (" (set and saved)" if self.mode == "sandbox" else " (not changed)")
 
     def _voice(self):
         self._settings()
         t = self.p.inner_text("#settings")
-        assert "sidekick's voice" in t.lower(), "no Sidekick's voice section"
-        return "Settings has Sidekick's voice (a voice list to pick and ▶ to hear)"
+        assert "einstein's voice" in t.lower(), "no Einstein's voice section"
+        return "Settings has Einstein's voice (a voice list to pick and ▶ to hear)"
 
     # ---- sidekick card: buttons ----
     def _sk_card(self):
@@ -406,28 +406,28 @@ class Walk:
         self.p.wait_for_timeout(2500)
         on = self.p.locator("[data-agmode]").count() > 0
         if self.mode == "sandbox":
-            assert on, "the agent is enabled and the radio is on Draft but there is no Sidekick card"
+            assert on, "the agent is enabled and the radio is on Draft but there is no Einstein card"
         return on
 
     def h_sidekick_buttons_what_would_you_say_now(self):
         if not self._sk_card():
-            return "Sidekick is off on this station: its card is not shown (as the card says)"
+            return "Einstein is off on this station: its card is not shown (as the card says)"
         b = self.p.get_by_role("button", name="What would you say now?")
         assert b.count() >= 1, "button missing"
         if self.mode == "sandbox":
             b.first.click()
             self.p.wait_for_timeout(2500)
-        return "'What would you say now?' is on Sidekick's card" + (" and gives a draft" if self.mode == "sandbox" else "")
+        return "'What would you say now?' is on Einstein's card" + (" and gives a draft" if self.mode == "sandbox" else "")
 
     def h_sidekick_buttons_hear_it(self):
         if not self._sk_card():
-            return "Sidekick is off on this station: no drafts, so no ▶ Hear it (as the card says)"
+            return "Einstein is off on this station: no drafts, so no ▶ Hear it (as the card says)"
         b = self.p.get_by_role("button", name="Hear it")
         return "▶ Hear it present on a draft" if b.count() else "no draft on screen right now to carry ▶ Hear it / 👍 👎 (drafts appear on a turn)"
 
     def h_sidekick_buttons_i_checked_in_myself(self):
         if not self._sk_card():
-            return "Sidekick is off on this station"
+            return "Einstein is off on this station"
         b = self.p.get_by_role("button", name="I checked in myself")
         assert b.count() >= 1, "button missing"
         if self.mode == "sandbox":
@@ -440,7 +440,7 @@ class Walk:
 
     def h_sidekick_buttons_mute_for_this_net(self):
         if not self._sk_card():
-            return "Sidekick is off on this station"
+            return "Einstein is off on this station"
         b = self.p.get_by_role("button", name="Mute for this net")
         assert b.count() >= 1, "button missing"
         if self.mode == "sandbox":
@@ -453,7 +453,7 @@ class Walk:
 
     def h_sidekick_buttons_chat_prepared(self):
         if not self._sk_card():
-            return "Sidekick is off on this station: no Chat & prepared… button (as the card says)"
+            return "Einstein is off on this station: no Chat & prepared… button (as the card says)"
         b = self.p.get_by_role("button", name="Chat & prepared")
         assert b.count() >= 1, "button missing"
         b.first.click()
@@ -472,28 +472,28 @@ class Walk:
         assert sends == 0 if not any(tx.values()) else True, "Send offered although no radio's Transmit switch is on"
         return f"Send is not offered ({sends} Send switches) while Transmit is off on every radio: {tx}"
 
-    def h_sidekick_wrong_no_sidekick_on_a_radio(self):
+    def h_sidekick_wrong_no_einstein_on_a_radio(self):
         self.goto()
         on = self.api("api/agent")["settings"].get("enabled")
         if self.mode == "sandbox":
-            assert self.p.locator("[data-agmode]").count() > 0, "agent enabled but no Sidekick card"
-            return "with the agent enabled the radio's card shows Sidekick"
-        assert (self.p.locator("[data-agmode]").count() > 0) == bool(on), "Sidekick switch visibility does not follow the Enable setting"
-        return f"the Sidekick switch follows Settings → Enable the station agent (enabled={bool(on)})"
+            assert self.p.locator("[data-agmode]").count() > 0, "agent enabled but no Einstein card"
+            return "with the agent enabled the radio's card shows Einstein"
+        assert (self.p.locator("[data-agmode]").count() > 0) == bool(on), "Einstein switch visibility does not follow the Enable setting"
+        return f"the Einstein switch follows Settings → Enable the station agent (enabled={bool(on)})"
 
     def h_sidekick_wrong_wants_to_check_in_again(self):
         return self.h_sidekick_buttons_i_checked_in_myself()
 
     def h_sidekick_wrong_amber_offline_rules(self):
         if not self._sk_card():
-            return "Sidekick is off on this station"
+            return "Einstein is off on this station"
         t = self.p.inner_text("body")
         has_key = self.api("api/agent").get("key_set", None)
         keys = {k["name"]: k for k in self.api("api/secrets")["keys"]}
         key_set = any(k.get("set") for k in keys.values()) if keys else False
         if "Offline rules" in t:
             return "the amber 'Offline rules' note is shown (no key on this PC)" if not key_set else "the amber 'Offline rules' note is shown"
-        assert key_set, "no xAI key on this PC but no amber 'Offline rules' note on Sidekick's card"
+        assert key_set, "no xAI key on this PC but no amber 'Offline rules' note on Einstein's card"
         return "a key is set and xAI is reachable: no amber note (as the card says)"
 
     def h_sidekick_buttons_hear(self):
@@ -503,9 +503,9 @@ class Walk:
     def h_sidekick_switch_off(self):
         self.goto()
         if self.p.locator("[data-agmode]").count() == 0:
-            return "no Sidekick switch: the station agent is off on this station, so every radio is Off (the default)"
+            return "no Einstein switch: the station agent is off on this station, so every radio is Off (the default)"
         assert self.p.locator("[data-agmode][data-v=off]").count() >= 1, "the switch has no Off"
-        return "the radio's Sidekick switch has Off"
+        return "the radio's Einstein switch has Off"
 
     def h_sidekick_switch_draft(self):
         return self._draft_switch()
@@ -535,14 +535,14 @@ class Walk:
 
     def h_sidekick_ask_7(self):
         if not self._sk_tab("prep"):
-            return "Sidekick is off on this station: no Chat & prepared… (as the card says)"
+            return "Einstein is off on this station: no Chat & prepared… (as the card says)"
         t = self.p.inner_text("#skBody")
         assert "New talk" in t, "the Prepared tab has no New talk…"
         return "Prepared tab: New talk… is there (talks are approved, then Send now / Arm on this radio)"
 
     def h_sidekick_ask_8(self):
         if not self._sk_tab("lib"):
-            return "Sidekick is off on this station: no Library or Sites (as the card says)"
+            return "Einstein is off on this station: no Library or Sites (as the card says)"
         lib = self.p.locator("#skSearch").count()
         self.p.locator("#skTabs [data-sktab=sites]").first.click()
         self.p.wait_for_timeout(600)
