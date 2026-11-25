@@ -596,14 +596,14 @@ header button.hq{background:transparent;border-color:rgba(255,255,255,.18);font-
 /* The conversation is a fixed-height workspace (owner 2026-11-25 audit): the thread scrolls inside it and the message
    box is always in view; before, the panel grew to 1300 px and its top and bottom could not both be on screen. */
 .vpanel .vchan{flex:0 0 auto;height:clamp(340px,calc(100dvh - 385px),920px);grid-template-columns:minmax(140px,190px) 1fr;grid-template-rows:minmax(0,1fr);margin:6px 0}
-.vpanel .vros{max-height:none;min-height:0}.vpanel .vconv{min-height:0;overflow:auto}.vpanel .vthread{max-height:none;flex:1 1 0;min-height:110px}
+.vpanel .vros{max-height:none;min-height:0}.vpanel .vconv{min-height:0;overflow:auto}.vpanel .vconv>*:not(.vthread){flex:none}.vpanel .vthread{max-height:none;flex:1 1 0;min-height:110px}
 .vfold>summary,.vtools>summary{cursor:pointer;color:var(--muted)}.vfold[open],.vtools[open]{flex-basis:100%;order:9}.vfoldin{padding:4px 0 2px}.vfoldin p{margin:4px 0}.vtools{border-top:1px solid var(--line);padding-top:4px}.vtools[open]>summary{margin-bottom:4px}
 .vbar{padding:5px 10px;margin:4px 0;gap:4px 8px}.vbar>span:not([style]){min-width:0}.vwork{display:block;text-align:left;width:100%;font:inherit;font-size:13px;min-height:0}
 @container (max-width:520px){.vpanel .vchan{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
   .vpanel .vros{display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-height:104px;padding:4px}.vpanel .vros h5{display:none}.vpanel .vros .vst{width:auto;padding:2px 8px 2px 4px;border-color:var(--line);border-radius:999px}.vpanel .vros .vst .sub,.vpanel .vros .vai.sm{display:none}.vpanel .vros .vst.aikid{margin-left:0}.vpanel .vros form{margin:0}.vpanel .vros input:not([type=checkbox]){width:7em}
   .vpanel .vcomp{flex-wrap:wrap}.vpanel .vcomp textarea{flex-basis:100%}.vb{max-width:94%}
   .vpanel .vpre{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}.vpanel .vpre button{flex:none}
-  .vpanel:not(.vfocus) .vchan{height:clamp(420px,calc(100dvh - 300px),920px)}.vpanel:not(.vfocus) [data-vfocus]{background:var(--accent,#1f4fbf);color:#fff;border-color:transparent}}
+  .vpanel:not(.vfocus) .vchan{height:clamp(380px,calc(100dvh - 590px),920px)}.vpanel:not(.vfocus) [data-vfocus]{background:var(--accent,#1f4fbf);color:#fff;border-color:transparent}}
 /* Focus: the chat takes the whole window */
 body.vfocusing{overflow:hidden}.vpanel.vfocus{position:fixed;inset:0;z-index:70;background:var(--bg,var(--panel));padding:10px 16px;overflow:auto;margin:0;border-radius:0}
 .vpanel.vfocus .vchan{flex:1 1 0;height:auto;min-height:300px;grid-template-columns:minmax(180px,250px) 1fr}.vpanel.vfocus .vb{max-width:min(80%,76ch);font-size:15px}.vpanel.vfocus .vpnote,.vpanel.vfocus .vinbox{flex:none}
