@@ -2,6 +2,8 @@
 under automatic control only where Part 97 allows it (owner 2026-11-21)."""
 import time
 
+import re
+
 import pytest
 
 from station import einstein as E
@@ -565,10 +567,13 @@ def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert "data-vshare=" in idx and "📦 Share with" in idx and '"/api/nets/share/export.ics"' in idx
     assert idx.count("${vNetsBtn(f)}") == 2 and "data-vnetsinst" in idx and '"/api/nets/share/install"' in idx
-    ask = idx.split("const V_ASK=[")[1].split("]];")[0]
-    for word in ("PACK", "CHIRP", "CHIRP 2M", "BANDPLAN 70CM", "ICS205", "ICS309", "NETS", "CALENDAR", "WX213", "HF"):
-        assert f'","{word}","now"' in ask or f'","{word}","net"' in ask, word   # command words, sent at once
-    assert '"MSG ","box"' in ask and "Local EMCOMM CHIRP file (2m/70cm/ad hoc)" in ask
+    ask = idx.split("const V_ASK=[")[1].split("]];")[0]                 # owner 2026-11-25: these five, in order
+    labels = re.findall(r'\[\"([^"]+)\",\"([^"]+)\",\"(\w+)\"', ask)
+    assert [(l, c) for l, c, _ in labels] == [
+        ("📦 Send your station's band plan", "PACK PLAN"), ("📅 Send your station's nets", "PACK NETS"),
+        ("Send your weather as ICS-213", "WX213"), ("What are the HF band conditions now?", "HF"),
+        ("What is the weather forecast for my station?", "WX {grid}")]
+    assert 'c.replace("{grid}",ch.me.grid||"")' in idx and "Set your grid square in Settings → Station" in idx
 
 
 def test_news_is_searched_on_the_web_never_answered_with_the_weather(tmp_path):
@@ -774,3 +779,29 @@ def test_the_quick_requests_are_command_words_answered_without_the_ai_even_off_g
     r = _ask(m, v, "K7ABC", "CHIRP file of every 2 m repeater for my mobile with the tones please")
     assert r.endswith("From the model.") and len(asked) == 1
     assert "(no AI)" in next(x["outcome"] for x in e.state(rid)["recent"] if "CHIRP" in x["outcome"])
+
+
+def test_pack_plan_and_pack_nets_send_one_part_each(tmp_path):
+    """Owner 2026-11-25: "Send your station's band plan" and a new "Send your station's nets": PACK PLAN sends the
+    plans, kept and ad hoc channels; PACK NETS the net schedule; PACK both."""
+    from station import stationpack as SP
+    from tests.test_stationpack import _sender
+    st, rid, m, clk, e = _setup(tmp_path)
+    _sender(st)
+    st.cfg["schedule"] = [{"id": "n1", "name": "Tuesday Net", "freq_mhz": 146.94, "mode": "FM", "start": "19:00",
+                           "duration_min": 60, "repeat": {"freq": "weekly", "weekdays": ["Tue"]}}]
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    last = lambda: SP.parse([c for c in v.calls if c[0] == "file"][-1][2])
+    r = _ask(m, v, "K7ABC", "PACK PLAN")
+    assert "local plan" in r and "net" not in r.split("KB")[0]
+    assert _wait(lambda: any(c[0] == "file" for c in v.calls))
+    d = last()
+    assert d["plans"] and "nets" not in d
+    r = _ask(m, v, "K7ABC", "pack nets")
+    time.sleep(0.1)
+    d = last()
+    assert "1 net" in r and d["nets"]["nets"][0]["name"] == "Tuesday Net" and not d.get("plans")

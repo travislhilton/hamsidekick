@@ -213,7 +213,7 @@ ASK_HELP = ("Or ask me anything in words (radio, emergency comms, technical; I s
             "or a web page). Files arrive after my reply; on HAM Sidekick Station open them with View.")
 DIRECT_ALIAS = {"CAL": "CALENDAR", "MESSAGE": "MSG", "LOOKUP": "CALL"}
 DIRECT_HELP = ("Command words (answered by this station without the AI; all but WX and HF work with no internet): "
-               "PACK (band plan + nets to install), CHIRP or CHIRP 2M / 70CM (local EMCOMM channels for a handheld), "
+               "PACK (band plan + nets to install; PACK PLAN or PACK NETS for one), CHIRP or CHIRP 2M / 70CM (local EMCOMM channels for a handheld), "
                "BANDPLAN 70CM (any band, for your license), ICS205 (ad hoc channels), ICS309 (this session's log), NETS, "
                "CALENDAR (nets as a calendar file), CALL K7ABC (callbook), MSG your note (for the operator), "
                "WX or WX213 [place] (weather, as an ICS-213), HF or HF213 (band conditions). ")
@@ -1073,8 +1073,9 @@ class Einstein:
                 f"emergency net or repeater. I am an automated station and cannot send help; I have alerted "
                 f"{self.op_call(rid)}, the control operator.")
         cmd = text.strip().upper()
-        if re.match(r"PACK\b", cmd):                 # owner 2026-11-24: the band plan and nets, to install there
-            say(self._pack(rid, peer, send))
+        if re.match(r"PACK\b", cmd):                 # owner 2026-11-24: the band plan and nets, to install there;
+            pw = re.search(r"\b(PLAN|NETS?)\b", cmd[4:])  # 11-25: PACK PLAN / PACK NETS, one button for each
+            say(self._pack(rid, peer, send, ("plan" if pw.group(1) == "PLAN" else "nets") if pw else None))
             quick("answered: sent the station pack" if s.get("pack_sent") else "answered PACK: nothing to send", ok=True)
             return
         if cmd in ("HELP", "?", "MENU"):
@@ -1119,13 +1120,16 @@ class Einstein:
         threading.Thread(target=self._think, args=(rid, peer, s, text, send), daemon=True,
                          name=f"einstein-{peer}").start()
 
-    def _pack(self, rid, peer, send) -> str:
+    def _pack(self, rid, peer, send, only: str | None = None) -> str:
         """PACK: this station's band plan (the local plans read here, kept channels, ad hoc channels) and net schedule
         as one station pack, as the operator chose in Settings; made by code, no model, the same every time. The
         file follows the reply; a HAM Sidekick station shows 📦 Review and install… on it."""
         from . import stationpack as SP
         sh = self.share()
         parts = [k for k in SP.PARTS if sh.get(k)]
+        want = {"plan": ("plans", "kept", "adhoc"), "nets": ("nets",)}.get(only or "")
+        if want:                                     # PACK PLAN / PACK NETS: that part only
+            parts = [k for k in parts if k in want]
         s = self.sessions.get((rid, peer)) or {}
         s["pack_sent"] = False
         now = self.clock()
@@ -1133,11 +1137,13 @@ class Einstein:
         if len(sent) >= PACKS_PER_HOUR and not s.get("owner"):
             return f"I sent you the station pack {len(sent)} times this hour: it has not changed since; try later."
         if not parts:
-            return f"{self.op_call(rid)} shares nothing this way: ask them on the air."
+            return (f"{self.op_call(rid)} does not share " + ("its band plan" if only == "plan" else "its nets" if only == "nets"
+                    else "anything") + " this way: ask them on the air.")
         doc = SP.build(self.st, parts, bool(sh.get("own_files")))
         c = SP.counts(doc)
         if not any(c[k] for k in ("plans", "kept", "adhoc", "nets")):
-            return "This station has no band plan or nets to share yet."
+            return ("This station has no " + ("band plan" if only == "plan" else "nets" if only == "nets" else
+                    "band plan or nets") + " to share yet.")
         data = SP.dumps(doc)
         if len(data) > self.cfg.get("file_max", FILE_MAX):
             return f"The station pack is {len(data) // 1024} KB, more than I send ({FILE_MAX // 1024} KB)."

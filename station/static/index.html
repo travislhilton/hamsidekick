@@ -2260,7 +2260,7 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
       :one?`<div class="small muted">${r&&r.state==="quiet"?"⚠ No keep-alive heard from "+esc(one)+" lately: it may have left. ":""}Not linked: messages go out by themselves when the frequency is clear.</div>`
       :`<div class="small"><b>To ${sel.length} stations:</b> ${sel.map(esc).join(", ")} <span class="muted">· each gets its own link, one after another</span></div>`;
     const isAI=one&&r&&r.ai;
-    const presets=isAI?V_ASK.map(([l,c,how,what])=>`<button class="small${c==="PACK"?" primary":""}" data-vask="${esc(c)}"${how==="now"||how==="net"?" data-vasknow":""} title="${how==="now"?`Sends ${esc(c)} now: ${esc(what)}. Answered by their station without the AI: works off grid too.`:how==="net"?`Sends ${esc(c)} now: ${esc(what)}. Answered without the AI, but their station needs the internet for it.`:how==="box"?`Puts ${esc(c.trim())} in the message box: type your note after it, then Send (${esc(what)}).`:"Puts the question in the message box (edit, then Send). Answered by the AI: needs the internet at their station."}">${how==="now"?"":how==="net"?"🌐 ":how==="ai"?"🤖 ":""}${esc(l)}</button>`).join(""):(ch.presets||[]).map((p,i)=>(/\{name\}/.test(p)&&!ch.me.name)||(/\{grid\}/.test(p)&&!ch.me.grid)?`<button class="small" disabled title="Set your name and grid square in Settings → Station to use this one">${esc(p.replace(/\{\w+\}/g,"…").slice(0,34))}</button>`:`<button class="small" data-vpreset="${i}" title="${esc(vFill(p,ch,one||"",m))}">${esc(vFill(p,ch,one||"ALL",m).slice(0,34))}${vFill(p,ch,one||"",m).length>34?"…":""}</button>`).join("");
+    const presets=isAI?V_ASK.map(([l,c,how,what])=>/\{grid\}/.test(c)&&!ch.me.grid?`<button class="small" disabled title="Set your grid square in Settings → Station to use this one">${esc(l)}</button>`:[l,c.replace("{grid}",ch.me.grid||""),how,what]).map(x=>typeof x==="string"?x:(([l,c,how,what])=>`<button class="small${c==="PACK"?" primary":""}" data-vask="${esc(c)}"${how==="now"||how==="net"?" data-vasknow":""} title="${how==="now"?`Sends ${esc(c)} now: ${esc(what)}. Answered by their station without the AI: works off grid too.`:how==="net"?`Sends ${esc(c)} now: ${esc(what)}. Answered without the AI, but their station needs the internet for it.`:how==="box"?`Puts ${esc(c.trim())} in the message box: type your note after it, then Send (${esc(what)}).`:"Puts the question in the message box (edit, then Send). Answered by the AI: needs the internet at their station."}">${how==="now"?"":how==="net"?"🌐 ":how==="ai"?"🤖 ":""}${esc(l)}</button>`)(x)).join(""):(ch.presets||[]).map((p,i)=>(/\{name\}/.test(p)&&!ch.me.name)||(/\{grid\}/.test(p)&&!ch.me.grid)?`<button class="small" disabled title="Set your name and grid square in Settings → Station to use this one">${esc(p.replace(/\{\w+\}/g,"…").slice(0,34))}</button>`:`<button class="small" data-vpreset="${i}" title="${esc(vFill(p,ch,one||"",m))}">${esc(vFill(p,ch,one||"ALL",m).slice(0,34))}${vFill(p,ch,one||"",m).length>34?"…":""}</button>`).join("");
     conv=`<div class="vconv"><div><b class="mono" style="font-size:16px">${one?esc(one):"Several stations"}</b></div>${lk}
       ${one?`<div class="vthread" id="vThread-${esc(rid)}" aria-live="polite">${th.map(it=>vBubble(it,one)).join("")||'<p class="small muted">No messages yet. A quick message below gets things going.</p>'}${r&&r.working_s?`<div class="vb in working" role="status">🤖 ${esc(one)} is working on your question… <span class="meta">it keeps the link open for the answer</span></div>`:""}</div>`:""}
       <div class="vpre" aria-label="Quick messages">${presets} <button class="small linkish" data-vpedit>Edit</button></div>
@@ -2322,19 +2322,11 @@ document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!t.c
 // Einstein's quick requests (owner 2026-11-24): [label, what is sent, how]. "now" = a command word its station answers
 // without the AI (the same every time; off grid too), sent at once; "net" = the same but it needs the internet there;
 // "ai" = a question in words, put in the box to edit.
-const V_ASK=[["📦 Band plan & nets for my station","PACK","now","their band plan (local plans, kept and ad hoc channels) and net schedule as one file; you then see what is new to you and install what you choose"],
-  ["HELP","HELP","now","what it does and its command words"],
-  ["Local EMCOMM CHIRP file (2m/70cm/ad hoc)","CHIRP","now","one CHIRP file: the area's 2 m and 70 cm repeaters, simplex and ad hoc channels, with their radio aliases"],
-  ["CHIRP: local 2 m for a handheld","CHIRP 2M","now","the same, 2 m only"],
-  ["Band plan 70 cm for my license","BANDPLAN 70CM","now","the area's 70 cm plan as a page, with what your license allows on each row"],
-  ["ICS-205 of the ad hoc channels","ICS205","now","an ICS-205 radio plan of their reserved ad hoc channels"],
-  ["ICS-309 log of this session","ICS309","now","an ICS-309 communications log of this session"],
-  ["This station's nets","NETS","now","each net with its frequency and next time"],
-  ["Net schedule as a calendar file","CALENDAR","now","a calendar file (.ics) and a HAM Sidekick net file (📅 Add nets…)"],
-  ["Weather here as an ICS-213","WX213","net","the forecast and alerts at their station as an ICS-213"],
-  ["HF band conditions now","HF","net","solar flux, K index and what they mean for HF"],
-  ["What is in the news today?","What is in the news today?","ai",""],
-  ["Leave a message for the operator","MSG ","box","a note for its control operator"]];
+const V_ASK=[["📦 Send your station's band plan","PACK PLAN","now","its band plan as one file: the local plans it has read, its kept channels and ad hoc channels; you then see what is new to you and install what you choose"],
+  ["📅 Send your station's nets","PACK NETS","now","its net schedule as one file; you then see which nets are new to you and add the ones you choose"],
+  ["Send your weather as ICS-213","WX213","net","the forecast and alerts where that station is, as an ICS-213 message"],
+  ["What are the HF band conditions now?","HF","net","solar flux, K index and what they mean for HF"],
+  ["What is the weather forecast for my station?","WX {grid}","net","sends your grid square (Settings → Station) so their station looks up the forecast and alerts where you are"]];
 // Einstein on the air (station/einstein.py): this radio's AI assistant at a call of its own
 function vEinBar(m,ch){const e=ch.einstein;if(!e)return"";const rid=m.radio,st=e.state,can=e.can_on||[false,""];
   const dot={answering:"here",waiting:"quiet",paused:"quiet",off:"gone"}[st]||"gone";
