@@ -402,3 +402,27 @@ def test_the_sender_is_told_the_receiver_cancelled_so_it_is_not_taken_for_a_link
     it = m2.chan.view()["threads"]["K7ABC-7"][-1]
     assert it["status"] == "failed" and it["cancelled_by"] == "K7ABC-7"
     assert it["why"] == "cancelled by the operator at K7ABC-7 after 61% had arrived: not a link failure"
+
+
+def test_the_operator_adds_quick_requests_of_their_own(tmp_path):
+    """Owner 2026-11-25: "We should let the user add requests to the Quick requests." Kept on the station with the
+    quick messages: a label (optional), what is sent, and whether one tap sends it; each text once, at most 12; a
+    request to finish typing keeps its trailing space."""
+    from station import varachan as VC
+    st, m, v, clk = _chan(tmp_path)
+    assert m.chan.view()["asks"] == [] and m.chan.view()["asks_max"] == 12
+    m.chan.settings({"asks": [{"label": "  Repeaters near me ", "text": " What repeaters are\n near {grid}? ", "now": True},
+                              {"text": "chirp"}, {"text": "CHIRP", "label": "again"}, {"text": "MSG", "now": False},
+                              {"text": "   "}, "junk", {"label": "no text"}]})
+    assert m.chan.view()["asks"] == [
+        {"label": "Repeaters near me", "text": "What repeaters are near {grid}?", "now": True},
+        {"label": "", "text": "chirp", "now": True},
+        {"label": "", "text": "MSG ", "now": False}]
+    assert len(VC.clean_asks([{"text": f"q{i}"} for i in range(30)])) == 12 and VC.clean_asks("x") == []
+    m.chan.settings({"asks": []})
+    assert m.chan.view()["asks"] == []
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'id="askDlg"' in idx and "data-vaskedit" in idx and "data-vaskadd=" in idx and "const AQ_SUG=[" in idx
+    assert 'V_ASK.concat((ch.asks||[]).map(a=>[a.label||a.text.trim(),a.text,a.now?"mine":"minebox"' in idx
+    assert 'post("/api/vara/channel",{radio:AQ.rid,asks})' in idx and "yours · sends now" in idx

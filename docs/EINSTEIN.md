@@ -68,6 +68,12 @@ conditions now?** (`HF`), **🌐 ⚠ What are the emergency alerts for my area?*
 Settings → Station, so their station looks up the forecast where you are). On the asking station the buttons show this: no mark = works off grid, 🌐 = needs the internet there, 🤖 = a question
 for the AI (put in the box to edit).
 
+**Your own quick requests** (owner 2026-11-25). After the built-in buttons come yours, marked ★: **＋ Add or edit
+mine…** opens *My quick requests* (what is sent, an optional button label, "send at once" or put in the box to finish,
+↑ ↓ to order, ✕ to remove, one-tap suggestions for the command words that have no button, fill-ins `{grid}` `{name}`
+`{me}` `{them}`; up to 12). Quicker still: **☆** on any question you have sent an AI station makes it a quick request
+in one tap. They are kept on the station, with your quick messages.
+
 Replies are laid out for people (owner 2026-11-25): the answer on the first line, then one point per line; a long
 reply that still comes as one paragraph is split into one sentence per line before it goes out.
 

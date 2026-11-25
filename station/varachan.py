@@ -94,6 +94,31 @@ EINSTEIN_IDLE_S = 300          # Einstein lets a link go after this long with no
 AI_WAIT_S = 150                # the asker keeps its link open this long for an AI station's answer
 
 
+ASKS_MAX = 12
+
+
+def clean_asks(raw) -> list[dict]:
+    """The operator's own quick requests for AI stations (owner 2026-11-25: "let the user add requests to the Quick
+    requests"): [{"label": the button's words (may be empty: the text is shown), "text": what is sent, "now": sent
+    by one tap (False = put in the message box to finish, e.g. "MSG ")}], each text once, at most ASKS_MAX."""
+    out, seen = [], set()
+    for a in raw if isinstance(raw, list) else []:
+        if not isinstance(a, dict):
+            continue
+        now = a.get("now", True) is not False
+        text = " ".join(str(a.get("text") or "").split())[:300]
+        if not text:
+            continue
+        if not now:
+            text += " "                                   # a request to finish typing keeps its space ("MSG ")
+        k = text.strip().lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append({"label": " ".join(str(a.get("label") or "").split())[:40], "text": text, "now": now})
+    return out[:ASKS_MAX]
+
+
 class Channel:
     def __init__(self, modem, clock=time.time):
         self.m, self.clock = modem, clock
@@ -207,6 +232,8 @@ class Channel:
             if "presets" in body:
                 ps = [" ".join(str(p).split())[:120] for p in body["presets"] or [] if str(p).strip()][:12]
                 d["presets"] = ps or list(PRESETS)
+            if "asks" in body:                            # the operator's own quick requests for AI stations
+                d["asks"] = clean_asks(body["asks"])
             if "forget" in body:
                 c = str(body["forget"]).upper()
                 d["roster"].pop(c, None)
@@ -845,6 +872,7 @@ class Channel:
             nxt = max(0, round((d.get("last_announce") or 0) + d["every_min"] * 60 - now))
         op = (getattr(self.m.st, "_saved", lambda: {})() or {}).get("operator") or {}
         return {"on": d["on"], "every_min": d["every_min"], "next_announce_s": nxt, "presets": d["presets"],
+                "asks": d.get("asks") or [], "asks_max": ASKS_MAX,
                 "pinned": d.get("pinned"), "roster": roster, "announce_via": d.get("announce_via") or [],
                 "testing": s.get("testing"), "bitrate": s.get("bitrate"),
                 "threads": {c: th[-120:] for c, th in d["threads"].items()},

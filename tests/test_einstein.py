@@ -577,7 +577,7 @@ def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
         ("Send your weather as ICS-213", "WX213"), ("What are the HF band conditions now?", "HF"),
         ("⚠ What are the emergency alerts for my area?", "ALERTS {grid}"),
         ("What is the weather forecast for my station?", "WX {grid}")]
-    assert 'c.replace("{grid}",ch.me.grid||"")' in idx and "Set your grid square in Settings → Station" in idx
+    assert "const askFill=c=>vFill(c,ch,one||\"\",m)" in idx and "Set your grid square in Settings → Station" in idx
 
 
 def test_news_is_searched_on_the_web_never_answered_with_the_weather(tmp_path):
