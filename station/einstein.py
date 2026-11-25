@@ -422,7 +422,9 @@ class Tools:
         if len(h["failed"]) >= 5:
             raise OSError("no alert source could be reached")
         self.alert_place = {"name": h["place"], "lat": p["lat"], "lon": p["lon"]}      # for the local news check
-        mi = lambda km: f"{km * 0.621371:.0f} mi" if km is not None else "distance unknown"   # noqa: E731
+        from . import units as UN
+        un = UN.of(self.e.st)                                  # this station's units (Settings -> Station)
+        mi = lambda km: UN.dist(km, un)   # noqa: E731
 
         def until(t):
             try:
@@ -453,8 +455,8 @@ class Tools:
         clear = [w for k, w in (
             ("official", "official warnings: weather, flood, and civil ones (hazardous materials, radiological, "
                          "evacuation, shelter in place)"),
-            ("quakes", f"earthquakes M{wx.QUAKE_MAG:g}+ within {round(wx.QUAKE_KM * 0.621371 / 5) * 5} mi in {wx.QUAKE_H} h"),
-            ("fires", f"wildfires within {wx.FIRE_KM * 0.621371:.0f} mi"), ("volcanoes", "volcanoes at raised alert"),
+            ("quakes", f"earthquakes M{wx.QUAKE_MAG:g}+ within {UN.round_to(wx.QUAKE_KM, un, 10)} in {wx.QUAKE_H} h"),
+            ("fires", f"wildfires within {UN.round_to(wx.FIRE_KM, un, 10)}"), ("volcanoes", "volcanoes at raised alert"),
             ("air", f"air quality (US AQI {aqi:.0f})" if aqi is not None else "air quality"))
                  if k not in h["failed"] and k not in h["skipped"] and not (
                      h[k] if k != "air" else (aqi is not None and aqi >= wx.AQI_BAD))]

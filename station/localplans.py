@@ -285,6 +285,8 @@ class Plans:
         sfi = netfind.last_sfi(self.st)
         phys = bool(hf["set"])
         day = time.strftime("%Y-%m-%d", time.gmtime())
+        from . import units as UN
+        un = UN.of(self.st)                               # distances in the operator's unit (Settings -> Station)
         ing = d.get("ingested") or {}
         changed = False
         for key, kind in EXPRESS_KEYS.items():
@@ -297,16 +299,16 @@ class Plans:
             except OSError:
                 continue
             by_phys = kind == "hf" and phys
-            sig = [str(p), mt, km[kind], [round(where[0], 3), round(where[1], 3)]] + (
+            sig = [str(p), mt, km[kind], [round(where[0], 3), round(where[1], 3)], un] + (
                 ["v2", day, round(sfi / 5) * 5, hf["antenna"], hf["height_m"], hf["power_w"], hf["ground"],
                  list(hf["good_km"] or [])] if by_phys else [])
             if prev and prev.get("sig") == sig:
                 continue
-            mi = round(km[kind] / 1.609)
-            title = (f"Winlink VARA FM gateways within {mi} mi (VHF/UHF)" if kind == "vhf"
+            mi = UN.dist(km[kind], un)
+            title = (f"Winlink VARA FM gateways within {mi} (VHF/UHF)" if kind == "vhf"
                      else f"Winlink VARA HF gateways your antenna reaches today (propagation for {day} UTC, solar flux "
                           f"{round(sfi)})" if by_phys
-                     else f"Winlink VARA HF gateways within {mi} mi (set your HF antenna in Find nets for the ones it "
+                     else f"Winlink VARA HF gateways within {mi} (set your HF antenna in Find nets for the ones it "
                           "really reaches)") + " · Winlink Express's channel list"
             try:
                 rows = wc.near(p, kind == "hf", where, HF_PHYS_KM if by_phys else km[kind])
@@ -338,7 +340,7 @@ class Plans:
                         band_n[b] = band_n.get(b, 0) + 1
                         rows.append(r)
             freqs = []
-            for f in wc.as_frequencies(rows, title):
+            for f in wc.as_frequencies(rows, title, un):
                 c, _ = _clean_freq(f, set(), require_source=False)
                 if c:
                     freqs.append(c | {"source_doc": title, "gateway": f["gateway"], "kind": "winlink"})
@@ -348,7 +350,7 @@ class Plans:
                         "excluded": prev.get("excluded", kind == "hf") if prev else kind == "hf"}
             changed = True
             print(f"localplans: {len(rows)} {kind.upper()} VARA gateways "
-                  + ("by propagation" if by_phys else f"within {mi} mi") + f" from {p.name}", flush=True)
+                  + ("by propagation" if by_phys else f"within {mi}") + f" from {p.name}", flush=True)
         if changed:
             with self.lock:
                 d2 = _load(self.st)

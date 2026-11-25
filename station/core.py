@@ -466,10 +466,15 @@ class Station:
         tmp = self._operator_path().with_suffix(".tmp")
         tmp.write_text(json.dumps(saved, indent=2), encoding="utf-8"); os.replace(tmp, self._operator_path())
 
+    def units(self) -> str:
+        """"km" (the default) or "mi": how distances are shown and typed everywhere (station/units.py)."""
+        u = (self._saved().get("operator") or {}).get("units")
+        return u if u in ("km", "mi") else "km"
+
     def operator(self) -> dict:
         from . import winlink
         op = {"callsign": self.me, "name": "", "grid": "", "winlink_dir": "", "winlink_account": "",
-              "reach_km": self.reach_km(), "keep_awake": self.awake_mode, "ai_summary": True} | \
+              "reach_km": self.reach_km(), "units": "km", "keep_awake": self.awake_mode, "ai_summary": True} | \
              {k: v for k, v in (self._saved().get("operator") or {}).items() if v is not None}
         op["keep_weeks"] = self.keep_weeks()
         op["callsign"] = self.me
@@ -524,6 +529,9 @@ class Station:
                 raise ValueError("VHF/UHF reach must be a number of km")
             if not 50 <= reach <= 5000:
                 raise ValueError("VHF/UHF reach must be between 50 and 5000 km")
+        un = body.get("units")
+        if un not in (None, "") and un not in ("km", "mi"):
+            raise ValueError("units are km or mi")
         from .retention import MAX_WEEKS
         weeks = body.get("keep_weeks")
         if weeks not in (None, ""):
@@ -540,6 +548,8 @@ class Station:
             if weeks not in (None, ""):
                 shorter = weeks < self.keep_weeks()
                 op["keep_weeks"] = weeks
+            if un in ("km", "mi"):
+                op["units"] = un
             if reach not in (None, ""):
                 if reach != op.get("reach_km"):
                     self.__dict__.pop("_agreed", None)          # re-run today's agreement with the new reach
@@ -2318,7 +2328,7 @@ class Station:
 
     def snapshot(self) -> dict:
         with self.lock:
-            return {"callsign": self.me, "radios": list(self.radios.values()), "tx": self._recent_tx(),
+            return {"callsign": self.me, "units": self.units(), "radios": list(self.radios.values()), "tx": self._recent_tx(),
                     "heard": self.heard_list(), "hints": self.hints, "net": self.schedule_now(),
                     "schedule": self.nets.decorated(), "unheard": self.nets.unheard(), "engines": self.engines,
                     "alerts": self.nets.alerts.last, "netclose": self.closer.state(), "urgent": self._urgent(), "history": self.history.status,

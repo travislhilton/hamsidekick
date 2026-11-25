@@ -41,7 +41,8 @@ def test_only_vara_gateways_with_public_or_emcomm_codes_within_reach_nearest_fir
     assert [(r["call"], r["freq_mhz"], r["modes"]) for r in h][0] == ("N0CALL", 7.1025, ["VARA HF", "VARA HF 2750"])
     assert all(r["freq_mhz"] != 3.5925 for r in h) and h[-1]["hours"] == "12-23"
     use = wc.as_frequencies(v, "t")[1]["use"]
-    assert use.startswith("Winlink gateway K7ABC-10 (VARA FM / VARA FM wide), ") and "mi " in use and "grid EM59mt" in use
+    assert use.startswith("Winlink gateway K7ABC-10 (VARA FM / VARA FM wide), ") and "km " in use and "grid EM59mt" in use
+    assert "37 mi E" in wc.as_frequencies(v, "t", "mi")[1]["use"]             # the operator's unit
 
 
 def test_the_gateways_go_into_the_band_plan_from_express_and_hf_is_only_offered(tmp_path, monkeypatch):
@@ -53,13 +54,15 @@ def test_the_gateways_go_into_the_band_plan_from_express_and_hf_is_only_offered(
     gws = {g["key"]: g for g in s["gateways"]}
     vhf, hf = gws["express:vhf"], gws["express:hf"]
     assert vhf["band"]["in"] and not hf["band"]["in"]                    # VHF/UHF in; VARA HF offered, unticked
-    assert "50 mi" in vhf["title"] and [g["gateway"]["call"] for g in vhf["list"]] == ["W9XYZ-10", "K7ABC-10"]
+    assert "80 km" in vhf["title"] and [g["gateway"]["call"] for g in vhf["list"]] == ["W9XYZ-10", "K7ABC-10"]
     t = p.consolidated()
     rows = [r for b in t["bands"] for r in b["rows"] if r["type"] == "channel" and "Winlink gateway" in (r["use"] or "")]
     assert {round(r["from"], 3) for r in rows} == {145.05, 440.95}
     p.choose("express:hf", True)
     assert p.state()["gateways"][1]["band"]["in"]
     p.settings({"km": 300})                                                # a wider reach rebuilds the list
+    assert "300 km" in {g["key"]: g for g in p.state()["gateways"]}["express:vhf"]["title"]
+    st._save({"operator": {"units": "mi"}})                                # Settings -> Station -> Units: miles
     assert "186 mi" in {g["key"]: g for g in p.state()["gateways"]}["express:vhf"]["title"]
     assert len({g["key"]: g for g in p.state()["gateways"]}["express:vhf"]["list"]) == 3
 
@@ -175,7 +178,7 @@ def test_hf_gateways_are_chosen_by_what_the_antenna_reaches_not_by_a_circle(tmp_
     st.where = lambda: HERE
     monkeypatch.setattr(p, "_installs", lambda: [str(inst)])
     hf = {g["key"]: g for g in p.state()["gateways"]}["express:hf"]
-    assert "within 373 mi" in hf["title"] and "set your HF antenna in Find nets" in hf["title"]   # no antenna set yet
+    assert "within 600 km" in hf["title"] and "set your HF antenna in Find nets" in hf["title"]   # no antenna set yet
     assert [g["gateway"]["call"] for g in hf["list"]] == ["N0CALL"]
     netfind.Finder(st).settings({"hf": {"antenna": "invv", "height_m": 40, "ends_m": 10, "unit": "us", "power_w": 100,
                                         "good_from_km": 400, "good_to_km": 600}})
@@ -183,7 +186,7 @@ def test_hf_gateways_are_chosen_by_what_the_antenna_reaches_not_by_a_circle(tmp_
     assert h["unit"] == "us" and h["apex_m"] == 12.2 and h["ends_m"] == 3.0 and h["height_m"] == 9.13   # feet in
     assert h["good_km"] == [644, 966]                                                                 # miles in
     hf = {g["key"]: g for g in p.state()["gateways"]}["express:hf"]
-    assert "your antenna reaches today" in hf["title"] and "373 mi" not in hf["title"]
+    assert "your antenna reaches today" in hf["title"] and "600 km" not in hf["title"]
     calls = [(g["gateway"]["call"], g["freq_mhz"]) for g in hf["list"]]
     assert ("K7ABC", 14.105) in calls and ("N0CALL", 14.105) not in calls        # one hop away: in; the skip zone: out
     k = next(g for g in hf["list"] if g["gateway"]["call"] == "K7ABC" and g["freq_mhz"] == 14.105)
@@ -193,5 +196,5 @@ def test_hf_gateways_are_chosen_by_what_the_antenna_reaches_not_by_a_circle(tmp_
         netfind.Finder(st).settings({"hf": {"antenna": "invv", "height_m": 30, "ends_m": 40, "unit": "us", "power_w": 100}})
     from station.server import STATIC
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert 'id="nfUnit"' in idx and 'id="nfEnds"' in idx and "Where your signal lands today" in idx
+    assert 'id="nfEnds"' in idx and "Where your signal lands today" in idx and 'id="nfUnit"' not in idx   # the global Units
     assert "On 80 and 40 m you hear stations well from" in idx and "data-nfusephys" in idx

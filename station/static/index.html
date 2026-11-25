@@ -606,14 +606,13 @@ header button.hq{background:transparent;border-color:rgba(255,255,255,.18);font-
 .vtools{border-top:1px solid var(--line);padding-top:3px}.vtools>summary{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vtools[open]{max-height:48%;overflow:auto;overscroll-behavior:contain}.vtools[open]>summary{margin-bottom:4px;white-space:normal}
 .vbar{padding:5px 10px;margin:4px 0;gap:4px 8px}.vbar>span:not([style]){min-width:0}.vwork{display:block;text-align:left;width:100%;font:inherit;font-size:13px;min-height:0;flex:none}
 .vaddbtn{display:none;border-radius:999px;min-height:0;padding:1px 9px}
-.vqchips{display:contents}.vqbtn{display:none}
+.vqchips{display:none}.vpanel .vqbtn{display:flex;width:100%;align-items:center;gap:6px;text-align:left;font-size:13.5px;padding:5px 10px;border-radius:8px;min-height:32px}.vqcar{margin-left:auto}
 #vqPop{display:flex;flex-direction:column;gap:1px;position:fixed;overflow:auto;overscroll-behavior:contain;background:var(--panel);color:var(--ink);border:1px solid var(--accent,#1f4fbf);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.3);z-index:95;padding:4px;box-sizing:border-box}#vqPop[hidden]{display:none}
 .vqmenu .vqrow{display:block;width:100%;text-align:left;border:0;border-radius:7px;padding:7px 9px;min-height:40px;font-size:14px;line-height:1.3;white-space:normal;background:none;color:inherit}.vqmenu .vqrow:hover:not([disabled]),.vqmenu .vqrow:focus-visible{background:color-mix(in srgb,var(--accent,#1f4fbf) 13%,var(--panel));outline:none}.vqmenu .vqrow[disabled]{opacity:.55}
 .vql{display:block;font-weight:600}.vqh{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
 @container (max-width:520px){.vpanel .vchan{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:4px}
   .vpanel .vros{display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-height:68px;overflow:auto;padding:3px;border:0}.vpanel .vros h5,.vpanel .vros [data-vall]{display:none}.vpanel .vros .vst{width:auto;padding:1px 8px 1px 4px;border-color:var(--line);border-radius:999px}.vpanel .vros .vst .sub,.vpanel .vros .vai.sm{display:none}.vpanel .vros .vst.aikid{margin-left:0}.vpanel .vros form{margin:0}.vpanel .vros input:not([type=checkbox]){width:7em}
   .vaddbtn{display:inline-block}.vaddcall:not(.show){display:none}.vfl{display:none}.vb{max-width:94%}.vphead h3{font-size:14px}
-  .vqchips{display:none}.vpanel .vqbtn{display:flex;width:100%;align-items:center;gap:6px;text-align:left;font-size:13.5px;padding:5px 10px;border-radius:8px;min-height:32px}.vqcar{margin-left:auto}
   .vpanel:not(.vfocus) [data-vfocus]{background:var(--accent,#1f4fbf);color:#fff;border-color:transparent}}
 /* Focus: the chat takes the whole window */
 body.vfocusing{overflow:hidden}.vpanel.vfocus{position:fixed;inset:0;z-index:70;background:var(--bg,var(--panel));padding:10px 16px;overflow:auto;margin:0;border-radius:0}
@@ -699,6 +698,9 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
     <div class="srow"><label class="sl" for="setGrid">Grid square</label><div class="sc">
       <input id="setGrid" name="grid" maxlength="6" placeholder="EM59et" style="text-transform:none;width:8em"><span class="ferr" data-ferr="grid"></span>
       <div class="sh">Where the station is: 4 or 6 characters. Used by Find nets and on Winlink messages.</div></div></div>
+    <div class="srow"><label class="sl" for="setUnits">Units</label><div class="sc">
+      <select id="setUnits" name="units" style="width:auto"><option value="km">Kilometres and metres</option><option value="mi">Miles and feet</option></select>
+      <div class="sh">Every distance and antenna height on this station is shown and typed in these: Find nets, Plans, HF reach, alerts, gateways.</div></div></div>
     <h4 class="sec">Display <span class="stag">this browser · changes at once</span></h4>
     <div class="srow"><label class="sl" for="dispTheme">Colours</label><div class="sc">
       <select id="dispTheme" onchange="setDisplay('theme',this.value)"><option value="auto">Automatic (follow this device)</option><option value="light">Light (daylight, bright rooms)</option><option value="dark">Dark</option><option value="night">Night: red on black (keeps night vision)</option></select></div></div>
@@ -711,7 +713,7 @@ function setDisplay(k,v){DISP[k]=v;try{localStorage.setItem("hamsidekick.display
     <div id="alertSet" class="small"></div>
     <h4 class="sec">Logging nets <span class="stag">Save below</span></h4>
     <div class="srow"><label class="sl" for="setReach">VHF/UHF reach</label><div class="sc">
-      <span class="inl"><input id="setReach" name="reach_km" type="number" min="50" max="5000" step="10" style="width:7em"> km</span><span class="ferr" data-ferr="reach_km"></span>
+      <span class="inl"><input id="setReach" name="reach_km" type="number" min="30" max="5000" step="10" style="width:7em"> <span id="setReachU">km</span></span><span class="ferr" data-ferr="reach_km"></span>
       <div class="sh">A far-away callsign heard only once is not counted. Raise it for a linked repeater system.</div>
       <details class="why"><summary>Why?</summary><div>On a repeater or simplex net, a callsign licensed farther away than this, heard only once, that the two transcription passes did not read alike and that has no name or earlier check-in with it is shown struck through and not counted.</div></details></div></div>
     <div class="srow"><span class="sl">AI net summary</span><div class="sc">
@@ -881,8 +883,8 @@ function txHtml(t0){
   const calls=(t.callsigns||[]).filter(c=>c!==sp).map(c=>{const f=fx[c],u=unc[c];
     const tip="mentioned"+(f?` · heard "${f.heard}", corrected: ${f.why}`:"")+(u!==undefined?` · can't be confirmed: ${u}. Still counted.`:byq.has(c)?" · confirmed on QRZ.com":"");
     return `<span class="call${f?" fixed":""}${u!==undefined?" unc":""}" data-call="${esc(c)}" title="${esc(tip)}">${esc(c)}</span>`}).join("")+
-    ((k&&!c&&k.distant)||[]).map(d=>(d.near||[]).length?`<span class="maybe" title="${esc(d.call)} is licensed ${d.km} km away, beyond VHF/UHF reach, and is one letter from ${esc(d.near.map(n=>n.call+" ("+n.km+" km)").join(", "))}. Probably one of those misheard (a visitor on a link is possible); not counted until you choose. Click a call to look it up; ✎ Fix to set it."><span class="call far" data-call="${esc(d.call)}">${esc(d.call)}</span>? ${d.near.map(n=>`<span class="call" data-call="${esc(n.call)}">${esc(n.call)}</span>`).join("")}</span>`:
-      `<span class="call far" data-call="${esc(d.call)}" title="${d.km} km away, beyond VHF/UHF reach, and nothing backs it: the two transcription passes did not read it alike, it was not heard again, and no name, town or earlier check-in goes with it. Probably misheard; not counted as a station. Use ✎ Fix if it was really there.">${esc(d.call)}</span>`).join("")+
+    ((k&&!c&&k.distant)||[]).map(d=>(d.near||[]).length?`<span class="maybe" title="${esc(d.call)} is licensed ${dText(d.km)} away, beyond VHF/UHF reach, and is one letter from ${esc(d.near.map(n=>n.call+" ("+dText(n.km)+")").join(", "))}. Probably one of those misheard (a visitor on a link is possible); not counted until you choose. Click a call to look it up; ✎ Fix to set it."><span class="call far" data-call="${esc(d.call)}">${esc(d.call)}</span>? ${d.near.map(n=>`<span class="call" data-call="${esc(n.call)}">${esc(n.call)}</span>`).join("")}</span>`:
+      `<span class="call far" data-call="${esc(d.call)}" title="${dText(d.km)} away, beyond VHF/UHF reach, and nothing backs it: the two transcription passes did not read it alike, it was not heard again, and no name, town or earlier check-in goes with it. Probably misheard; not counted as a station. Use ✎ Fix if it was really there.">${esc(d.call)}</span>`).join("")+
     (t.maybe||[]).map(m=>`<span class="maybe" title="Heard &quot;${esc(m.heard)}&quot;; could be ${esc(m.candidates.join(" or "))}. Click one to look it up; use Who? to set the speaker.">${esc(m.heard)}? ${m.candidates.map(c=>`<span class="call" data-call="${esc(c)}">${esc(c)}</span>`).join("")}</span>`).join("");
   const who=t.status!=="final"?"":(w?whoHtml(w,fx[sp]):"")+`<button class="whob" data-who="${esc(t0.id)}" title="Say who was talking (always wins; kept in the log and the ICS-309)">Who?</button>`+
     (editing||c?"":`<button class="fixb" data-fix="${esc(t0.id)}" title="Correct the words: your text is used for the minutes, search and the Winlink messages, and the station learns from it">✎ Fix</button>`);
@@ -1723,6 +1725,14 @@ function renderHeard(rid){
 }
 
 // ---------- settings ----------
+// Distances and heights in the operator's units (owner 2026-11-25: "a global setting ... mi or km ... Default to km").
+// Everything is kept in km and metres; these convert only what is shown or typed. S.units comes with the state.
+const UNIT={mi:()=>!!(typeof S!=="undefined"&&S&&S.units==="mi"),d:()=>UNIT.mi()?"mi":"km",h:()=>UNIT.mi()?"ft":"m"};
+function dNum(km){return km==null||km===""?"":UNIT.mi()?Math.round(km/1.609344):+km}
+function dText(km){return km==null||km===""?"":dNum(km).toLocaleString()+" "+UNIT.d()}
+function dIn(v){return v===""||v==null?"":UNIT.mi()?Math.round(v*1.609344):+v}          // what was typed -> km
+function hNum(m){return m==null||m===""?"":UNIT.mi()?Math.round(m/0.3048):+m}
+function kmText(t){return !UNIT.mi()?t:String(t||"").replace(/(\d[\d,]*(?:\.\d+)?)(-(\d[\d,]*(?:\.\d+)?))? km\b/g,(m,a,_,b)=>{const c=x=>Math.round(parseFloat(x.replace(/,/g,""))/1.609344).toLocaleString();return c(a)+(b?"-"+c(b):"")+" mi"})}
 let OP=null;
 async function loadSettings(){OP=await (await fetch("/api/settings")).json();return OP}
 function fillAccounts(f){
@@ -1730,7 +1740,7 @@ function fillAccounts(f){
   f.winlink_account.innerHTML=(inst?inst.accounts:[]).map(a=>`<option${a===OP.winlink_account?" selected":""}>${esc(a)}</option>`).join("");
 }
 // ---------- Settings: tabs; the fields above the Save bar save together, every other part on its own button ----------
-const SETF={callsign:["station","Callsign"],name:["station","Name"],grid:["station","Grid square"],winlink_dir:["winlink","Winlink folder"],
+const SETF={units:["station","Units"],callsign:["station","Callsign"],name:["station","Name"],grid:["station","Grid square"],winlink_dir:["winlink","Winlink folder"],
   winlink_account:["winlink","Send as"],reach_km:["nets","VHF/UHF reach"],ai_summary:["nets","AI net summary"],keep_awake:["pc","Full speed"],keep_weeks:["pc","Keep weeks"]};
 let SETWAS={};
 const setVal=(f,k)=>f[k].type==="checkbox"?f[k].checked:String(f[k].value);
@@ -1753,7 +1763,9 @@ function setClose(){if(setDirty().length&&!confirm("Close without saving your ch
 async function openSettings(tab){
   const op=await loadSettings(),f=$("setForm");
   $("dispTheme").value=DISP.theme;$("dispClock").value=DISP.clock;
-  f.callsign.value=op.callsign||"";f.name.value=op.name||"";f.grid.value=op.grid||"";f.reach_km.value=op.reach_km||300;f.keep_awake.value=op.keep_awake||"traffic";f.keep_weeks.value=op.keep_weeks||6;f.keep_weeks.dataset.was=op.keep_weeks||6;f.ai_summary.checked=op.ai_summary!==false;
+  f.callsign.value=op.callsign||"";f.name.value=op.name||"";f.grid.value=op.grid||"";f.units.value=op.units==="mi"?"mi":"km";f.reach_km.value=f.units.value==="mi"?Math.round((op.reach_km||300)/1.609344):(op.reach_km||300);$("setReachU").textContent=f.units.value;
+  f.units.onchange=()=>{const mi=f.units.value==="mi",v=+f.reach_km.value;if(v)f.reach_km.value=mi?Math.round(v/1.609344):Math.round(v*1.609344/10)*10;$("setReachU").textContent=f.units.value};
+  f.keep_awake.value=op.keep_awake||"traffic";f.keep_weeks.value=op.keep_weeks||6;f.keep_weeks.dataset.was=op.keep_weeks||6;f.ai_summary.checked=op.ai_summary!==false;
   f.winlink_dir.innerHTML=(op.installs||[]).map(i=>`<option value="${esc(i.path)}"${i.path===op.winlink_dir?" selected":""}>${esc(i.path)}${i.active?" (active "+esc(i.active)+")":""}</option>`).join("");
   $("wlNone").textContent=(op.installs||[]).length?"":"No Winlink Express found on this PC (looked in C:\\RMS Express and the installed-programs list).";
   fillAccounts(f);setClearErrs();SETWAS={};Object.keys(SETF).forEach(k=>SETWAS[k]=setVal(f,k));setDirty();
@@ -1781,14 +1793,14 @@ $("setSave").onclick=async e=>{
   const kw=+f.keep_weeks.value,was=+f.keep_weeks.dataset.was||6;
   if(kw&&kw<was&&!confirm(`Keep recordings and net history for ${kw} weeks instead of ${was}?\n\nEverything older than ${kw} weeks (recordings, logs, net history and minutes) will be deleted in about a minute. This cannot be undone.`))return;
   $("setSave").disabled=true;$("setDirty").textContent="Saving…";
-  let r,d;try{r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({callsign:f.callsign.value,name:f.name.value,grid:f.grid.value,winlink_dir:f.winlink_dir.value,winlink_account:f.winlink_account.value,reach_km:f.reach_km.value,keep_awake:f.keep_awake.value,keep_weeks:f.keep_weeks.value,ai_summary:f.ai_summary.checked})});
+  let r,d;try{r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({callsign:f.callsign.value,name:f.name.value,grid:f.grid.value,winlink_dir:f.winlink_dir.value,winlink_account:f.winlink_account.value,units:f.units.value,reach_km:f.reach_km.value===""?"":f.units.value==="mi"?Math.round(f.reach_km.value*1.609344):f.reach_km.value,keep_awake:f.keep_awake.value,keep_weeks:f.keep_weeks.value,ai_summary:f.ai_summary.checked})});
     d=await r.json()}catch(err){r={ok:false};d={error:err.message}}
   if(!r.ok){const msg=d.error||"not saved",m=msg.toLowerCase();
     // the error beside its field, on its tab
     const k=/call/.test(m)?"callsign":/grid/.test(m)?"grid":/reach|km/.test(m)?"reach_km":/week/.test(m)?"keep_weeks":/winlink|folder|account/.test(m)?"winlink_dir":/name/.test(m)?"name":null;
     if(k){setTab(SETF[k][0]);setFieldErr(k,msg);f[k].focus()}
     $("setErr").textContent="Not saved: "+msg;setDirty();return}
-  OP=d;$("me").textContent=d.callsign+" station";f.keep_weeks.dataset.was=f.keep_weeks.value;
+  OP=d;if(typeof S!=="undefined"&&S)S.units=d.units==="mi"?"mi":"km";$("me").textContent=d.callsign+" station";f.keep_weeks.dataset.was=f.keep_weeks.value;
   SETWAS={};Object.keys(SETF).forEach(k=>SETWAS[k]=setVal(f,k));setDirty();$("setDirty").textContent="✓ Saved.";
 };
 // ---------- This PC (station/pccheck.py): speed, power settings, what the station changes ----------
@@ -2938,7 +2950,7 @@ async function renderPlans(full){
   const busy=PL.busy||d.busy;
   const search=!d.key?'<p>Searching needs the xAI key (Settings → Einstein & AI → Station agent). You can still add a plan file once the key is set, and the band plan works without it.</p>'
     :`<div class="row nfrow"><span>${d.location?`Near <b>${esc(d.location.label)}</b>`:'<span class="bad">Set the station\'s location first (Nets → Find nets).</span>'}</span>
-      <label>Within <input id="plKm" type="number" min="5" max="400" value="${d.km}" style="width:5em"> km</label>
+      <label>Within <input id="plKm" type="number" min="3" max="400" value="${dNum(d.km)}" style="width:5em"> ${UNIT.d()}</label>
       <button class="primary" data-plgo${busy||!d.location?" disabled":""}>${busy?"Searching… clubs, the coordinator's band plan, ARES / RACES plans (up to two minutes)":d.at?"Search again":"Find local plans"}</button></div>
       <p class="small muted">${d.at?`Last searched ${esc(new Date(d.at*1000).toLocaleString([],{month:"short",day:"numeric",year:"numeric"}))}${d.cost_usd!=null?` · cost $${d.cost_usd}`:""}.${d.stale?' <span class="warnc">Over a month ago: plans change; search again to see what is new.</span>':""}`:"One search costs about $0.20–0.50 of xAI. It reads only public pages: a members-only plan can be added below as a file."}${d.saving?" Saving offline copies…":""}</p>`;
   const msg=PL.msg?`<p class="${PL.msg.bad?"bad":"ok"}">${esc(PL.msg.text)}</p>`:"";
@@ -2956,7 +2968,7 @@ async function renderPlans(full){
     if(b.in)return `<div>${tick} <span class="muted">(${b.segments} range${b.segments===1?"":"s"}, ${b.channels} channel${b.channels===1?"":"s"})</span> <select class="bpas" data-plauth="${esc(key)}" aria-label="Whose plan this is"><option value="coordinator"${b.authority==="coordinator"?" selected":""}>as the state coordinator's plan</option><option value="local"${b.authority!=="coordinator"?" selected":""}>as a local plan</option></select> <button class="linkish small" data-plagain="${esc(key)}" title="Read it again with xAI (a few cents), e.g. after the plan changed">read again</button></div>`;
     if(b.error)return `<div>${tick} <span class="warnc">could not be read: ${esc(b.error)}</span></div>`;
     return `<div>${tick}${b.read?' <span class="muted">(left out)</span>':' <span class="muted">(read once with xAI, a few cents)</span>'}</div>`};
-  const gwRow=g=>{const w=g.gateway;return `<li>${bpMhz(g.freq_mhz)} ${esc(g.mode||"")} · <b>${esc(w?w.call:g.use||"")}</b>${w?` <span class="muted">${esc(w.modes.join(" / "))} · ${Math.round(w.km/1.609)} mi ${esc(w.dir)} · grid ${esc(w.grid)}${w.hours&&w.hours!=="00-23"?" · "+esc(w.hours)+" UTC":""}</span>${w.service==="EMCOMM"?' <span class="np k-tune" style="padding:0 6px">EMCOMM</span>':""}`:""}${g.source_url?` · <a href="${esc(g.source_url)}" target="_blank" rel="noopener noreferrer">source</a>`:""}</li>`};
+  const gwRow=g=>{const w=g.gateway;return `<li>${bpMhz(g.freq_mhz)} ${esc(g.mode||"")} · <b>${esc(w?w.call:g.use||"")}</b>${w?` <span class="muted">${esc(w.modes.join(" / "))} · ${dText(w.km)} ${esc(w.dir)} · grid ${esc(w.grid)}${w.hours&&w.hours!=="00-23"?" · "+esc(w.hours)+" UTC":""}</span>${w.service==="EMCOMM"?' <span class="np k-tune" style="padding:0 6px">EMCOMM</span>':""}`:""}${g.source_url?` · <a href="${esc(g.source_url)}" target="_blank" rel="noopener noreferrer">source</a>`:""}</li>`};
   const gw=(d.gateways||[]).map(G=>`<li><b>${esc(G.title)}</b> <span class="np" style="padding:0 6px">Winlink</span> · ${G.list.length} gateway channel${G.list.length===1?"":"s"}${G.express&&G.list_at?` <span class="muted small">(list updated ${esc(new Date(G.list_at*1000).toLocaleDateString())}: Winlink Express → Channel Selection → Update Table Via Internet refreshes it)</span>`:""}${bpCtl(G.key,G.band,true,true)}<details><summary class="muted">The gateways${G.express?", nearest first":""}</summary><ul>${G.list.map(gwRow).join("")}</ul></details></li>`).join("");
   const docs=wlListNote(d.winlink_list)+((d.documents||[]).length||(d.files||[]).length||(d.gateways||[]).length?`<h4 id="plDocs">Plans and documents</h4><p class="small muted">Tick <b>In the band plan</b> on each plan you want in the band plan table (header → Band plan). Each is read once, then it is in; untick to leave it out. ${inBP?`<b>${inBP}</b> in the band plan now. <button class="linkish small" data-bpfromplans>Open the band plan</button>`:"None in the band plan yet."}</p><ul class="small pldocs">${gw}${(d.files||[]).map(x=>`<li><b>${esc(x.name)}</b> <span class="np" style="padding:0 6px">your file</span> · ${x.found} frequenc${x.found===1?"y":"ies"} read · <a href="/api/localplans/doc/${esc(x.id)}">download</a>${bpCtl("file:"+x.id,x.band,x.band&&(x.band.read||x.band.error))}</li>`).join("")}${(d.documents||[]).map(x=>`<li><b>${esc(x.title)}</b> <span class="np" style="padding:0 6px">${esc((d.doc_kinds||{})[x.kind]||x.kind)}</span>${x.org?" · "+esc(x.org):""}${x.date?" · "+esc(x.date):""} · <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">open</a>${!x.public?' · <span class="muted">members only: not copied (add it below as a file if you have it)</span>':x.saved&&x.saved.path?` · <a href="/api/localplans/doc/${esc(x.saved.id)}">offline copy</a> <span class="muted">(saved ${esc(new Date(x.saved.at*1000).toLocaleDateString())})</span>`:x.saved&&x.saved.error?` · <span class="warnc" title="${esc(x.saved.error)}">copy failed</span> <button class="linkish small" data-plcopy="${esc(x.url)}">try again</button>`:` · <button class="linkish small" data-plcopy="${esc(x.url)}">save an offline copy</button>`}${bpCtl(x.url,x.band,x.public&&d.key)}</li>`).join("")}</ul>`:"");
   const clubs=(d.clubs||[]).length?`<details class="small"${PL.clubsOpen?" open":""} data-plclubs><summary><b>Clubs and groups (${d.clubs.length})</b></summary><ul>${d.clubs.map(c=>`<li><b>${c.url?`<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${esc(c.name)}</a>`:esc(c.name)}</b>${c.emcomm?' <span class="badge emergency">EMCOMM</span>':""}${c.area?" · "+esc(c.area):""}${c.meets?` · <span class="muted">${esc(c.meets)}</span>`:""}${c.repeaters.length?`<div class="muted">${esc(c.repeaters.join("; "))}</div>`:""}</li>`).join("")}</ul></details>`:"";
@@ -2965,7 +2977,7 @@ async function renderPlans(full){
   const cls=bp&&bp.license_class,fx=a=>a.map(([x,y])=>`${x}–${y}`).join(", ");
   const band=bp?`<details class="small"${PL.bpOpen?" open":""} data-plbp><summary><b>Band plan</b> <span class="muted">(built in: FCC privileges${cls?` for a ${esc(cls)}`:""} and the ARRL band plan)</span></summary><div class="nlistwrap"><table class="nlist"><thead><tr><th>Band</th>${cls?"<th>Your privileges, MHz</th>":""}<th>Band plan</th></tr></thead><tbody>${bp.bands.slice().reverse().map(b=>`<tr><td><b>${esc(b.band)}</b><div class="muted">${b.from}–${b.to}</div></td>${cls?`<td>${b.mine&&(b.mine.phone.length||b.mine.data.length||b.mine.cw.length)?["phone","data","cw"].filter(k=>b.mine[k].length).map(k=>`<div>${k==="cw"?"CW":k[0].toUpperCase()+k.slice(1)}: ${fx(b.mine[k])}</div>`).join(""):'<span class="muted">none</span>'}</td>`:""}<td>${b.plan.slice().sort((p,q)=>q.to-p.to||q.from-p.from).map(x=>`<div>${x.from===x.to?x.from:`${x.from}–${x.to}`} <span class="muted">${esc(x.what)}</span></div>`).join("")}</td></tr>`).join("")}</tbody></table></div><p class="muted">US rules (47 CFR 97.301 / 97.305). The band plan is voluntary; your state's coordinator and local plans refine VHF/UHF.</p></details>`:"";
   box.innerHTML=head+search+msg+chg+kept+fr+docs+clubs+out+file+band;
-  const km=$("plKm");if(km)km.onchange=async()=>{try{PL.d=await post("/api/localplans/settings",{km:km.value})}catch(e){PL.msg={bad:true,text:e.message};renderPlans()}};
+  const km=$("plKm");if(km)km.onchange=async()=>{try{PL.d=await post("/api/localplans/settings",{km:dIn(km.value)})}catch(e){PL.msg={bad:true,text:e.message};renderPlans()}};
   const fi=$("plFile");if(fi)fi.onchange=async()=>{const f=fi.files[0];if(!f)return;PL.msg={bad:false,text:`Reading ${f.name}…`};renderPlans();
     try{const b64=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(",")[1]);r.onerror=no;r.readAsDataURL(f)});
       const d2=await post("/api/localplans/file",{name:f.name,data:b64});PL.d=d2;PL.msg={bad:false,text:`${f.name}: ${d2.found} frequenc${d2.found===1?"y":"ies"} found. Tick the ones to keep.`}}catch(e){PL.msg={bad:true,text:e.message}}renderPlans()};
@@ -2979,7 +2991,7 @@ document.addEventListener("click",async e=>{
   const t=e.target;if(!t.closest||!t.closest("#netsBody")||NV.tab!=="plans")return;
   const act=async(fn,ok)=>{try{PL.d=await fn();PL.msg=ok?{bad:false,text:typeof ok==="function"?ok(PL.d):ok}:null}catch(err){PL.msg={bad:true,text:err.message}}renderPlans();renderRadios()};
   if(t.closest("[data-bpfromplans]")){bpOpen();return}
-  if(t.closest("[data-plgo]")){PL.busy=true;PL.msg=null;renderPlans();await act(()=>post("/api/localplans/search",{km:$("plKm")?$("plKm").value:undefined}),d=>`${(d.frequencies||[]).filter(f=>!f.kept).length} frequencies, ${(d.documents||[]).length} plans and documents, ${(d.clubs||[]).length} clubs found.`);PL.busy=false;renderPlans();return}
+  if(t.closest("[data-plgo]")){PL.busy=true;PL.msg=null;renderPlans();await act(()=>post("/api/localplans/search",{km:$("plKm")?dIn($("plKm").value):undefined}),d=>`${(d.frequencies||[]).filter(f=>!f.kept).length} frequencies, ${(d.documents||[]).length} plans and documents, ${(d.clubs||[]).length} clubs found.`);PL.busy=false;renderPlans();return}
   const pk=t.closest("[data-plpick]");if(pk){pk.checked?PL.sel.add(pk.dataset.plpick):PL.sel.delete(pk.dataset.plpick);renderPlans();return}
   const al=t.closest("[data-plall]");if(al){(PL.d.frequencies||[]).filter(f=>!f.kept).forEach(f=>al.checked?PL.sel.add(f.id):PL.sel.delete(f.id));renderPlans();return}
   if(t.closest("[data-plkeep]")){const ids=[...PL.sel];PL.sel.clear();await act(()=>post("/api/localplans/keep",{ids}),`Kept ${ids.length}.`);return}
@@ -3093,8 +3105,8 @@ let NA={d:null,sig:"",sel:{},msg:null};
 // ----- Find nets (station/netfind.py): nets near the station from an xAI web search, ticked and added -----
 const NF={d:null,sel:new Set(),radio:{},msg:null,busy:false,geoTried:false,addr:false,hideFar:true};
 function nfVals(){const v=id=>$(id)?$(id).value:undefined,o={};
-  if($("nfKm"))o.km=v("nfKm");if($("nfHfKm"))o.hf_km=v("nfHfKm");
-  if($("nfAnt"))o.hf={antenna:v("nfAnt"),height_m:$("nfHt")?v("nfHt"):"",ends_m:$("nfEnds")?v("nfEnds"):"",unit:$("nfUnit")?v("nfUnit"):"si",power_w:v("nfPw"),good_from_km:v("nfGood1"),good_to_km:v("nfGood2"),ground:v("nfGnd")};
+  if($("nfKm"))o.km=dIn(v("nfKm"));if($("nfHfKm"))o.hf_km=dIn(v("nfHfKm"));
+  if($("nfAnt"))o.hf={antenna:v("nfAnt"),height_m:$("nfHt")?v("nfHt"):"",ends_m:$("nfEnds")?v("nfEnds"):"",unit:UNIT.mi()?"us":"si",power_w:v("nfPw"),good_from_km:v("nfGood1"),good_to_km:v("nfGood2"),ground:v("nfGnd")};
   const ints=[...document.querySelectorAll("[data-nfint]")];if(ints.length)o.interests=ints.filter(x=>x.checked).map(x=>x.dataset.nfint);
   if($("nfDx"))o.dx=$("nfDx").checked;
   return o}
@@ -3103,7 +3115,7 @@ function nfHour(h){const t=new Date();t.setUTCHours(h%24,0,0,0);return t.toLocal
 function nfReachHtml(){const t=NF.reach;if(t===undefined)return"";if(t===null)return'<p class="small muted">Working out the paths… (a few seconds)</p>';
   const on=t.filter(r=>r.windows.length),off=t.filter(r=>!r.windows.length);
   if(!on.length)return'<p class="small muted">With this setup the model finds no part of the world heard often enough today. A higher antenna, a vertical or a beam, or more power, changes that.</p>';
-  return `<table class="nlist small"><thead><tr><th>Region</th><th>Band and your time (how often you hear it)</th></tr></thead><tbody>${on.map(r=>`<tr><td><b>${esc(r.label)}</b><div class="muted">${r.km.toLocaleString()} km</div></td><td>${r.windows.slice(0,5).map(w=>`<span style="white-space:nowrap">${esc(w.band)} ${w.from===0&&w.to===24?"all day":`${nfHour(w.from)}–${nfHour(w.to)}`} <span class="muted">(${w.best}%${w.send!==w.best?`, they hear you ${w.send}%`:""})</span></span>`).join(" · ")}</td></tr>`).join("")}</tbody></table>
+  return `<table class="nlist small"><thead><tr><th>Region</th><th>Band and your time (how often you hear it)</th></tr></thead><tbody>${on.map(r=>`<tr><td><b>${esc(r.label)}</b><div class="muted">${dText(r.km)}</div></td><td>${r.windows.slice(0,5).map(w=>`<span style="white-space:nowrap">${esc(w.band)} ${w.from===0&&w.to===24?"all day":`${nfHour(w.from)}–${nfHour(w.to)}`} <span class="muted">(${w.best}%${w.send!==w.best?`, they hear you ${w.send}%`:""})</span></span>`).join(" · ")}</td></tr>`).join("")}</tbody></table>
     ${off.length?`<p class="small muted">Not heard often enough today: ${esc(off.map(r=>r.label).join(", "))}.</p>`:""}`}
 async function nfLoadReach(){if(NF.reachLoading)return;NF.reachLoading=true;NF.reach=null;renderFind();
   try{NF.reach=(await api("/api/netfind/reach")).table}catch(e){NF.reach=[]}NF.reachLoading=false;if($("nfBox"))renderFind()}
@@ -3114,7 +3126,7 @@ async function nfGeo(){if(NF.geoTried||!navigator.geolocation)return false;NF.ge
   return new Promise(res=>navigator.geolocation.getCurrentPosition(async p=>{try{NF.d=await post("/api/netfind/settings",{gps:{lat:p.coords.latitude,lon:p.coords.longitude,acc_m:p.coords.accuracy}});res(true)}catch(e){res(false)}},
     ()=>res(false),{timeout:15000,maximumAge:3600000}))}
 // feet and miles, or metres and km (owner 2026-11-25: a ring typed as 400-600 meaning miles was read as km)
-function nfUnits(d){const us=(d.hf.unit||((navigator.language||"")==="en-US"&&!d.hf.set?"us":"si"))==="us";
+function nfUnits(d){const us=UNIT.mi();   // the station's Units (Settings -> Station), not a choice of this form's
   return {us,HU:us?"ft":"m",DU:us?"mi":"km",hOut:x=>x==null||x===""?"":us?Math.round(x/0.3048):x,dOut:x=>x==null||x===""?"":us?Math.round(x/1.609344):x}}
 function nfFoot(d){const U=nfUnits(d),DU=U.DU,dOut=U.dOut;
   const span=r=>r.map(([a,b])=>a===b?`${dOut(a)}`:`${dOut(a)}–${dOut(b)}`).join(", ");
@@ -3131,18 +3143,17 @@ async function renderFind(){
   if(!d.key){box.innerHTML=back+`<h4>Find nets near you</h4><p>This needs the xAI key: Settings → Einstein & AI → xAI key. One search costs about $0.10–0.30 and takes up to a minute.</p>`;return}
   const R=d.reach,both=R.HF&&R.VU,bands=NF.bands||(both?"":R.HF?"HF":"VU");
   const loc=d.location;
-  const where=loc?`Near <b>${esc(loc.label)}</b>${loc.source==="grid"?"":""}. <span class="small muted">Only a rounded position (about 10 km) is sent, never a street address.</span>
+  const where=loc?`Near <b>${esc(loc.label)}</b>${loc.source==="grid"?"":""}. <span class="small muted">Only a rounded position (about ${dText(10)}) is sent, never a street address.</span>
       <button type="button" class="linkish small" data-nfaddr>${loc.source==="address"?"Change the address":"Use an address instead"}</button>${loc.source!=="grid"&&loc.source!=="gps"&&navigator.geolocation?' <button type="button" class="linkish small" data-nfgeo>Use this PC\'s location</button>':""}`
     :`<span class="bad">Where is the station?</span> Set a grid square in Settings, allow this PC's location${navigator.geolocation?' (<button type="button" class="linkish" data-nfgeo>try again</button>)':""}, or type an address below.`;
   const addr=(!loc||NF.addr)?`<div class="row"><input id="nfAddr" value="${esc(d.address)}" placeholder="Address, or just ZIP / town, state" style="flex:1;min-width:220px" aria-label="Station address"><button type="button" data-nfaddrsave>Save</button></div>`:"";
   const radios=R.radios.length?`Your radios (${esc(R.radios.join(", "))}) record <b>${[R.VU?"VHF/UHF":"",R.HF?"HF":""].filter(Boolean).join(" and ")||"neither HF nor VHF/UHF"}</b>, so ${both?"both are":"only that is"} searched.`:'<span class="bad">No radio on this PC yet: add one in Radios first.</span>';
   const pickBands=both?`<label>Search <select id="nfBands"><option value=""${bands===""?" selected":""}>VHF/UHF and HF</option><option value="VU"${bands==="VU"?" selected":""}>VHF/UHF only</option><option value="HF"${bands==="HF"?" selected":""}>HF only</option></select></label>`:"";
   const vu=R.VU&&bands!=="HF",hf=R.HF&&bands!=="VU";
-  const dist=`${vu?`<label>VHF/UHF within <input id="nfKm" type="number" min="1" max="500" value="${d.km}" style="width:5em"> km</label>`:""}${hf?` <label title="How far the regional HF search looks (state, section and regional nets). The table below shows where your antenna really lands; the worldwide search is the tick box below.">HF within <input id="nfHfKm" type="number" min="50" max="${d.max_hf_km||20000}" value="${d.hf_km}" style="width:6em"> km</label>`:""}`;
+  const dist=`${vu?`<label>VHF/UHF within <input id="nfKm" type="number" min="1" max="500" value="${dNum(d.km)}" style="width:5em"> ${UNIT.d()}</label>`:""}${hf?` <label title="How far the regional HF search looks (state, section and regional nets). The table below shows where your antenna really lands; the worldwide search is the tick box below.">HF within <input id="nfHfKm" type="number" min="30" max="${d.max_hf_km||20000}" value="${dNum(d.hf_km)}" style="width:6em"> ${UNIT.d()}</label>`:""}`;
   const akind=(d.antennas.find(a=>a.id===d.hf.antenna)||{}).kind;
   const U=nfUnits(d),us=U.us,HU=U.HU,DU=U.DU,hOut=U.hOut,dOut=U.dOut,foot=nfFoot(d);
   const hfset=hf?`<div class="row nfrow"><b>Your HF setup</b> <label>Antenna <select id="nfAnt">${d.antennas.map(a=>`<option value="${a.id}"${d.hf.antenna===a.id?" selected":""}>${esc(a.label)}</option>`).join("")}</select></label>
-      <label title="Feet and miles, or metres and kilometres, for the heights and distances here">Units <select id="nfUnit"><option value="us"${us?" selected":""}>feet and miles</option><option value="si"${us?"":" selected"}>metres and km</option></select></label>
       <label${akind==="h"?"":" hidden"} title="Height above ground (an inverted V: its apex, the centre). A low wire fires straight up (nearby nets, NVIS), a high one fires low (distant nets)">Height${d.hf.antenna==="invv"?" (apex)":""} <input id="nfHt" type="number" min="0" max="330" step="0.5" value="${hOut(d.hf.apex_m!=null?d.hf.apex_m:d.hf.height_m)}" style="width:5em"> ${HU}</label>
       <label${d.hf.antenna==="invv"?"":" hidden"} title="How high the two ends of the inverted V are. The wire works from about a third of the way down from the apex to the ends, so low ends make it fire more steeply. Leave empty if you do not know.">Ends <input id="nfEnds" type="number" min="0" max="330" step="0.5" value="${hOut(d.hf.ends_m)}" placeholder="optional" style="width:5em"> ${HU}</label>
       <label${akind==="h"?" hidden":""} title="Ground under a vertical decides how low it fires: salt water best, dry rocky ground worst">Ground <select id="nfGnd">${d.grounds.map(g=>`<option value="${g.id}"${d.hf.ground===g.id?" selected":""}>${esc(g.label)}</option>`).join("")}</select></label>
@@ -3169,10 +3180,10 @@ async function renderFind(){
   const rows=nets.map(n=>{const rid=NF.radio[n.id]!==undefined?NF.radio[n.id]:(n.radio||"");
     return `<tr class="${NF.sel.has(n.id)?"picked":""}"><td class="ck"><input type="checkbox" data-nfpick="${n.id}"${NF.sel.has(n.id)?" checked":""} aria-label="Select ${esc(n.name)}"></td>
     <td><b>${esc(n.name)}</b>${n.region_label?` <span class="np k-ready" style="padding:0 6px" title="Found by the worldwide search">${esc(n.region_label)}</span>`:""}${n.kind&&n.band==="HF"?` <span class="np" style="padding:0 6px">${esc((d.interests.find(i=>i.id===n.kind)||{}).label||n.kind)}</span>`:""}${n.wide?' <span class="small muted">covers your area</span>':""}${n.emergency?' <span class="badge emergency">Emergency</span>':""}
-      <div class="small muted">${esc([n.org,n.area,n.distance_km!=null?`${n.dist_src==="computed"?"":"~"}${n.distance_km} km${n.dist_src==="computed"?"":" (search's estimate)"}`:""].filter(Boolean).join(" · "))}${n.note?` · ${esc(n.note)}`:""}</div></td>
+      <div class="small muted">${esc([n.org,n.area,n.distance_km!=null?`${n.dist_src==="computed"?"":"~"}${dText(n.distance_km)}${n.dist_src==="computed"?"":" (search's estimate)"}`:""].filter(Boolean).join(" · "))}${n.note?` · ${esc(n.note)}`:""}</div></td>
     <td>${nfRule(n)}</td>
     <td class="f">${Number(n.freq_mhz).toFixed(3)} MHz ${esc(n.mode)}${n.offset_mhz!=null?`<div class="small muted">${n.offset_mhz>0?"+":""}${n.offset_mhz} MHz${n.tone_hz?` · tone ${n.tone_hz}`:""}</div>`:n.tone_hz?`<div class="small muted">tone ${n.tone_hz}</div>`:""}</td>
-    <td>${n.prop?`<div title="${esc(n.prop.why)}">Hear ${chip(n.prop.chance,n.prop.pct_hear)}</div><div title="${esc(n.prop.why)}" class="small">Check in ${chip(n.prop.checkin,n.prop.pct_send)}</div><div class="small muted" title="${esc(n.prop.why)}">${n.prop.km.toLocaleString()} km${n.prop.long_path?" the long way round":""} · ${n.prop.snr_hear!=null?`${n.prop.hops} hop${n.prop.hops>1?"s":""} at ${n.prop.takeoff}°`:`skips (MUF ${n.prop.muf} MHz)`}${n.prop.dark!=null?(n.prop.dark?" · dark":" · daylight"):""}</div><details class="small"><summary>why</summary>${esc(n.prop.why)}</details>`:'<span class="small muted">—</span>'}</td>
+    <td>${n.prop?`<div title="${esc(kmText(n.prop.why))}">Hear ${chip(n.prop.chance,n.prop.pct_hear)}</div><div title="${esc(kmText(n.prop.why))}" class="small">Check in ${chip(n.prop.checkin,n.prop.pct_send)}</div><div class="small muted" title="${esc(kmText(n.prop.why))}">${n.prop.km.toLocaleString()} km${n.prop.long_path?" the long way round":""} · ${n.prop.snr_hear!=null?`${n.prop.hops} hop${n.prop.hops>1?"s":""} at ${n.prop.takeoff}°`:`skips (MUF ${n.prop.muf} MHz)`}${n.prop.dark!=null?(n.prop.dark?" · dark":" · daylight"):""}</div><details class="small"><summary>why</summary>${esc(kmText(n.prop.why))}</details>`:'<span class="small muted">—</span>'}</td>
     <td><select data-nfradio="${n.id}" aria-label="Radio for ${esc(n.name)}"><option value="">no radio</option>${tgt.map(r=>`<option value="${esc(r.id)}"${rid===r.id?" selected":""}>${esc(r.name)}</option>`).join("")}</select>${n.radio_why&&rid===n.radio?`<div class="small muted">${esc(n.radio_why)}</div>`:""}</td>
     <td class="small"><a href="${esc(n.source_url)}" target="_blank" rel="noopener noreferrer">source</a><div class="${n.source_opened?"muted":"warnc"}">${n.source_opened?"opened by the search":"not opened: check it"}</div></td></tr>`}).join("");
   const farNote=far.length?`<p class="small"><label class="chk"><input type="checkbox" data-nfhidefar${NF.hideFar?" checked":""}> Hide ${far.length} HF net${far.length===1?"":"s"} you probably can't hear at ${far.length===1?"its":"their"} hour</label></p>`:"";
@@ -3186,19 +3197,18 @@ async function renderFind(){
   box.innerHTML=back+`<h4>Find nets near you</h4><p>${where}</p>${addr}<p>${radios}</p><div class="row nfrow">${pickBands} ${dist}</div>${hfset}${go}${msg}${farNote}${table}${unh}${sch}${out}`;
   const save=async(b,redraw)=>{try{const d2=await post("/api/netfind/settings",b);if(redraw){NF.d=d2;renderFind()}else{NF.d.nets=d2.nets;NF.d.hf=d2.hf;NF.d.km=d2.km;NF.d.hf_km=d2.hf_km;NF.d.interests=d2.interests;NF.d.footprint=d2.footprint;NF.d.hf_km_physics=d2.hf_km_physics;NF.d.sfi=d2.sfi}}
     catch(e){NF.msg={bad:true,text:e.message};renderFind()}};          // a field change saves quietly: no redraw swallows the next click
-  const km=$("nfKm");if(km)km.onchange=()=>save({km:km.value});
-  const hk=$("nfHfKm");if(hk)hk.onchange=()=>save({hf_km:hk.value});
+  const km=$("nfKm");if(km)km.onchange=()=>save({km:dIn(km.value)});
+  const hk=$("nfHfKm");if(hk)hk.onchange=()=>save({hf_km:dIn(hk.value)});
   const dx=$("nfDx");if(dx)dx.onchange=()=>{NF.d.dx=dx.checked;save({dx:dx.checked});if(dx.checked){NF.reachOpen=true;if(!NF.reach)nfLoadReach();else renderFind()}};
   const rb=$("nfReachBox");if(rb){rb.ontoggle=()=>{NF.reachOpen=rb.open;if(rb.open&&NF.reach===undefined)nfLoadReach()};if(rb.open&&NF.reach===undefined)setTimeout(nfLoadReach,0)}
   const ant=$("nfAnt"),pw=$("nfPw"),ht=$("nfHt");if(ant){const f=()=>save({hf:nfVals().hf},false).then(()=>{if(NF.reach!==undefined&&!NF.reachLoading){NF.reach=undefined;if(NF.reachOpen)nfLoadReach()}});   // never redraw while typing
     const gd=$("nfGnd");ant.onchange=()=>{const k=(NF.d.antennas.find(a=>a.id===ant.value)||{}).kind;if(ht)ht.closest("label").hidden=k!=="h";if(gd)gd.closest("label").hidden=k==="h";f()};pw.onchange=f;if(ht)ht.onchange=f;if(gd)gd.onchange=f;
     const g1=$("nfGood1"),g2=$("nfGood2");const fg=()=>{if((g1.value&&g2.value)||(!g1.value&&!g2.value))f()};g1.onchange=fg;g2.onchange=fg;
     // the table follows each change (drawn alone: the form is never redrawn while typing); the units redraw it all
-    const f0=f,en=$("nfEnds"),un=$("nfUnit"),redo=()=>f0().then(()=>{const b=$("nfFootBox");if(b&&NF.d)b.outerHTML=nfFoot(NF.d)});
+    const f0=f,en=$("nfEnds"),redo=()=>f0().then(()=>{const b=$("nfFootBox");if(b&&NF.d)b.outerHTML=nfFoot(NF.d)});
     ant.onchange=()=>{const k=(NF.d.antennas.find(a=>a.id===ant.value)||{}).kind;if(ht)ht.closest("label").hidden=k!=="h";if(gd)gd.closest("label").hidden=k==="h";if(en)en.closest("label").hidden=ant.value!=="invv";redo()};
     pw.onchange=redo;if(ht)ht.onchange=redo;if(gd)gd.onchange=redo;if(en)en.onchange=redo;g1.onchange=()=>{if((g1.value&&g2.value)||(!g1.value&&!g2.value))redo()};g2.onchange=g1.onchange;
-    if(un)un.onchange=()=>{const toUs=un.value==="us",h=x=>{if(x&&x.value)x.value=toUs?Math.round(x.value/0.3048):Math.round(x.value*0.3048*10)/10},dd=x=>{if(x&&x.value)x.value=toUs?Math.round(x.value/1.609344):Math.round(x.value*1.609344)};
-      h(ht);h(en);dd(g1);dd(g2);save({hf:nfVals().hf},true)}}
+}
   document.querySelectorAll("[data-nfint]").forEach(x=>x.onchange=()=>{const v=nfVals().interests;if(v.length)save({interests:v})});
   const bs=$("nfBands");if(bs)bs.onchange=()=>{NF.bands=bs.value||"";renderFind()};
 }
@@ -3257,7 +3267,7 @@ function netForm(n){
    <label>Frequency (MHz) <input name="freq_mhz" inputmode="decimal" placeholder="146.940" value="${esc(n.freq_mhz??"")}"></label>
    <label>Mode <select name="mode"><option value="">the radio's</option>${["FM","USB","LSB","AM","CW","DIG"].map(m=>`<option${m===n.mode?" selected":""}>${m}</option>`).join("")}</select></label>
    <label>Net control (callsign) <input name="ncs" maxlength="11" value="${esc(n.ncs||"")}" class="up" placeholder="optional"></label>
-   <label>Reach (km) <input name="reach_km" type="number" min="50" max="5000" step="10" value="${esc(n.reach_km??"")}" placeholder="the station's"><span class="hint">a linked system or intertie: how far its stations can be (a call licensed farther is set aside as probably misheard)</span></label>
+   <label>Reach (${UNIT.d()}) <input name="reach_km" type="number" min="30" max="5000" step="10" value="${esc(dNum(n.reach_km??""))}" placeholder="the station's"><span class="hint">a linked system or intertie: how far its stations can be (a call licensed farther is set aside as probably misheard)</span></label>
    <label>Alert, minutes before <input name="alert_min" type="number" min="0" max="120" value="${esc(n.alert_min??5)}"><span class="hint">0 = no alert</span></label>
    <label class="chk wide"><input type="checkbox" name="emergency"${n.emergency?" checked":""}> Emergency or priority net: keep an Urgent board for it</label>
    <label class="wide">Einstein on this net <select name="checkins"><option value=""${n.checkins!=="none"?" selected":""}>May check in when check-ins are open to this station</option><option value="none"${n.checkins==="none"?" selected":""}>Never checks in (a members-, mobiles- or traffic-only net)</option></select></label>
@@ -3289,7 +3299,7 @@ function collectNet(f,saved){
   if(freq!=="once"){if(f.ends.value==="on")rule.until=f.until.value;if(f.ends.value==="after")rule.count=f.count.value}
   const b={name:f.name.value,radio:f.radio.value,start:f.start.value,duration_min:f.duration_min.value,freq_mhz:f.freq_mhz.value,
     mode:f.mode.value,ncs:f.ncs.value,alert_min:f.alert_min.value,emergency:f.emergency.checked,checkins:f.checkins.value,repeat:rule,
-    reach_km:f.reach_km.value};
+    reach_km:dIn(f.reach_km.value)};
   if(saved&&saved.exceptions)b.exceptions=saved.exceptions;
   return b}
 function showFor(f){

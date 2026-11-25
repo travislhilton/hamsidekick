@@ -94,15 +94,17 @@ def near(path: Path, hf: bool, where: tuple[float, float], km: float,
     return sorted(rows.values(), key=lambda r: (r["km"], r["call"], -r["freq_mhz"]))
 
 
-def as_frequencies(rows: list[dict], title: str) -> list[dict]:
-    """Gateways as band-plan channels (localplans' frequency shape: kind "winlink")."""
+def as_frequencies(rows: list[dict], title: str, unit: str = "km") -> list[dict]:
+    """Gateways as band-plan channels (localplans' frequency shape: kind "winlink"); distances in the operator's
+    unit ("km" or "mi")."""
+    from .units import dist
     out = []
     for r in rows:
         mi = r["km"] / 1.609
         out.append({"freq_mhz": r["freq_mhz"], "mode": "FM" if r["freq_mhz"] > 30 else "USB", "offset_mhz": None,
                     "tone_hz": None, "kind": "winlink", "priority": None, "org": r["call"], "source_url": None,
                     "source_opened": False, "net": None, "source_doc": title,
-                    "use": f"Winlink gateway {r['call']} ({' / '.join(r['modes'])}), {mi:.0f} mi {r['dir']}, "
+                    "use": f"Winlink gateway {r['call']} ({' / '.join(r['modes'])}), {dist(r['km'], unit)} {r['dir']}, "
                            f"grid {r['grid']}" + (f", {r['hours']} UTC" if r.get("hours") and r["hours"] != "00-23"
                                                   else "") + (" · EMCOMM" if r["service"] == "EMCOMM" else "")
                            + (f" · reach {r['reach']['pct']}% {r['reach']['when']}, {r['reach']['hops']} hop"

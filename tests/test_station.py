@@ -763,3 +763,27 @@ def test_vara_message_text_can_be_selected_and_copied():
     assert "if(vSelecting(box)){VA.drawLater=true;continue}" in idx and 'addEventListener("selectionchange"' in idx
     assert '<span class="vtx">${vFmt(it.text,' in idx and "data-vcopy" in idx
     assert ".vb .meta,.vb button,.vb .vxfer{user-select:none" in idx and 'document.execCommand("copy")' in idx
+
+
+def test_one_units_setting_for_every_distance_km_by_default(tmp_path):
+    """Owner 2026-11-25: "There should be a global setting for user preference for distances in mi or km and then
+    everything should be calculated and displayed accordingly. Default to km units." Kept in km and metres; the
+    setting converts only what is shown or typed: on the page (helpers fed by the state) and in the station's own
+    texts (alerts, gateway lines, plan titles)."""
+    import pytest
+    from station import units as U
+    from station.server import STATIC
+    from tests.test_agent import _station
+    st = _station(tmp_path)
+    assert st.units() == "km" and st.snapshot()["units"] == "km" and st.operator()["units"] == "km"
+    st.set_operator({"callsign": "W9XYZ", "units": "mi"}) if hasattr(st, "set_operator") else st._save({"operator": {"units": "mi"}})
+    assert st.units() == "mi" and st.snapshot()["units"] == "mi" and U.of(st) == "mi"
+    assert U.dist(160, "km") == "160 km" and U.dist(160, "mi") == "99 mi" and U.dist(2000, "mi") == "1,243 mi"
+    assert U.round_to(160, "mi", 10) == "100 mi" and U.round_to(80, "km", 10) == "80 km" and U.dist(None, "mi") == "distance unknown"
+    assert round(U.to_km(100, "mi")) == 161 and U.to_km(100, "km") == 100 and U.height(6.1, "mi") == "20 ft"
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'id="setUnits" name="units"' in idx and '<option value="km">Kilometres and metres</option>' in idx
+    assert "function dText(km)" in idx and "function dIn(v)" in idx and "function kmText(t)" in idx
+    assert "units:f.units.value" in idx and "S.units=d.units" in idx
+    for old in ('> km</label>', "/1.609)} mi", '${d.km} km away', "Reach (km)"):
+        assert old not in idx, old                                   # no distance is hard-wired to one unit

@@ -946,7 +946,7 @@ def test_alerts_gives_every_hazard_for_my_area_and_says_what_is_clear(tmp_path):
     assert "4 emergency alerts for Springfield, IL" in r
     assert r.index("ALERT: Hazardous Materials Warning (Extreme, Immediate) until Thu Nov 26 06:00") < r.index("ALERT: Wind Advisory")
     assert "- What to do: Shelter in place. Close windows and turn off ventilation." in r
-    assert "EARTHQUAKE: M4.2, 12 km NW of Riverton," in r and "mi from you" in r
+    assert "EARTHQUAKE: M4.2, 12 km NW of Riverton," in r and "km from you" in r      # km: the default unit
     assert "WILDFIRE: Oak Ridge, 1,250 acres, 30% contained," in r and "(Sangamon County)" in r and "Tiny Old" not in r
     assert "Also checked, clear: volcanoes at raised alert; air quality (US AQI 34)." in r
     assert "No feed reports a chemical or biological release unless an authority has issued an alert" in r
@@ -965,7 +965,11 @@ def test_alerts_gives_every_hazard_for_my_area_and_says_what_is_clear(tmp_path):
     e.fetch = partly
     r = _ask(m, v, "K7ABC", "ALERTS EN50")
     assert r.startswith("W9XYZ-14 Einstein:\nNo emergency alerts for Springfield, IL") or "No emergency alerts for Springfield, IL" in r
-    assert "Could not be reached now: earthquakes (USGS)." in r and "wildfires within 50 mi" in r
+    assert "Could not be reached now: earthquakes (USGS)." in r and "wildfires within 80 km" in r
+    st._save({"operator": {"units": "mi"}})                      # Settings -> Station -> Units: miles
+    e.fetch = ok
+    r = _ask(m, v, "K7ABC", "ALERTS EN50")
+    assert "earthquakes M3+ within 100 mi in 24 h; wildfires within 50 mi" in r
 
     def down(url):
         raise urllib.error.URLError("no route")
@@ -1048,7 +1052,9 @@ def test_in_a_narrow_column_the_quick_requests_are_a_button_and_a_readable_list(
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert "data-vqtoggle=" in idx and 'class="vqrow" role="menuitem" data-vask=' in idx
     assert "sends now · no AI · works off grid" in idx and "needs the internet at their station" in idx
-    assert ".vqchips{display:none}" in idx and ".vqchips{display:contents}.vqbtn{display:none}" in idx   # narrow: the list; wide: chips
+    # owner 2026-11-25: "lets always use the Quick messages button": at every width, so the chips never take the
+    # message log's room (the chips stay in the page, hidden: a row of the list acts through its chip)
+    assert ".vqchips{display:none}.vpanel .vqbtn{display:flex" in idx and ".vqchips{display:contents}" not in idx
     assert ".vpanel .vpre{flex-wrap:nowrap;overflow-x:auto" not in idx
     # "the window is hidden below the top section and I can't see the list": it is drawn on the window, not in the
     # panel (which cut it off), above the button when there is room, else below, never taller than the room there is
