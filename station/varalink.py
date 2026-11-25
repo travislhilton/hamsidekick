@@ -436,6 +436,9 @@ class Modem:
         for f in out:                                 # another operator's reserved ad hoc channels: offered to Install
             if f["name"].lower().endswith(ADHOC_SUFFIX) and f["bytes"] < 200_000:
                 f["adhoc"] = _adhoc_summary(d / f["name"])
+            if f["name"].lower().endswith(".hspack") and f["bytes"] < 2_000_000:   # another station's pack: Review
+                from . import stationpack
+                f["pack"] = stationpack.summary(d / f["name"])
             if f["name"].lower().endswith(".hsnets") and f["bytes"] < 500_000:    # another station's nets: Add
                 from . import netshare
                 f["nets"] = netshare.summary(d / f["name"])

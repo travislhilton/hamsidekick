@@ -52,7 +52,7 @@ STT_USD_PER_HOUR = 0.10              # Speech to Text (REST)
 TTS_USD_PER_MCHAR = 15.0             # Text to Speech, per 1M characters
 
 FEATURES = {"draft": "Einstein drafts", "answer": "Einstein (thinking model)", "chat": "Einstein chat",
-            "topic": "Einstein prepared topics", "net_summary": "Net summaries", "find_nets": "Find nets", "local_plans": "Local plans",
+            "topic": "Einstein prepared topics", "net_summary": "Net summaries", "find_nets": "Find nets", "einstein_web": "Einstein web search (on the air)", "local_plans": "Local plans",
             "speech_to_text": "Grok speech-to-text", "text_to_speech": "Einstein's voice"}
 BACKGROUND = ("net summaries", "Grok speech-to-text", "the voice's pre-made clips")
 

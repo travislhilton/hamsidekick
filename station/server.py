@@ -251,6 +251,12 @@ def make_handler(station):
                     page = forms.html_for(forms.read_winlink_xml(data))
                 elif ext == ".csv":
                     page = forms.csv_table(data.decode("utf-8", "replace"), title)
+                elif ext == ".hspack":
+                    from . import stationpack as SP
+                    try:
+                        page = forms.text_page(SP.text(SP.read(p)), title)
+                    except ValueError as e:
+                        page = forms.text_page(str(e), title)
                 elif ext == ".hsnets":
                     from . import netshare
                     try:
@@ -283,6 +289,9 @@ def make_handler(station):
                     start = None
                 data, ctype, name = _plans(station).radio_export((q.get("radio") or [None])[0], start)
                 return self._send(200, data, ctype, {"Content-Disposition": f'attachment; filename="{name}"'})
+            if u.path == "/api/pack/available":                  # what 📦 Share… can send (stationpack.py)
+                from . import stationpack as SP
+                return self._json(SP.available(station))
             if u.path in ("/api/nets/share/export", "/api/nets/share/export.ics"):   # the net schedule to send (netshare.py)
                 import json as _j
                 from . import netshare
@@ -406,7 +415,7 @@ def make_handler(station):
                       "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
-                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio", "/api/nets/share/preview", "/api/nets/share/install",
+                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio", "/api/nets/share/preview", "/api/nets/share/install", "/api/pack/build", "/api/pack/review", "/api/pack/install",
                       "/api/einstein/settings", "/api/einstein/notes", "/api/einstein/ownerkey",
                       "/api/remote/peers", "/api/remote/presence", "/api/remote/stop"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "adhoc", "handoff", "takeback", "join", "leave",
@@ -525,6 +534,21 @@ def make_handler(station):
                     return self._json(_plans(station).radio_set(body))
                 if u.path == "/api/adhoc":                       # reserve / unreserve / rename (adhoc.py)
                     return self._json(_plans(station).adhoc_set(body))
+                if u.path.startswith("/api/pack/"):            # station packs (stationpack.py)
+                    import base64 as _b64
+                    from . import stationpack as SP
+                    if u.path == "/api/pack/build":            # {parts: [...], own_files: bool} -> the file to send
+                        doc = SP.build(station, body.get("parts") or SP.PARTS, bool(body.get("own_files")))
+                        data = SP.dumps(doc)
+                        return self._json({"name": SP.name_for(doc), "bytes": len(data), "counts": SP.counts(doc),
+                                           "data": _b64.b64encode(data).decode()})
+                    p = station.vara.inbox_file(str(body.get("name") or ""))
+                    if not p:
+                        raise ValueError("that file is no longer in the VARA inbox")
+                    doc = SP.read(p)
+                    if u.path == "/api/pack/review":
+                        return self._json(SP.review(station, doc))
+                    return self._json(SP.install(station, doc, body.get("choice") or {}))
                 if u.path in ("/api/nets/share/preview", "/api/nets/share/install"):   # {"name": a .hsnets file in a VARA inbox}
                     from . import netshare
                     p = station.vara.inbox_file(str(body.get("name") or ""))

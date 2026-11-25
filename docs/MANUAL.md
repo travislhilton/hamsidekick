@@ -444,6 +444,17 @@ channels** before exporting to send those too (off by default). Connected over V
 over VARA** in the band plan) sends them as a `.hsadhoc` file; the other station's VARA window shows **★ Install N ad hoc
 channels from <call>** beside it: one click adds them. The file is only ever read as data (every channel checked),
 never run.
+**📦 Share with <call>…** (owner 2026-11-24; the VARA panel, a station chosen): everything another operator needs to set
+their station up for your area, in one file (`<CALL>-station-pack.hspack`, a few KB, compressed): your **band plan** (the
+local plans you read, as read: their ranges and channels, so the other station needs no xAI key or internet; Winlink
+gateway lists never go, your own members-only files only when you tick them), your **kept channels**, your **ad hoc
+channels** and your **net schedule** (no check-in lists or alerts); tick **also a calendar file** for a phone or a station
+without HAM Sidekick. Their station shows **📦 Review and install…** on the file (in the chat and under Files received):
+each plan says *new to you* (with how many of its channels they do not have), *you have it, the same*, or *read
+differently* (which reading is newer); each net *new*, *changed* or *you have it*. What adds something is ticked;
+**Install N selected** backs up their band plan and schedule first and never deletes. An installed plan is listed in
+Band plan → Plans read as *via <call>*, with the usual **in the table** tick to leave it out. If the pack was made for
+another 4-character grid square the review says so.
 **💾 Radio channels → CHIRP** (owner 2026-11-17): in the **Band plan** tab every channel row has **💾+**: it puts that
 frequency on your radio list, with a suggested alias (a repeater's or gateway's callsign, R + the frequency for a
 repeater, else the frequency) you can change beside it; **💾** again takes it off. The **💾 Radio channels** tab lists

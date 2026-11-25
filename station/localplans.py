@@ -791,7 +791,8 @@ class Plans:
         t["read"] = [{"key": k, "title": e.get("title"), "org": e.get("org"), "kind": e.get("kind"),
                       "authority": e.get("authority"), "excluded": bool(e.get("excluded")), "error": e.get("error"),
                       "segments": len(e.get("segments") or []), "channels": len(e.get("frequencies") or []),
-                      "at": e.get("at"), "url": e.get("url")} for k, e in (d.get("ingested") or {}).items()]
+                      "at": e.get("at"), "url": e.get("url"), "via": e.get("via"), "via_at": e.get("via_at")}
+                     for k, e in (d.get("ingested") or {}).items()]
         t["unread"] = len([u for u, r in (d.get("docs") or {}).items() if r.get("path")
                            and u not in (d.get("ingested") or {})])
         t["location"] = (netfind.location(self.st) or {}).get("label")

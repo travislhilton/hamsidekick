@@ -1,6 +1,7 @@
 """Share a net schedule over the air (owner 2026-11-24: "how can we share net schedules this way").
 
-Two files, both made here and sent over VARA by the operator (📅 Send my net schedule) or by Einstein:
+Two files, both made here and sent over VARA by the operator (📦 Share with <call>…: the nets inside a station pack, the calendar
+when ticked; station/stationpack.py) or by Einstein:
 * a calendar (.ics, iCalendar): the next weeks of each net as single events, so any phone, Outlook or Google Calendar
   opens it, and a station without HAM Sidekick can use it too;
 * a HAM Sidekick net file (.hsnets): the share-settings document (station/portable.py, schema hamsidekick-settings/1)
