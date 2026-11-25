@@ -575,6 +575,7 @@ def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
     assert [(l, c) for l, c, _ in labels] == [("What can you do?", "HELP"),
         ("📦 Send your station's band plan", "PACK PLAN"), ("📅 Send your station's nets", "PACK NETS"),
         ("Send your weather as ICS-213", "WX213"), ("What are the HF band conditions now?", "HF"),
+        ("⚠ What are the urgent weather warnings for my area?", "ALERTS {grid}"),
         ("What is the weather forecast for my station?", "WX {grid}")]
     assert 'c.replace("{grid}",ch.me.grid||"")' in idx and "Set your grid square in Settings → Station" in idx
 
@@ -887,3 +888,44 @@ def test_a_new_link_keeps_the_limits_and_identifies_briefly_and_a_pack_is_announ
                    "over 2500 pending applications, Charlie naming amateur radio its backup, and delta released an open "
                    "codec for digital voice without the proprietary chips that it needed before.\nSources: A, B.")
     assert r.split("\n")[0].endswith("includes:") and r.count("\n- ") == 4 and r.endswith("Sources: A, B.")
+
+
+def test_alerts_gives_the_urgent_weather_warnings_most_severe_first(tmp_path):
+    """Owner 2026-11-25: "What are the urgent weather warnings for my area?". ALERTS [place or grid] is answered by
+    code from the National Weather Service: each warning with its severity, until when and what to do; none = said
+    plainly; no internet = said plainly. The quick button sends the asker's grid."""
+    import urllib.error
+    feats = [{"properties": {"event": "Wind Advisory", "severity": "Moderate", "urgency": "Expected",
+                             "headline": "Wind Advisory until 6 PM", "ends": "2026-11-26T18:00:00-06:00", "instruction": ""}},
+             {"properties": {"event": "Blizzard Warning", "severity": "Extreme", "urgency": "Immediate",
+                             "headline": "Blizzard Warning issued November 25 by NWS", "ends": "2026-11-26T06:00:00-06:00",
+                             "instruction": "Travel should be restricted to emergencies only.\nCarry a winter kit."}}]
+
+    def fetch(url):
+        if "/points/" in url:
+            return {"properties": {"relativeLocation": {"properties": {"city": "Springfield", "state": "IL"}}}}
+        if "/alerts/active" in url:
+            return {"features": fetch.feats}
+        raise AssertionError(url)
+    fetch.feats = feats
+    st, rid, m, clk, e = _setup(tmp_path, model=lambda *a: (_ for _ in ()).throw(AssertionError("no model")))
+    e.fetch = fetch
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    r = _ask(m, v, "K7ABC", "ALERTS EN50")
+    assert "2 active weather alerts for Springfield, IL" in r
+    assert r.index("ALERT: Blizzard Warning (Extreme, Immediate) until Thu Nov 26 06:00") < r.index("ALERT: Wind Advisory")
+    assert "- What to do: Travel should be restricted to emergencies only. Carry a winter kit." in r
+    fetch.feats = []
+    assert "No active weather alerts for Springfield, IL" in _ask(m, v, "K7ABC", "warnings EN50")
+
+    def down(url):
+        raise urllib.error.URLError("no route")
+    e.fetch = down
+    assert "ALERTS needs the internet here" in _ask(m, v, "K7ABC", "ALERTS EN50")
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert '"ALERTS {grid}","net"' in idx and "- ALERTS [place]: urgent weather warnings" in E.DIRECT_HELP

@@ -2369,6 +2369,7 @@ const V_ASK=[["What can you do?","HELP","now","what it can send and do, and its 
   ["📅 Send your station's nets","PACK NETS","now","its net schedule as one file; you then see which nets are new to you and add the ones you choose"],
   ["Send your weather as ICS-213","WX213","net","the forecast and alerts where that station is, as an ICS-213 message"],
   ["What are the HF band conditions now?","HF","net","solar flux, K index and what they mean for HF"],
+  ["⚠ What are the urgent weather warnings for my area?","ALERTS {grid}","net","sends your grid square (Settings → Station) so their station looks up the active National Weather Service warnings where you are, most severe first; it says so when there are none"],
   ["What is the weather forecast for my station?","WX {grid}","net","sends your grid square (Settings → Station) so their station looks up the forecast and alerts where you are"]];
 // Einstein on the air (station/einstein.py): this radio's AI assistant at a call of its own
 function vEinBar(m,ch){const e=ch.einstein;if(!e)return"";const rid=m.radio,st=e.state,can=e.can_on||[false,""];

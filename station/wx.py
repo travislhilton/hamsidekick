@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -111,6 +112,39 @@ def forecast(p: dict, fetch=None, periods: int = 4) -> dict:
                     "temp": f"high {dl['temperature_2m_max'][i]}, low {dl['temperature_2m_min'][i]} {u.get('temperature_2m_max', '')}",
                     "wind": f"{dl['wind_speed_10m_max'][i]} {u.get('wind_speed_10m_max', '')}, gusts {dl['wind_gusts_10m_max'][i]}"})
     return {"source": "Open-Meteo (open-meteo.com)", "place": p.get("label", ""), "periods": out[:periods], "alerts": []}
+
+
+_SEV = {"Extreme": 0, "Severe": 1, "Moderate": 2, "Minor": 3}
+
+
+def alerts(p: dict, fetch=None) -> dict:
+    """The active US National Weather Service alerts for a place from place(), most severe first (owner 2026-11-25:
+    "What are the urgent weather warnings for my area?"): {"source", "place", "us": bool, "alerts": [{"event",
+    "severity", "urgency", "headline", "until", "area", "do"}]}. Outside the US: us False, no alerts (the NWS does not
+    cover it). Raises when the NWS cannot be reached."""
+    fetch = fetch or _fetch
+    lat, lon = round(p["lat"], 2), round(p["lon"], 2)
+    where = p.get("label") or f"{lat}, {lon}"
+    if p.get("us") is False:
+        return {"source": "", "place": where, "us": False, "alerts": []}
+    try:
+        rel = ((fetch(f"https://api.weather.gov/points/{lat},{lon}")["properties"].get("relativeLocation") or {})
+               .get("properties") or {})
+        where = ", ".join(x for x in (rel.get("city"), rel.get("state")) if x) or where
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 404):                         # not a point the NWS covers
+            return {"source": "", "place": where, "us": False, "alerts": []}
+        raise
+    al = fetch(f"https://api.weather.gov/alerts/active?point={lat},{lon}").get("features") or []
+    out = []
+    for a in al:
+        q = a.get("properties") or {}
+        do = " ".join(str(q.get("instruction") or "").split())
+        out.append({"event": q.get("event", ""), "severity": q.get("severity", ""), "urgency": q.get("urgency", ""),
+                    "headline": " ".join(str(q.get("headline") or "").split()),
+                    "until": q.get("ends") or q.get("expires") or "", "area": q.get("areaDesc", ""), "do": do})
+    out.sort(key=lambda x: _SEV.get(x["severity"], 9))
+    return {"source": "US National Weather Service (api.weather.gov)", "place": where, "us": True, "alerts": out[:6]}
 
 
 def space(fetch=None, cache: dict | None = None) -> dict:

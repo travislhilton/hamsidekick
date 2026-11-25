@@ -210,12 +210,12 @@ def _web_post(key: str, body: dict, timeout: float) -> dict:
 PACKS_PER_HOUR = 3
 # Command words the station's code answers (Einstein._direct): no AI, so the same every time, free, and off grid for
 # all but WX / HF (the internet, not the AI). A word may stand first in a message: "CHIRP 2M", "WX213", "MSG …".
-DIRECT_RE = re.compile(r"\s*(CHIRP|BAND\s*PLAN|ICS[\s-]?205|ICS[\s-]?309|NETS|CALENDAR|CAL|MSG|MESSAGE|WX\s*213|WX|"
+DIRECT_RE = re.compile(r"\s*(ALERTS?|WARNINGS?|CHIRP|BAND\s*PLAN|ICS[\s-]?205|ICS[\s-]?309|NETS|CALENDAR|CAL|MSG|MESSAGE|WX\s*213|WX|"
                        r"HF\s*213|HF|CALL|LOOKUP)\b[\s:,-]*(.*)", re.I | re.S)
 ASK_HELP = ("\n\nOr ask me anything in words: radio, emergency comms, technical, news and facts (I search the "
             "internet).\nFiles arrive after my reply: on HAM Sidekick Station open them with View.")
-DIRECT_ALIAS = {"CAL": "CALENDAR", "MESSAGE": "MSG", "LOOKUP": "CALL"}
-DIRECT_HELP = ("What I can send (type the word; all but WX and HF work with no internet here):\n"
+DIRECT_ALIAS = {"ALERT": "ALERTS", "WARNING": "ALERTS", "WARNINGS": "ALERTS", "CAL": "CALENDAR", "MESSAGE": "MSG", "LOOKUP": "CALL"}
+DIRECT_HELP = ("What I can send (type the word; all but ALERTS, WX and HF work with no internet here):\n"
                "- PACK PLAN: this station's band plan, to install on yours\n"
                "- PACK NETS: its net schedule, to install on yours\n"
                "- CHIRP (or CHIRP 2M / CHIRP 70CM): local EMCOMM channels for a handheld\n"
@@ -224,6 +224,7 @@ DIRECT_HELP = ("What I can send (type the word; all but WX and HF work with no i
                "- ICS205: ad hoc channel plan; ICS309: log of this session\n"
                "- CALL K7ABC: callbook lookup\n"
                "- MSG your note: a message for the operator\n"
+               "- ALERTS [place]: urgent weather warnings\n"
                "- WX or WX213 [place]: weather (as an ICS-213)\n"
                "- HF: HF band conditions")
 OFFLINE_WHY = "no internet: answers its command words (PACK, CHIRP, BANDPLAN, NETS …) and your owner-key commands only"
@@ -383,6 +384,34 @@ class Tools:
         if as_form:
             return text + "\n" + self._form213("Weather: " + w["place"], text, "Weather report")
         return text
+
+    def t_alerts(self, place: str = "") -> str:
+        """The urgent weather warnings for a place, most severe first; says plainly when there are none."""
+        from . import wx
+        p = self.e.here() if str(place).strip().lower() in ("", "here", "your area", "there") else wx.place(place, fetch=self.e.fetch)
+        if not p:
+            return "unknown place: send ALERTS and a town with its state, a ZIP, or a grid square"
+        a = wx.alerts(p, fetch=self.e.fetch)
+        at = f"{datetime.now():%Y-%m-%d %H:%M} local at {self.e.of(self.rid)}"
+        if not a["us"]:
+            return f"Weather alerts here come from the US National Weather Service, which does not cover {a['place']}."
+        if not a["alerts"]:
+            return f"No active weather alerts for {a['place']} (US National Weather Service, {at})."
+
+        def until(t):
+            try:
+                return " until " + datetime.fromisoformat(t).strftime("%a %b %d %H:%M")
+            except (TypeError, ValueError):
+                return ""
+        out = [f"{len(a['alerts'])} active weather alert{'s' if len(a['alerts']) != 1 else ''} for {a['place']} "
+               f"(US National Weather Service, {at}):"]
+        for x in a["alerts"]:
+            out.append(f"ALERT: {x['event']} ({', '.join(v for v in (x['severity'], x['urgency']) if v)}){until(x['until'])}")
+            if x["headline"]:
+                out.append("- " + x["headline"][:220])
+            if x["do"]:
+                out.append("- What to do: " + (x["do"][:260].rsplit(" ", 1)[0] + " …" if len(x["do"]) > 260 else x["do"]))
+        return "\n".join(out)
 
     def t_hf_conditions(self, as_form: bool = False) -> str:
         from . import wx
@@ -1247,7 +1276,7 @@ class Einstein:
         online = self.online()[0]
         if word == "CALL" and not re.fullmatch(r"[A-Za-z0-9]{3,7}(-\d{1,2})?", rest):
             return False                                  # "call me later": a sentence, not a lookup
-        if word != "MSG" and len(rest.split()) > (6 if word in ("WX", "WX213") else 4) and online:
+        if word != "MSG" and len(rest.split()) > (6 if word in ("WX", "WX213", "ALERTS") else 4) and online:
             return False
         if word == "MSG" and not rest:
             say("MSG and your note, e.g. MSG please call me on 146.520 tonight.")
@@ -1279,12 +1308,14 @@ class Einstein:
                 out = tools.t_leave_message(rest) + ". 73"
             elif word == "CALL":
                 out = _call_words(tools.t_lookup_call(rest))
+            elif word == "ALERTS":
+                out = tools.t_alerts(rest or "here")
             elif word in ("WX", "WX213"):
                 out = tools.t_weather(rest or "here", as_form=word == "WX213")
             else:                                         # HF, HF213
                 out = tools.t_hf_conditions(as_form=word == "HF213")
         except Exception as e:  # noqa: BLE001
-            net = word in ("WX", "WX213", "HF", "HF213")
+            net = word in ("ALERTS", "WX", "WX213", "HF", "HF213")
             self._log(rid, {"kind": "error", "peer": peer, "error": f"{word}: {type(e).__name__}: {str(e)[:200]}"})
             say(f"{word} needs the internet here, and it cannot be reached now." if net
                 else f"Sorry, {word} did not work just now ({type(e).__name__}); {self.op_call(rid)} can follow up.")
