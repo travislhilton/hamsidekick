@@ -205,9 +205,21 @@ def _web_post(key: str, body: dict, timeout: float) -> dict:
 
 
 PACKS_PER_HOUR = 3
-OFFLINE_WHY = "no internet: answers PACK, HELP and your owner-key commands only"
-OFFLINE_SAY = ("No internet here right now, so I can't answer questions. I can still send PACK: this station's band "
-               "plan and nets, to install on yours. HELP lists the rest. Questions again when the internet is back.")
+# Command words the station's code answers (Einstein._direct): no AI, so the same every time, free, and off grid for
+# all but WX / HF (the internet, not the AI). A word may stand first in a message: "CHIRP 2M", "WX213", "MSG …".
+DIRECT_RE = re.compile(r"\s*(CHIRP|BAND\s*PLAN|ICS[\s-]?205|ICS[\s-]?309|NETS|CALENDAR|CAL|MSG|MESSAGE|WX\s*213|WX|"
+                       r"HF\s*213|HF|CALL|LOOKUP)\b[\s:,-]*(.*)", re.I | re.S)
+ASK_HELP = ("Or ask me anything in words (radio, emergency comms, technical; I search the internet for news, facts "
+            "or a web page). Files arrive after my reply; on HAM Sidekick Station open them with View.")
+DIRECT_ALIAS = {"CAL": "CALENDAR", "MESSAGE": "MSG", "LOOKUP": "CALL"}
+DIRECT_HELP = ("Command words (answered by this station without the AI; all but WX and HF work with no internet): "
+               "PACK (band plan + nets to install), CHIRP or CHIRP 2M / 70CM (local EMCOMM channels for a handheld), "
+               "BANDPLAN 70CM (any band, for your license), ICS205 (ad hoc channels), ICS309 (this session's log), NETS, "
+               "CALENDAR (nets as a calendar file), CALL K7ABC (callbook), MSG your note (for the operator), "
+               "WX or WX213 [place] (weather, as an ICS-213), HF or HF213 (band conditions). ")
+OFFLINE_WHY = "no internet: answers its command words (PACK, CHIRP, BANDPLAN, NETS …) and your owner-key commands only"
+OFFLINE_SAY = ("No internet here right now, so I can't answer questions in words. My command words still work: PACK, "
+               "CHIRP, BANDPLAN 70CM, ICS205, ICS309, NETS, CALENDAR, CALL, MSG. HELP says what each sends.")
 SHARE_DEFAULT = {"plans": True, "kept": True, "adhoc": True, "nets": True, "own_files": False}
 
 TOOL_STEP = {"band_plan": "reading the band plan", "weather": "looking up the weather", "hf_conditions":
@@ -592,6 +604,28 @@ _BANDS = {"160": (1.8, 2.0), "80": (3.5, 4.0), "60": (5.33, 5.41), "40": (7.0, 7
           "20": (14.0, 14.35), "17": (18.068, 18.168), "15": (21.0, 21.45), "12": (24.89, 24.99), "10": (28.0, 29.7),
           "6": (50.0, 54.0), "2": (144.0, 148.0), "1.25": (222.0, 225.0), "220": (222.0, 225.0), "70": (420.0, 450.0),
           "440": (420.0, 450.0), "33": (902.0, 928.0), "23": (1240.0, 1300.0)}
+
+
+def _band_word(text: str) -> str:
+    """'2m', '70 CM', '440', '220', '6 meters' in a command's words -> the band as _band_range reads it ('' = none)."""
+    t = str(text or "").lower()
+    m = re.search(r"\b(160|80|60|40|30|20|17|15|12|10|6|2|1\.25|70|33|23)\s*(m|cm|meters?|metres?)\b|\b(440|220|1\.25)\b", t)
+    if not m:
+        return ""
+    if m.group(3):
+        return {"440": "70 cm", "220": "1.25 m", "1.25": "1.25 m"}[m.group(3)]
+    return f"{m.group(1)} {'cm' if m.group(2) == 'cm' else 'm'}"
+
+
+def _call_words(js: str) -> str:
+    try:
+        d = json.loads(js)
+    except ValueError:
+        return js
+    where = ", ".join(x for x in (d.get("city"), d.get("state"), d.get("country")) if x)
+    return (f"{d.get('call')}: {d.get('name') or ''}" + (f", {d['license_class']}" if d.get("license_class") else "")
+            + (f" ({d['license_status']})" if d.get("license_status") else "") + (f", {where}" if where else "")
+            + (f", expires {d['expires']}" if d.get("expires") else "") + " (this station's callbook)").replace(": ,", ":")
 
 
 def _band_range(band: str):
@@ -1044,7 +1078,7 @@ class Einstein:
             quick("answered: sent the station pack" if s.get("pack_sent") else "answered PACK: nothing to send", ok=True)
             return
         if cmd in ("HELP", "?", "MENU"):
-            say(HELP + (OWNER_HELP if s["owner"] else ""))
+            say(DIRECT_HELP + ASK_HELP + (OWNER_HELP if s["owner"] else ""))
             quick("answered: its HELP list")
             return
         if cmd in ("STATUS", "MESSAGES", "PAUSE", "RESUME"):
@@ -1054,6 +1088,8 @@ class Einstein:
                 return
             say(self._owner(rid, cmd))
             quick(f"answered your {cmd} (owner key)")
+            return
+        if self._direct(rid, peer, s, text, send, say, t0):   # owner 2026-11-24: quick requests answered without the AI
             return
         now = self.clock()
         while s["asked"] and now - s["asked"][0] > 3600:
@@ -1070,7 +1106,7 @@ class Einstein:
             return
         if not self.online()[0]:                     # off grid: what the station's code does needs no internet
             say(OFFLINE_SAY)
-            quick("not answered: no internet here (PACK and HELP still work)", ok=False)
+            quick("not answered: no internet here (its command words still work)", ok=False)
             return
         if self.busy.get((rid, peer)):
             say("Still working on your last question: one at a time, please.")
@@ -1118,6 +1154,92 @@ class Einstein:
         return (f"Sending {base(self.of(rid))}'s station pack: {what}. {len(data) / 1024:.1f} KB"
                 + (f", about {est:.0f} s" if est else "") + ". On HAM Sidekick Station open it with 📦 Review and "
                 "install: you choose what goes into your band plan and schedule; nothing of yours is deleted.")
+
+    def _send_files(self, s, files, send):
+        now = self.clock()
+        while s["files"] and now - s["files"][0] > 3600:
+            s["files"].popleft()
+        for f in files:
+            if len(s["files"]) >= FILES_PER_HOUR and not s["owner"]:
+                send(text=f"(not sending {f['name']}: {FILES_PER_HOUR} files an hour is my limit)")
+                break
+            if Path(f["name"]).suffix.lower() not in SAFE_EXT:
+                continue
+            s["files"].append(now)
+            send(name=f["name"], data=f["data"])
+
+    def _direct(self, rid, peer, s, text, send, say, t0) -> bool:
+        """A command word answered by the station's code, never the model (owner 2026-11-24: "From our quick selects,
+        what else can we send information for without the AI?" — "go"): the same every time, free, quick, and off grid
+        for all but WX and HF (they need the internet, not the AI). A command word followed by a long sentence goes to
+        the model when it is reachable (it may want something the word alone does not say)."""
+        m = DIRECT_RE.match(text)
+        if not m:
+            return False
+        word = re.sub(r"[\s-]", "", m.group(1).upper())
+        word = DIRECT_ALIAS.get(word, word)
+        rest = " ".join(m.group(2).split())
+        online = self.online()[0]
+        if word == "CALL" and not re.fullmatch(r"[A-Za-z0-9]{3,7}(-\d{1,2})?", rest):
+            return False                                  # "call me later": a sentence, not a lookup
+        if word != "MSG" and len(rest.split()) > (6 if word in ("WX", "WX213") else 4) and online:
+            return False
+        if word == "MSG" and not rest:
+            say("MSG and your note, e.g. MSG please call me on 146.520 tonight.")
+            self._done(rid, peer, text, "answered: how to use MSG", started=t0)
+            return True
+        tools = Tools(self, rid, peer, s)
+        band = _band_word(rest)
+        try:
+            if word == "CHIRP":
+                out = tools.t_make_chirp(source="local", band=band, radio="ht",
+                                         title="Local EMCOMM " + (band or "2m-70cm-adhoc"))
+            elif word == "BANDPLAN":
+                if not band:
+                    say("BANDPLAN and a band, e.g. BANDPLAN 2M, BANDPLAN 70CM or BANDPLAN 40M.")
+                    self._done(rid, peer, text, "answered: how to use BANDPLAN", started=t0)
+                    return True
+                out = tools.t_band_plan(band, as_file=True)
+                lines = out.split("\n")
+                out = "\n".join([lines[0]] + [x for x in lines[1:] if "license" in x or "made file" in x])
+            elif word == "ICS205":
+                out = tools.t_make_ics205(incident=rest or "Ad hoc channels", source="adhoc")
+            elif word == "ICS309":
+                out = tools.t_make_ics309(incident=rest)
+            elif word == "NETS":
+                out = tools.t_nets()
+            elif word == "CALENDAR":
+                out = tools.t_make_net_schedule()
+            elif word == "MSG":
+                out = tools.t_leave_message(rest) + ". 73"
+            elif word == "CALL":
+                out = _call_words(tools.t_lookup_call(rest))
+            elif word in ("WX", "WX213"):
+                out = tools.t_weather(rest or "here", as_form=word == "WX213")
+            else:                                         # HF, HF213
+                out = tools.t_hf_conditions(as_form=word == "HF213")
+        except Exception as e:  # noqa: BLE001
+            net = word in ("WX", "WX213", "HF", "HF213")
+            self._log(rid, {"kind": "error", "peer": peer, "error": f"{word}: {type(e).__name__}: {str(e)[:200]}"})
+            say(f"{word} needs the internet here, and it cannot be reached now." if net
+                else f"Sorry, {word} did not work just now ({type(e).__name__}); {self.op_call(rid)} can follow up.")
+            self._done(rid, peer, text, f"could not answer {word}", ok=False, started=t0)
+            return True
+        files = one_file_each(list(tools.files.values()))
+        reply = re.sub(r"made file f\d+: (.+?)\. Put \"f\d+\" in attach to send it\.", r"Sending \1.", out)
+        bad = text_problems(reply)
+        if bad:
+            reply, files = "I can't send that on amateur radio (" + "; ".join(bad) + ").", []
+        if len(reply) > REPLY_CHARS:
+            reply = reply[:REPLY_CHARS - 40].rsplit(" ", 1)[0] + " … (the file has it all)" if files else \
+                reply[:REPLY_CHARS - 4].rsplit(" ", 1)[0] + " …"
+        s["history"] += [{"role": "asker", "text": text}, {"role": "einstein", "text": reply}]
+        say(reply)
+        self._log(rid, {"kind": "direct", "peer": peer, "word": word, "files": [f["name"] for f in files]})
+        self._send_files(s, files, send)
+        self._done(rid, peer, text, f"answered {word} (no AI)", tools=tools.calls or [word.lower()],
+                   files=[f["name"] for f in files], started=t0)
+        return True
 
     def _wrap(self, rid, peer, s, text) -> str:
         """Disclosure first, then the call every 10 minutes (97.119(a), 97.113(a)(4)), as code, never the model."""
@@ -1231,17 +1353,7 @@ class Einstein:
             send(text=reply)
             self._done(rid, peer, text, "blocked: " + "; ".join(bad) if bad else "answered", ok=not bad,
                        tools=tools.calls, files=[f["name"] for f in files])
-            now = self.clock()
-            while s["files"] and now - s["files"][0] > 3600:
-                s["files"].popleft()
-            for f in files:
-                if len(s["files"]) >= FILES_PER_HOUR and not s["owner"]:
-                    send(text=f"(not sending {f['name']}: {FILES_PER_HOUR} files an hour is my limit)")
-                    break
-                if Path(f["name"]).suffix.lower() not in SAFE_EXT:
-                    continue
-                s["files"].append(now)
-                send(name=f["name"], data=f["data"])
+            self._send_files(s, files, send)
         except Exception as e:  # noqa: BLE001
             self._log(rid, {"kind": "error", "peer": peer, "error": f"{type(e).__name__}: {str(e)[:200]}"})
             self._done(rid, peer, text, "could not answer: " + ("no internet" if "URLError" in type(e).__name__

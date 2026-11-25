@@ -39,6 +39,31 @@ list. Files arrive after its answer and open with **View** (a form as the form, 
 | "Leave a message for the operator: …" | a note in **✉ Notes** on your VARA panel (the only message it takes) |
 | library questions | only when you tick "Einstein may search this station's library" |
 
+## Command words: answered without the AI (owner 2026-11-24)
+
+The quick buttons send these words; anyone can type them in plain VARA chat too. The station's code answers them,
+never the AI: the same answer every time, no cost, a reply in a second or two instead of 5–30, and **off grid** (no
+internet, no xAI key) for all but WX and HF, which need the internet (not the AI). A word followed by a long sentence
+("CHIRP file of every 2 m repeater for my mobile with tones") goes to the AI when it can be reached.
+
+| Word | Sends |
+|---|---|
+| `PACK` | the station pack (band plan + nets, to review and install) |
+| `CHIRP`, `CHIRP 2M`, `CHIRP 70CM` | one CHIRP file of the area's EMCOMM channels for a handheld: repeaters, simplex, calling, ad hoc, with the band plan's radio aliases |
+| `BANDPLAN 70CM` (any band: 2M, 440, 40M…) | the band plan page, with what the asker's license allows on each row |
+| `ICS205` | an ICS-205 radio plan of the reserved ad hoc channels |
+| `ICS309` | an ICS-309 log of this session |
+| `NETS` | the nets with frequency and next time, as text |
+| `CALENDAR` | the nets as a calendar file (.ics) and a HAM Sidekick net file |
+| `CALL K7ABC` | the station's callbook (FCC database, country list) |
+| `MSG your note` | a note for the control operator |
+| `WX`, `WX213` [place] | forecast and alerts (as an ICS-213) — needs the internet |
+| `HF`, `HF213` | space weather and what it means for HF (as an ICS-213) — needs the internet |
+| `HELP` | all of these |
+
+On the asking station the buttons show this: no mark = works off grid, 🌐 = needs the internet there, 🤖 = a question
+for the AI (put in the box to edit).
+
 ## Watching it work
 
 On the station running Einstein, a question shows under the 🤖 bar the moment it comes in: who asked, what, and

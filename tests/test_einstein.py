@@ -565,9 +565,10 @@ def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert "data-vshare=" in idx and "📦 Share with" in idx and '"/api/nets/share/export.ics"' in idx
     assert idx.count("${vNetsBtn(f)}") == 2 and "data-vnetsinst" in idx and '"/api/nets/share/install"' in idx
-    ask = idx.split("const V_ASK=[")[1].split("];")[0]
-    assert "Local EMCOMM CHIRP file (2m/70cm/ad hoc)" in ask and "Your net schedule as a calendar file" in ask
-    assert len("Local EMCOMM CHIRP file (2m/70cm/ad hoc)") <= 40 and len("Your net schedule as a calendar file") <= 40   # not cut
+    ask = idx.split("const V_ASK=[")[1].split("]];")[0]
+    for word in ("PACK", "CHIRP", "CHIRP 2M", "BANDPLAN 70CM", "ICS205", "ICS309", "NETS", "CALENDAR", "WX213", "HF"):
+        assert f'","{word}","now"' in ask or f'","{word}","net"' in ask, word   # command words, sent at once
+    assert '"MSG ","box"' in ask and "Local EMCOMM CHIRP file (2m/70cm/ad hoc)" in ask
 
 
 def test_news_is_searched_on_the_web_never_answered_with_the_weather(tmp_path):
@@ -704,3 +705,72 @@ def test_pack_sends_the_station_pack_by_code_as_the_operator_chose(tmp_path):
     assert "3 times this hour" in _ask(m, v, "K7ABC", "PACK")
     assert len([c for c in v.calls if c[0] == "file"]) == 3
     assert "PACK" in E.HELP
+
+
+def test_the_quick_requests_are_command_words_answered_without_the_ai_even_off_grid(tmp_path):
+    """Owner 2026-11-24: "From our quick selects, what else can we send information for without the AI?" — "go".
+    CHIRP, BANDPLAN, ICS205, ICS309, NETS, CALENDAR, CALL and MSG are answered by the station's code: never the model,
+    the same every time, with no internet; WX and HF need the internet but not the model; a command word followed by a
+    long sentence still goes to the model when it can be reached."""
+    table = {"bands": [{"rows": [
+        {"type": "range", "from": 144.0, "to": 148.0, "use": "2 m", "by": "FCC"},
+        {"type": "channel", "from": 146.94, "to": 146.94, "use": "Command net", "authority": "local", "offset_mhz": -0.6,
+         "tone_hz": 100.0, "kept": False, "mode": "FM", "org": "County ARES", "by": "County plan", "alias": "CMD NET"}]},
+        {"rows": [{"type": "channel", "from": 449.625, "to": 449.625, "use": "Linked repeater", "authority": "local",
+                   "offset_mhz": -5.0, "tone_hz": 103.5, "kept": False, "mode": "FM", "org": "County ARES",
+                   "by": "County plan", "alias": "LINK UHF"}]}], "sources": [{"name": "County plan"}]}
+
+    class Plans:
+        def consolidated(self):
+            return table
+
+        def adhoc(self):
+            return [{"kind": "voice", "freq_mhz": 147.42, "alias": "ADHOC1", "name": "ad hoc 1"}]
+    asked = []
+
+    def model(system, user, tools):
+        asked.append(user)
+        return {"reply": "From the model.", "attach": [], "note_for_operator": ""}, {"tools": []}
+    st, rid, m, clk, e = _setup(tmp_path, model=model)
+    e.plans = lambda: Plans()
+    st.cfg["schedule"] = [{"id": "n1", "name": "Tuesday Net", "freq_mhz": 146.94, "mode": "FM", "start": "19:00",
+                           "duration_min": 60, "repeat": {"freq": "weekly", "weekdays": ["Tue"]}}]
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    from station.online import Online
+    st.agent.online["xai"] = o = Online("xai")
+    o.failed("down")                                          # off grid
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    files = lambda: [c[1] for c in v.calls if c[0] == "file"]
+    r = _ask(m, v, "K7ABC", "CHIRP")
+    assert "CMD NET" in r and "LINK UHF" in r and "ADHOC1" in r and "Sending CHIRP-Local-EMCOMM" in r and "attach" not in r
+    assert files()[-1].startswith("CHIRP-Local-EMCOMM") and len(files()) == 1
+    r = _ask(m, v, "K7ABC", "chirp 70cm")
+    assert "LINK UHF" in r and "CMD NET" not in r and len(files()) == 2
+    r = _ask(m, v, "K7ABC", "BANDPLAN 70CM")
+    assert r.startswith("Band plan for 70 cm") and files()[-1].startswith("BandPlan-70-cm")
+    assert "BANDPLAN and a band" in _ask(m, v, "K7ABC", "band plan")
+    _ask(m, v, "K7ABC", "ICS-205")
+    assert files()[-1].startswith("ICS205-Ad-hoc")
+    _ask(m, v, "K7ABC", "ics309")
+    assert files()[-1].startswith("ICS309")
+    assert "Tuesday Net: 146.940 MHz FM, next" in _ask(m, v, "K7ABC", "NETS")
+    _ask(m, v, "K7ABC", "CALENDAR")
+    assert files()[-2].endswith(".ics") and files()[-1].endswith(".hsnets")
+    assert "note kept for W9XYZ" in _ask(m, v, "K7ABC", "MSG please call me tonight")
+    import urllib.error
+
+    def no_net(*a, **k):
+        raise urllib.error.URLError("no route to host")
+    e.here, e.fetch = (lambda: {"lat": 39.8, "lon": -89.65, "label": "Springfield, IL", "name": "Springfield, IL"}), no_net
+    assert "needs the internet" in _ask(m, v, "K7ABC", "WX")
+    assert "No internet here right now" in _ask(m, v, "K7ABC", "What is the news?")
+    h = _ask(m, v, "K7ABC", "HELP")
+    assert "CHIRP 2M" in h and "BANDPLAN 70CM" in h and "WX213" in h
+    assert asked == []                                        # the model was never asked
+    st.agent.online.pop("xai")                                # online: a long sentence goes to the model
+    r = _ask(m, v, "K7ABC", "CHIRP file of every 2 m repeater for my mobile with the tones please")
+    assert r.endswith("From the model.") and len(asked) == 1
+    assert "(no AI)" in next(x["outcome"] for x in e.state(rid)["recent"] if "CHIRP" in x["outcome"])
