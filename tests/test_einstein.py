@@ -850,3 +850,37 @@ def test_the_chat_is_a_workspace_with_a_focus_view_and_formatted_messages():
     assert 'data-vkeep="chan-' in idx and 'data-vkeep="tools-' in idx and "<summary>Link tools" in idx
     assert "function vFmt(t,ai)" in idx and 'class="vli"' in idx and 'class="vid"' in idx
     assert "With no internet it stops answering" not in idx and "stays on the air for its command words" in idx
+
+
+def test_a_new_link_keeps_the_limits_and_identifies_briefly_and_a_pack_is_announced_first(tmp_path):
+    """Found on the air 2026-11-25 (each quick request is its own short link): the hourly limits and the conversation
+    carry over to the next link; the full identification goes once in 10 minutes and a new link inside that starts
+    with the call and name only; PACK's words go out before its file; a list in one sentence becomes a list."""
+    from tests.test_stationpack import _sender
+    st, rid, m, clk, e = _setup(tmp_path, model=lambda *a: (_ for _ in ()).throw(AssertionError("no model")))
+    _sender(st)
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    first = _ask(m, v, "K7ABC", "NETS")
+    assert first.startswith("W9XYZ-14 Einstein here: an automated AI assistant")
+    for _ in range(2):
+        _link_e(m, v, "K7ABC")                                   # a new link each time
+        r = _ask(m, v, "K7ABC", "PACK PLAN")
+        assert r.startswith("W9XYZ-14 Einstein:\n") and "automated AI assistant" not in r
+    time.sleep(0.2)
+    kinds = [c[0] for c in v.calls if c[0] in ("chat", "file")]
+    assert kinds[-2:] == ["chat", "file"]                         # the words, then the file
+    _link_e(m, v, "K7ABC")
+    _ask(m, v, "K7ABC", "PACK PLAN")
+    _link_e(m, v, "K7ABC")
+    assert "3 times this hour" in _ask(m, v, "K7ABC", "PACK PLAN")   # the limit outlives the links
+    clk.t += 700
+    _link_e(m, v, "K7ABC")
+    assert "automated AI assistant" in _ask(m, v, "K7ABC", "NETS")   # 10 minutes on: the full identification again
+    r = E.readable("Top news this week includes Alpha extending the renewals to March because of the delays, Bravo filing "
+                   "over 2500 pending applications, Charlie naming amateur radio its backup, and delta released an open "
+                   "codec for digital voice without the proprietary chips that it needed before.\nSources: A, B.")
+    assert r.split("\n")[0].endswith("includes:") and r.count("\n- ") == 4 and r.endswith("Sources: A, B.")

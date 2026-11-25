@@ -68,6 +68,7 @@ FILES_PER_HOUR = 8            # files to one station per hour
 PER_DAY = 300                 # questions answered per day, all stations
 FILE_MAX = 64 * 1024          # one file Einstein makes
 ID_EVERY_S = 600              # 97.119(a)
+SESSION_KEEP_S = 3600         # a station's limits and conversation outlive its links for this long
 MODEL_TIMEOUT_S = 90
 HOLD_S = 6 * 3600             # an answer kept for a station whose link closed before it was ready
 PROBE_S = 60
@@ -376,7 +377,9 @@ class Tools:
         w = wx.forecast(p, fetch=self.e.fetch)
         text = (f"Weather for {w['place']} ({w['source']}, {datetime.now():%Y-%m-%d %H:%M} local at {self.e.of(self.rid)}):\n"
                 + "".join(f"ALERT: {a['event']} ({a['severity']}): {a['headline']}\n" for a in w["alerts"])
-                + "".join(f"{x['name']}: {x['text']} Temp {x['temp']}. Wind {x['wind']}.\n" for x in w["periods"]))
+                + "".join(f"{x['name']}: {x['text']}" + ("" if re.search(r"\b(high|low|temperature)", str(x["text"]), re.I)
+                                                          else f" Temp {x['temp']}. Wind {x['wind']}.") + "\n"
+                          for x in w["periods"]))
         if as_form:
             return text + "\n" + self._form213("Weather: " + w["place"], text, "Weather report")
         return text
@@ -626,7 +629,11 @@ def readable(text: str) -> str:
     human users"): one that came as a long paragraph gets one sentence per line; "; - " lists get their own lines.
     A reply that already has line breaks is left as it is."""
     t = str(text or "").strip()
-    if "\n" in t or len(t) < 160:
+    return "\n".join(_split_line(ln) for ln in t.split("\n"))
+
+
+def _split_line(t: str) -> str:
+    if len(t) < 160 or t.lstrip().startswith(("- ", "• ")):
         return t
     out, start = [], 0
     for m in re.finditer(r"(?<=[a-z0-9)\]%°\"'])([.!?])\s+(?=[A-Z0-9(\"'])", t):
@@ -635,7 +642,13 @@ def readable(text: str) -> str:
         out.append(t[start:m.end(1)])
         start = m.end()
     out.append(t[start:])
-    return "\n".join(x.strip() for x in out if x.strip())
+    out = [x.strip() for x in out if x.strip()]
+    if len(out) == 1 and len(t) > 220:                 # one sentence that lists things: "includes A, B, C, and D"
+        m = re.match(r"(.{8,160}?\b(?:includes?|are|:))\s+(.+)$", t)
+        parts = re.split(r",?\s+and\s+(?=\S+\s)(?![^,]*$)|,\s+and\s+|,\s+(?=[A-Z0-9])", m.group(2)) if m else []
+        if len(parts) >= 3:
+            return m.group(1).rstrip(":") + ":\n" + "\n".join("- " + p.strip().rstrip(".") for p in parts)
+    return "\n".join(out)
 
 
 def _band_word(text: str) -> str:
@@ -1042,9 +1055,15 @@ class Einstein:
         """A station linked to Einstein's call: a new session; returns the per-link challenge (+NONCE=...)."""
         nonce = _rand.token_hex(8).upper()
         with self.lock:
+            old = self.sessions.get((rid, peer)) or {}
+            keep = old if old and self.clock() - old.get("at", 0) < SESSION_KEEP_S else {}
+            # A quick request is its own short link (found on the air 2026-11-25): the hourly limits, what was said and
+            # when the full identification last went out carry over; the challenge and the owner proof never do.
             self.sessions[(rid, peer)] = {"at": self.clock(), "nonce": nonce, "owner": False, "disclosed": False,
-                                          "last_id": 0, "log": [], "asked": deque(), "files": deque(),
-                                          "history": [], "asker_class": None, "checked": None}
+                                          "last_id": 0, "log": keep.get("log", [])[-60:], "asked": keep.get("asked", deque()),
+                                          "files": keep.get("files", deque()), "packs": keep.get("packs", []),
+                                          "history": keep.get("history", [])[-12:], "full_at": keep.get("full_at"),
+                                          "asker_class": None, "checked": None}
         self._log(rid, {"kind": "link", "peer": peer})
         self._show(rid)
         return nonce
@@ -1107,7 +1126,10 @@ class Einstein:
         cmd = text.strip().upper()
         if re.match(r"PACK\b", cmd):                 # owner 2026-11-24: the band plan and nets, to install there;
             pw = re.search(r"\b(PLAN|NETS?)\b", cmd[4:])  # 11-25: PACK PLAN / PACK NETS, one button for each
-            say(self._pack(rid, peer, send, ("plan" if pw.group(1) == "PLAN" else "nets") if pw else None))
+            hold = []                                # the words go first, then the file (on the air 11-25 it came first)
+            say(self._pack(rid, peer, lambda **k: hold.append(k), ("plan" if pw.group(1) == "PLAN" else "nets") if pw else None))
+            for k in hold:
+                send(**k)
             quick("answered: sent the station pack" if s.get("pack_sent") else "answered PACK: nothing to send", ok=True)
             return
         if re.sub(r"[?!.\s]+$", "", cmd) in ("HELP", "", "MENU", "WHAT CAN YOU DO", "COMMANDS"):
@@ -1287,6 +1309,9 @@ class Einstein:
         if not s["disclosed"]:
             s["disclosed"] = True
             s["last_id"] = self.clock()
+            if s.get("full_at") is not None and self.clock() - s["full_at"] < ID_EVERY_S:
+                return f"{ecall} {self.name()}:\n{text}"      # a new link within 10 min of the full one: its call and name
+            s["full_at"] = self.clock()
             d = disclosure(self.name(), ecall, self.of(rid), self.op_call(rid))
             if text.startswith(DIRECT_HELP[:24]):          # the HELP list itself follows: no "Type HELP" above it
                 d = d.replace("Type HELP for what I can do.\n", "")
