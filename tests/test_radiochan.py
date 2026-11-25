@@ -21,7 +21,7 @@ def test_mark_a_repeater_and_a_simplex_channel():
     m = R.apply([], {"add": RPT})
     m = R.apply(m, {"add": {"freq_mhz": 146.52, "mode": "FM", "name": "National simplex calling"}})
     m = R.apply(m, {"add": {"freq_mhz": 442.1, "offset_mhz": 5, "tone_hz": 103.4, "name": "Club repeater"}})
-    assert [x["alias"] for x in m] == ["K7ABC", "146.52", "R442.1"]       # callsign / frequency / R + frequency
+    assert [x["alias"] for x in m] == ["K7ABC", "2M CALL", "CLUB"]      # callsign / national calling / the name
     assert m[2]["tone_hz"] == 103.5                                         # the nearest CTCSS tone
     with pytest.raises(ValueError, match="already"):
         R.apply(m, {"add": RPT})
@@ -31,7 +31,7 @@ def test_mark_a_repeater_and_a_simplex_channel():
     assert len(m) == 2
     r = _csv(R.listing([], m, []))
     assert [(x["Location"], x["Name"], x["Frequency"], x["Duplex"], x["Offset"], x["Tone"], x["rToneFreq"])
-            for x in r] == [("1", "146.52", "146.520000", "", "0.000000", "", "88.5"),
+            for x in r] == [("1", "2M CALL", "146.520000", "", "0.000000", "", "88.5"),
                             ("2", "ARES RPT", "146.940000", "-", "0.600000", "Tone", "100.0")]
     assert r[1]["Comment"].startswith("K7ABC repeater")
 
@@ -122,3 +122,37 @@ def test_a_seven_character_radio_names_aliases_that_would_read_the_same():
     assert p["dups"] == ["K7ABC: 147.42 and 147.48 MHz"]
     assert p["clash_short"] == ["VARAFM11 and VARAFM12 → VARAFM1", "CALLING and CALLING7 → CALLING"]
     assert "VARAFM12" in R.chirp_csv(items, "ht")
+
+
+def _chan(f, use, off=None, org=None, adhoc=None):
+    return {"type": "channel", "from": f, "to": f, "use": use, "offset_mhz": off, "org": org, "adhoc": adhoc or []}
+
+
+def test_every_plan_channel_gets_a_smart_unique_alias_and_mine_are_kept():
+    """Owner 2026-11-24: "radio aliases for each repeater and simplex specific frequency reserved in the band plan.
+    Create a smart 8 char default radio alias for those and allow the user to modify them. These will feed a radio
+    CHIRP file export." From the plan's words; unique in the plan (band, then the frequency's last digits); typed
+    ones (by frequency and offset), an ad hoc reservation's alias and a 💾 mark's typed alias win."""
+    rows = [_chan(146.94, "Springfield (linked repeater)", -0.6), _chan(444.95, "Springfield", 5.0),
+            _chan(146.46, "Tac #1 (assigned as necessary)", 0.0), _chan(146.52, "Most often used simplex frequency"),
+            _chan(146.54, "Simplex frequency"), _chan(442.1, "10 Meter Repeater", 5.0),
+            _chan(147.2, "Command Net #1 (primary); Command Net #2 (secondary)", 0.6),
+            _chan(145.05, "Winlink gateway K7ABC-10 (VARA FM)"), _chan(447.0, "DMR Digital (K7ABC) (CC1)", -5.0),
+            _chan(449.575, "D-Star B (K7ABC)", -5.0), _chan(146.42, "State Wide Net (RACES) backup", 0.0),
+            _chan(147.45, "State Wide Net (RACES) backup", 0.0), _chan(445.525, "x", adhoc=[{"alias": "VARA1"}]),
+            _chan(449.9, "County EOC", -5.0), _chan(147.3, "Hospital net", 0.6)]
+    table = {"bands": [{"band": "all", "rows": rows}]}
+    marks = [R.clean_mark({"freq_mhz": 449.9, "offset_mhz": -5.0, "alias": "EOC UHF", "name": "County EOC"}),
+             R.clean_mark({"freq_mhz": 147.3, "offset_mhz": 0.6, "name": "Hospital net"})]
+    R.assign_aliases(table, {R.key({"freq_mhz": 146.54, "offset_mhz": None}): "simplx 3"}, marks)
+    a = {r["from"]: r["alias"] for r in rows}
+    assert (a[146.94], a[444.95]) == ("SPRNG 2M", "SPRNG 70")                 # the same site on two bands
+    assert a[146.46] == "TAC1" and a[146.52] == "2M CALL" and a[442.1] == "R442.1" and a[147.2] == "CMD NET1"
+    assert a[145.05] == "K7ABC-10" and {a[447.0], a[449.575]} == {"K7ABC447", "K7ABC575"}
+    assert (a[146.42], a[147.45]) == ("STWN 642", "STWN 745") and a[146.54] == "SIMPLX 3" and a[445.525] == "VARA1"
+    assert a[449.9] == "EOC UHF" and a[147.3] == "HOSP NET"                   # a mark's typed alias wins
+    own = {r["from"] for r in rows if r["alias_own"]}
+    assert own == {146.54, 445.525, 449.9}
+    assert len(set(a.values())) == len(a) and all(len(v) <= R.ALIAS_MAX for v in a.values())
+    lst = R.listing([], marks, [], table)                        # the 💾 list and its CHIRP file use the same aliases
+    assert [x["alias"] for x in lst] == ["HOSP NET", "EOC UHF"]

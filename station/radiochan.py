@@ -59,14 +59,137 @@ def fmt_f(f: float) -> str:
     return s + "0" if s.endswith(".") else s
 
 
-def suggest_alias(row: dict) -> str:
-    """A first alias for a band-plan channel: a repeater's or gateway's callsign, else R + its frequency (repeater) or
-    the frequency."""
+def _old_default(row: dict) -> str:
+    """The alias a 💾 mark got before 2026-11-24 when the operator typed none: the org's callsign, else R + freq."""
     org = alias(row.get("org") or "").replace(" ", "")
     if CALL_RE.match(org):
         return org[:ALIAS_MAX]
-    f = fmt_f(float(row["freq_mhz"]))
-    return alias(("R" if row.get("offset_mhz") else "") + f)
+    return alias(("R" if row.get("offset_mhz") else "") + fmt_f(float(row["freq_mhz"])))
+
+
+# Smart aliases (owner 2026-11-24: "radio aliases for each repeater and simplex specific frequency reserved in the
+# band plan. Create a smart 8 char default radio alias for those and allow the user to modify them. These will feed
+# a radio CHIRP file export"). From the plan's own words: a callsign (repeater owner, gateway), a tactical number,
+# the national calling channels, else the site or use in its fewest letters; a plan with no words gets S / R + MHz.
+CALL_IN = re.compile(r"\b([A-Z]{1,2}[0-9][A-Z]{1,4}(?:-[0-9]{1,2})?)\b")
+NATIONAL = {144.39: "APRS", 29.6: "10M CALL", 52.525: "6M CALL", 146.52: "2M CALL", 223.5: "220 CALL", 446.0: "70 CALL"}
+GENERIC = set("""REPEATER REPEATERS RPTR LINKED LINK LINKS FM NFM SIMPLEX FREQUENCY FREQ OPERATION OPERATIONS THE OF AND
+FOR AS NEEDED ASSIGNED NECESSARY PRIMARY SECONDARY METER METERS CM M MHZ KHZ MOST OFTEN USED CHANNEL CHANNELS A AN TO IN
+ON AT BY OR ONLY USE VOICE TALK""".split())
+ABBR = {"COMMAND": "CMD", "BACKUP": "BU", "COUNTY": "CO", "NORTH": "N", "SOUTH": "S", "EAST": "E", "WEST": "W",
+        "MOUNT": "MT", "MOUNTAIN": "MTN", "EMERGENCY": "EMG", "PORTABLE": "PORT", "STATE": "ST", "NATIONAL": "NATL",
+        "CALLING": "CALL", "INTERCOM": "ICOM", "STORE": "STR", "HOUSE": "HSE", "TACTICAL": "TAC", "HOSPITAL": "HOSP",
+        "SHELTER": "SHLT", "STATEWIDE": "STWIDE", "VALLEY": "VLY", "PEAK": "PK", "CENTER": "CTR", "CENTRE": "CTR",
+        "GATEWAY": "GW", "NATIONWIDE": "NATL", "WIDE": "W", "DIGITAL": "DIG", "PACKET": "PKT", "WEATHER": "WX", "SKYWARN": "SKYWRN"}
+
+
+def band_tag(f: float) -> str:
+    from .bandplan import band
+    b = (band(f) or "").replace(" ", "").upper()
+    return {"1.25M": "220", "70CM": "70", "33CM": "33", "23CM": "23"}.get(b, b)
+
+
+def _novowel(w: str) -> str:
+    return w[0] + re.sub(r"[AEIOU]", "", w[1:]) if len(w) > 3 else w
+
+
+def _fit(words: list[str]) -> str:
+    for ws in (words, [_novowel(w) for w in words]):
+        for sep in (" ", ""):
+            if len(sep.join(ws)) <= ALIAS_MAX:
+                return sep.join(ws)
+    return "".join(_novowel(w) for w in words)[:ALIAS_MAX]
+
+
+def smart_alias(row: dict) -> str:
+    """The first alias for a band-plan channel {freq_mhz, offset_mhz, name (the plan's words), org}: at most
+    ALIAS_MAX characters, before it is made unique in the plan (assign_aliases)."""
+    f = round(float(row["freq_mhz"]), 4)
+    off = row.get("offset_mhz") or 0
+    text = str(row.get("name") or row.get("use") or "")
+    if not off and f in NATIONAL:
+        return NATIONAL[f]
+    up = text.upper()
+    m = CALL_IN.search(up) or CALL_IN.search(alias(row.get("org") or "").replace(" ", ""))
+    if m and len(m.group(1)) <= ALIAS_MAX:
+        return m.group(1)
+    t = re.search(r"\bTAC(?:TICAL)?\s*#?\s*(\d{1,2})\b", up)
+    if t:
+        return "TAC" + t.group(1)
+    first = re.split(r"[;:]|\s[-–—]\s", up)[0]
+    first = re.sub(r"\([^)]*\)", " ", first)
+    words = []
+    for w in re.findall(r"#\s*\d+|[A-Z0-9][A-Z0-9./-]*", first):
+        if w.startswith("#"):
+            if words:
+                words[-1] += re.sub(r"\D", "", w)     # "Net #2" -> NET2
+            continue
+        if w in GENERIC or re.fullmatch(r"[0-9.]+", w):
+            continue                                  # "10 Meter Repeater", "70 cm simplex": the band, not a name
+        words.append(ABBR.get(w, w))
+    if words:
+        return _fit(words)
+    return alias(("R" if off else "S" if f > 29.5 else "") + fmt_f(f))
+
+
+def suggest_alias(row: dict) -> str:
+    """A first alias for one channel on its own (no plan to keep it unique in)."""
+    return smart_alias(row)
+
+
+def _tail(f: float) -> str:
+    d = f"{f:.3f}".replace(".", "").rstrip("0")
+    return d[-3:]
+
+
+def assign_aliases(table: dict, custom: dict | None = None, marks: list[dict] | None = None) -> None:
+    """Every channel row of the consolidated table gets "alias" (what a radio shows) and "alias_own" (typed by the
+    operator). Typed ones (custom, by key(): frequency and offset, so a new plan search keeps them, and a 💾 mark's
+    alias typed before 2026-11-24) win; the others are smart and unique: a same alias gets the band, then the
+    frequency's last digits, then a number."""
+    custom = dict(custom or {})
+    for m in marks or []:
+        k = key(dict(m, src="plan"))
+        if k not in custom and m.get("alias") and m["alias"] not in (_old_default(m), smart_alias(m)):
+            custom[k] = m["alias"]
+    rows = [r for b in table.get("bands") or [] for r in b["rows"] if r["type"] == "channel"]
+    taken = set()
+    for r in rows:
+        k = key({"freq_mhz": r["from"], "offset_mhz": r.get("offset_mhz")})
+        r["alias_key"] = k
+        own = custom.get(k) or next((a.get("alias") for a in r.get("adhoc") or [] if a.get("alias")), None)
+        r["alias_own"] = bool(own)                       # typed here, or the ★ ad hoc reservation's alias
+        if own:
+            r["alias"] = alias(own)
+            taken.add(r["alias"])
+    base = {id(r): smart_alias({"freq_mhz": r["from"], "offset_mhz": r.get("offset_mhz"), "name": r.get("use"),
+                                "org": r.get("org")}) for r in rows if not r["alias_own"]}
+    count: dict[str, int] = {}
+    for v in base.values():
+        count[v] = count.get(v, 0) + 1
+    bandtag_count: dict[str, int] = {}
+    for r in rows:
+        if not r["alias_own"] and count[base[id(r)]] > 1:
+            bt = base[id(r)] + "|" + band_tag(r["from"])
+            bandtag_count[bt] = bandtag_count.get(bt, 0) + 1
+    for r in rows:
+        if r["alias_own"]:
+            continue
+        a = base[id(r)]
+        if count[a] > 1 or a in taken:
+            tag = band_tag(r["from"])
+            tl = _tail(r["from"])
+            tries = []
+            for x in ([tag] if tag and bandtag_count.get(a + "|" + tag, 0) <= 1 else []) + [tl]:
+                tries += [a + " " + x, a + x, a[:ALIAS_MAX - len(x) - 1] + " " + x, a[:ALIAS_MAX - len(x)] + x]
+            a = next((x.strip() for x in tries if len(x.strip()) <= ALIAS_MAX and x.strip() not in taken
+                      and len(x.strip()) > len(tl) + 1), "")
+            n = 2
+            while not a or a in taken:
+                a = base[id(r)][:ALIAS_MAX - len(str(n)) - 1] + "-" + str(n)
+                n += 1
+        r["alias"] = a
+        taken.add(a)
 
 
 def mode_of(f: float, mode) -> str:
@@ -156,7 +279,9 @@ def listing(adhoc_rows: list[dict], marks: list[dict], order: list[str], table: 
         out.append({"src": "adhoc", "kind": a["kind"], "width": a.get("width"), "freq_mhz": a["freq_mhz"],
                     "offset_mhz": None, "tone_hz": None, "mode": "FM", "alias": a.get("alias") or "",
                     "name": a.get("name") or "", "ok": a.get("ok", True), "why": a.get("why")})
+    amap = {c.get("alias_key"): c.get("alias") for c in chans if c.get("alias")}
     for m in marks:
+        m = dict(m, alias=amap.get(key(dict(m, src="plan"))) or m.get("alias") or "")
         hit = any(abs(c["from"] - m["freq_mhz"]) <= EPS and abs((c.get("offset_mhz") or 0) - (m.get("offset_mhz") or 0))
                   <= EPS for c in chans) if table else True
         out.append(dict(m, ok=hit, why=None if hit else "the band plan no longer lists this channel"))

@@ -415,8 +415,8 @@ class Tools:
                     if r["type"] == "channel":
                         items.append({"freq_mhz": r["from"], "offset_mhz": r.get("offset_mhz"), "tone_hz": r.get("tone_hz"),
                                       "mode": R.mode_of(r["from"], r.get("mode")),
-                                      "alias": R.suggest_alias({"freq_mhz": r["from"], "offset_mhz": r.get("offset_mhz"),
-                                                                "org": r.get("org")}),
+                                      "alias": r.get("alias") or R.suggest_alias({"freq_mhz": r["from"],
+                                                                "offset_mhz": r.get("offset_mhz"), "name": r.get("use")}),
                                       "name": R.long_name(r.get("use") or "")})
         lo, hi, _ = _band_range(band) if band else (None, None, None)
         if lo is not None:
@@ -450,7 +450,8 @@ class Tools:
                     continue
                 it = {"freq_mhz": f, "offset_mhz": r.get("offset_mhz"), "tone_hz": r.get("tone_hz"),
                       "mode": R.mode_of(f, r.get("mode")),
-                      "alias": R.suggest_alias({"freq_mhz": f, "offset_mhz": r.get("offset_mhz"), "org": r.get("org")}),
+                      "alias": r.get("alias") or R.suggest_alias({"freq_mhz": f, "offset_mhz": r.get("offset_mhz"),
+                                                                  "name": r.get("use"), "org": r.get("org")}),
                       "name": R.long_name(r.get("use") or "")}
                 (rep_ if r.get("offset_mhz") else simp if local else call_).append(it)
             out += rep_ + simp + call_ + [a for a in ad if lo <= a["freq_mhz"] <= hi]

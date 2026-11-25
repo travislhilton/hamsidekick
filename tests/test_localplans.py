@@ -150,3 +150,25 @@ def test_no_key_and_no_place_are_said_plainly(tmp_path):
     p = LP.Plans(st, post=lambda *a: {})
     with pytest.raises(ValueError, match="xAI key"):
         p.search()
+
+
+def test_a_typed_alias_is_kept_by_frequency_and_clears_back_to_the_smart_one(tmp_path):
+    """Owner 2026-11-24: every band-plan channel's alias can be changed; it survives a new consolidation, a 💾 mark of
+    the same channel shows it, and an empty one brings back the smart alias."""
+    from station import radiochan as R
+    st, p, _, _ = _plans(tmp_path)
+    p.express_gateways = lambda: None
+    d = LP._load(st)
+    d["ingested"] = {"u": {"title": "County plan", "authority": "local", "segments": [], "frequencies": [
+        {"freq_mhz": 146.94, "offset_mhz": -0.6, "tone_hz": 100.0, "use": "Springfield (linked repeater)"}]}}
+    LP._save(st, d)
+    ch = lambda: next(r for b in p.consolidated()["bands"] for r in b["rows"] if r["type"] == "channel" and r["from"] == 146.94)
+    assert ch()["alias"] == "SPRNGFLD" and not ch()["alias_own"]
+    p.radio_set({"add": {"freq_mhz": 146.94, "offset_mhz": -0.6, "name": "Springfield (linked repeater)"}})
+    p.radio_set({"alias": {"freq_mhz": 146.94, "offset_mhz": -0.6, "alias": "spfd rpt"}})
+    assert ch()["alias"] == "SPFD RPT" and ch()["alias_own"]
+    assert [c["alias"] for c in p.consolidated()["radio"]["channels"] if c["src"] == "plan"] == ["SPFD RPT"]
+    csv_ = p.radio_export()[0].decode()
+    assert ",SPFD RPT,146.940000," in csv_
+    p.radio_set({"alias": {"freq_mhz": 146.94, "offset_mhz": -0.6, "alias": ""}})
+    assert ch()["alias"] == "SPRNGFLD" and not ch()["alias_own"]

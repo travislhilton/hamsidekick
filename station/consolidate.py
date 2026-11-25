@@ -315,7 +315,9 @@ def _fm_points(band: str, p: dict, chans: list[float], kind: str) -> list[dict]:
                              "shared (local option / miscellaneous): no plan sets data aside here, so VARA FM shares it "
                              "with voice, links and experiments; listen first, stay off calling channels, and use your "
                              "coordinator's digital channels where it names them"
-                             if p.get("share") else "")})
+                             if p.get("share") and kind == "data" else
+                             "shared with links and control (the plan names simplex here too): listen first, and move "
+                             "off a link or control signal" if p.get("share") else "")})
     return out
 
 
@@ -378,8 +380,13 @@ def open_ranges(table: dict, kind: str) -> list[dict]:
             rule = [s for s in plan if s["authority"] != "arrl"] if any(
                 s["authority"] == "coordinator" for s in plan) else plan
             c = set().union(*(cats(s["use"]) for s in rule)) if rule else set()
+            vshare = kind == "voice" and "simplex" in c and fm_at(r["from"]) and bool(c & {"link", "experimental"}) \
+                and not c & (_NEVER - {"link", "experimental"})
+            if vshare:
+                c -= {"link", "experimental"}             # owner 2026-11-24: 70 cm had no ad hoc voice; the coordinator's
+                                                          # "Simplex, links and control" (445-447) names simplex: shared
             regional = any(re.search(r"\bexcept\b", (s["use"] or "").lower()) for s in rule)
-            share = kind == "data" and _shared_data(r, plan)
+            share = (kind == "data" and _shared_data(r, plan)) or vshare
             if not share and (c & _NEVER or regional):
                 continue                                  # "... except <area>": the station cannot tell; not offered
             if kind == "data" and not share and ((rule and "data" not in c) or (hf and "weak" in c)):

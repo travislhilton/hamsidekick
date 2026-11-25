@@ -499,7 +499,7 @@ a.btn,label.btn{display:inline-block;padding:4px 10px;border:1px solid var(--lin
 #pcSet ul{margin:4px 0 6px 18px;padding:0}#pcSet li.bad{color:#c0392b}#pcSet .fix{color:var(--muted)}
 .vlog{max-height:45vh;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:8px 0}
 .vmsg{margin:3px 0;overflow-wrap:anywhere}.vmsg.out b{color:var(--accent)}
-.rct td input:not(.rcal){min-width:14em;width:100%}.rcal{text-transform:uppercase;width:7.5em!important;max-width:7.5em;font-family:ui-monospace,Consolas,monospace;min-height:0}.rcon{display:inline-flex;gap:4px;align-items:center}.rcon .rcal{width:6.5em;padding:1px 4px;font-size:12.5px}
+.rct td input:not(.rcal){min-width:14em;width:100%}.rcal.own{font-weight:700}.rcal{text-transform:uppercase;width:7.5em!important;max-width:7.5em;font-family:ui-monospace,Consolas,monospace;min-height:0}.rcon{display:inline-flex;gap:4px;align-items:center}.rcon .rcal{width:6.5em;padding:1px 4px;font-size:12.5px}
 .rcbtn{min-height:0;padding:0 6px;font-size:12px}.rcbtn.on{background:color-mix(in srgb,var(--accent,#1f4fbf) 15%,var(--panel));border-color:var(--accent,#1f4fbf)}
 .vbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0}.vbar.on{border-color:#2e8b57;background:color-mix(in srgb,#2e8b57 7%,var(--panel))}
 .vchan{display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:10px;margin:8px 0}@media (max-width:640px){.vchan{grid-template-columns:1fr}}
@@ -2593,10 +2593,13 @@ function adMine(k,fitting){const all=(BP.d||{}).adhoc||[],rs=all.filter(a=>a.kin
 // alias; with the ad hoc set it makes one CHIRP file, in memory order, for the chosen radio.
 function rcKey(r){return {freq_mhz:+r.freq_mhz,offset_mhz:r.offset_mhz||null}}
 function rcMark(f,off){return (((BP.d||{}).radio||{}).marks||[]).find(m=>Math.abs(m.freq_mhz-f)<1e-4&&Math.abs((m.offset_mhz||0)-(off||0))<1e-4)}
+// Every channel has a radio alias (owner 2026-11-24): smart by default, typed ones kept by frequency + offset.
+function rcAlias(r){const k=JSON.stringify({freq_mhz:+r.from,offset_mhz:r.offset_mhz||null});
+  return `<input class="rcal${r.alias_own?" own":""}" data-rcchan='${esc(k)}' value="${esc(r.alias||"")}" maxlength="${RC_MAX}" placeholder="alias" aria-label="Radio alias for ${bpMhz(r.from)}, up to ${RC_MAX} characters" title="${r.alias_own?"Your alias: clear it for the smart one again":"Smart alias from the plan: type your own"} (what the radio shows; ${RC_MAX} characters; used by every CHIRP export)">`}
 function rcCell(r){if((r.adhoc||[]).length)return"";const m=rcMark(r.from,r.offset_mhz);
-  if(m)return ` <span class="rcon noprint"><button class="small rcbtn on" data-rcrm='${esc(JSON.stringify(rcKey(m)))}' aria-pressed="true" title="On your radio list as ${esc(m.alias)}: click to take it off">💾</button><input class="rcal" data-rcalias='${esc(JSON.stringify(rcKey(m)))}' value="${esc(m.alias)}" maxlength="${RC_MAX}" aria-label="Radio alias for ${bpMhz(r.from)}, up to ${RC_MAX} characters" title="What the radio's display shows (${RC_MAX} characters)"></span>`;
+  if(m)return ` <span class="rcon noprint"><button class="small rcbtn on" data-rcrm='${esc(JSON.stringify(rcKey(m)))}' aria-pressed="true" title="On your radio list as ${esc(r.alias||m.alias)}: click to take it off">💾</button>${rcAlias(r)}</span>`;
   const add={freq_mhz:r.from,offset_mhz:r.offset_mhz||null,tone_hz:r.tone_hz||null,mode:r.mode||"",org:r.org||"",name:r.use||""};
-  return ` <button class="small rcbtn noprint" data-rcadd='${esc(JSON.stringify(add))}' aria-pressed="false" title="Put ${bpMhz(r.from)} MHz on your radio list (💾 Radio channels → CHIRP)">💾+</button>`}
+  return ` <span class="rcon noprint"><button class="small rcbtn" data-rcadd='${esc(JSON.stringify(add))}' aria-pressed="false" title="Put ${bpMhz(r.from)} MHz on your radio list as ${esc(r.alias||"")} (💾 Radio channels → CHIRP)">💾+</button>${rcAlias(r)}</span>`}
 function rcView(d){const R=d.radio;if(!R)return"";const ch=R.channels;
   const ofs=c=>c.offset_mhz?` <span class="muted">${c.offset_mhz>0?"+":"−"}${Math.abs(c.offset_mhz)}${c.tone_hz?" · "+c.tone_hz:""}</span>`:"";
   const warn=[...R.dups.map(x=>`Two memories would both show <b>${esc(x)}</b>: change one alias`),...(R.clash_short||[]).map(x=>`On a radio that shows 7 (an older Baofeng UV-5R) CHIRP keeps the first 7: <b>${esc(x)}</b> would read the same`),...R.left_out.map(x=>`Left out: ${esc(x)}`)];
@@ -2691,6 +2694,7 @@ document.addEventListener("change",async e=>{const t=e.target;if(!t.closest||!t.
   if(t.matches("[data-adname]"))return adPost("/api/adhoc",{rename:{freq_mhz:+t.dataset.adname,kind:t.dataset.adk,name:t.value}});
   if(t.matches("[data-adalias]"))return adPost("/api/adhoc",{rename:{freq_mhz:+t.dataset.adalias,kind:t.dataset.adk,alias:t.value}});
   if(t.matches("[data-adradio]")){BP.adRadio=t.checked;renderBP();return}
+  if(t.matches("[data-rcchan]")){const m=JSON.parse(t.dataset.rcchan);return adPost("/api/radio",{alias:Object.assign(m,{alias:t.value})})}
   if(t.matches("[data-rcalias]")||t.matches("[data-rcname]")){const m=JSON.parse(t.dataset.rcalias||t.dataset.rcname);return adPost("/api/radio",{edit:Object.assign(m,t.matches("[data-rcalias]")?{alias:t.value}:{name:t.value})})}
   if(t.matches("[data-rcprof]"))return adPost("/api/radio",{profile:t.value});
   if(t.matches("[data-rcstart]"))return adPost("/api/radio",{start:+t.value});

@@ -437,7 +437,16 @@ A–Z 0–9 space . / -**, suggested VARA1, VARA2 … / TAC1, TAC2 …; owner 20
 aliases that would then read the same, so change one of those); change either there, change a VARA channel's width (a **wide** reservation keeps 25 kHz from your other reserved channels on 2 m and 1.25 m, 35 kHz on 70 cm: reserving wide next to one reserves it narrow and says so, and a wide one set too close is marked ⚠ naming the neighbour), **Use** it on a VARA radio. In the band plan, the full spectrum and the
 printout a reserved channel is a **★ my ad hoc** row (purple). It stays on the ad hoc list (marked ★) instead of being
 cut out, a voice reservation is not offered to VARA, and one the plans no longer leave open (a plan read later, a new
-gateway, or another operator's set on a station with different privileges) is marked ⚠ with why.
+gateway, or another operator's set on a station with different privileges) is marked ⚠ with why. A ⚠ "no longer open" on one
+station and not another usually means the two stations read a plan differently (a newer read of the same document
+found more channels): Nets → Plans names when each was read; read it again, or share the newer one with 📦.
+
+**A radio alias for every band-plan channel** (owner 2026-11-24). Every channel in the Band plan tab (repeaters,
+simplex, nets, gateways) shows its radio alias beside **💾+**: a smart 8-character one from the plan's own words (a
+callsign, TAC1, 2M CALL, the site in its fewest letters: HILLTOP, SPRNGFLD, CMD NET2), else S / R + its frequency,
+unique in the whole plan (the same name on two bands gets the band, SPRNG 2M / SPRNG 70; on one band the frequency's
+last digits). Type your own (bold when it is yours): it is kept by frequency and offset through every new plan
+search, the 💾 Radio channels list and every CHIRP export use it, and clearing it brings the smart one back.
 **Sharing**: **Export my set** saves a file (`ad-hoc-channels.json`, VARA FM and voice together); the other operator
 uses **Import a set…** (adds and renames; tick **Import replaces my set** to replace). Tick **with my 💾 radio
 channels** before exporting to send those too (off by default). Connected over VARA, **★ Send my ad hoc channels** (VARA window, or **★ Send

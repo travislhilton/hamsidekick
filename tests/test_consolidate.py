@@ -342,6 +342,10 @@ def test_a_coordinator_plan_decides_its_area(tmp_path):
     assert len(cm) == len(set(cm)) and len(two) == len(set(two))
     v = _pts(C.open_ranges(t, "voice"), "2 m")
     assert 146.58 in v and len(v) == len(set(v)) and all(round(f * 100) % 2 == 0 for f in v)
+    vc = [x for x in C.open_ranges(t, "voice") if x["band"] == "70 cm"]   # owner 2026-11-24: 70 cm had no ad hoc voice
+    cm = _pts(vc, "70 cm")
+    assert 445.5 in cm and 446.0 not in cm and len(cm) > 60 and not any(431 <= f <= 432 or 447 < f for f in cm)
+    assert all(x["shared"] and "links and control" in x["note"] for x in vc if 445 < x["from"] < 447)
 
 
 def test_the_plan_reader_asks_for_segments(tmp_path, monkeypatch):

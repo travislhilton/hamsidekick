@@ -788,6 +788,8 @@ class Plans:
                     "segments": e.get("segments") or [], "frequencies": e.get("frequencies") or []}
                    for k, e in (d.get("ingested") or {}).items() if not e.get("excluded") and not e.get("error")]
         t = consolidate.build(self._class(), sources, d.get("kept") or [], self._adhoc_rows(d))
+        from . import radiochan as R
+        R.assign_aliases(t, d.get("aliases") or {}, d.get("radio") or [])
         t["read"] = [{"key": k, "title": e.get("title"), "org": e.get("org"), "kind": e.get("kind"),
                       "authority": e.get("authority"), "excluded": bool(e.get("excluded")), "error": e.get("error"),
                       "segments": len(e.get("segments") or []), "channels": len(e.get("frequencies") or []),
@@ -863,14 +865,29 @@ class Plans:
                 "dups": pl["dups"], "clash_short": pl["clash_short"], "count": len(pl["rows"])}
 
     def radio_set(self, body: dict) -> dict:
-        """{"add" | "remove" | "edit": a band-plan channel} | {"move": key, "by": ±n, "keys": [shown order]} |
-        {"profile": id} | {"start": n}."""
+        """{"add" | "remove" | "edit": a band-plan channel} | {"alias": {freq_mhz, offset_mhz, alias}} (any channel's
+        radio alias; "" = the smart one again) | {"move": key, "by": ±n, "keys": [shown order]} | {"profile": id} |
+        {"start": n}."""
         from . import radiochan as R
         body = body or {}
         with self.lock:
             d = _load(self.st)
             if any(k in body for k in ("add", "remove", "edit")):
                 d["radio"] = R.apply(d.get("radio") or [], body)
+            for k in ("alias", "edit"):                     # owner 2026-11-24: an alias for every plan channel
+                a = body.get(k)
+                if isinstance(a, dict) and "alias" in a:
+                    ck = R.key(R.clean_mark(dict(a, alias="X")))
+                    v = R.alias(a.get("alias"))
+                    al = dict(d.get("aliases") or {})
+                    if v:
+                        al[ck] = v
+                    else:
+                        al.pop(ck, None)
+                    d["aliases"] = al
+                    for m in d.get("radio") or []:            # a 💾 mark shows the same alias
+                        if R.key(dict(m, src="plan")) == ck:
+                            m["alias"] = v
             if "move" in body:
                 d["radio_order"] = R.move(d.get("radio_order") or [], [str(k) for k in body.get("keys") or []],
                                           str(body["move"]), int(body.get("by") or 0))
