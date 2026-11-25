@@ -24,7 +24,7 @@ list. Files arrive after its answer and open with **View** (a form as the form, 
 |---|---|
 | "Local EMCOMM CHIRP file (2m/70cm/ad hoc)" | one CHIRP file for a handheld: per band (2 m, then 70 cm) the FM voice repeaters, then simplex, from the local plans you chose (ARES, RACES, ICS-205, club) and the plan channels you kept, then the national calling channel, then your reserved ad hoc channels. Never packet, APRS, Winlink gateways, D-Star / DMR or weak-signal channels |
 | "CHIRP file of the 2 m simplex channels for a Baofeng" | a CHIRP memory CSV: your radio list, the band plan's channels, your ad hoc channels, or channels the asker lists |
-| "The band plan for 70 cm for my license" | the area band plan, with the asker's privileges (their class from the FCC database) |
+| "The band plan for 70 cm for my license" | the area band plan for that band as a page (a table: ranges, channels with offset and tone, whose plan, and what the asker's license allows on each row; their class from the FCC database) |
 | "Weather for Springfield, IL as an ICS-213" | an ICS-213 General Message from the US National Weather Service (Open-Meteo outside the US), with active alerts; plus Winlink Express form data when Express is on the station PC |
 | "HF band conditions" | solar flux, K index and NOAA scales from NOAA SWPC, in words, optionally as an ICS-213 |
 | "An ICS-205 of the ad hoc channels for the drill" | an ICS-205 Incident Radio Communications Plan |

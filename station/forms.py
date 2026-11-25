@@ -185,6 +185,18 @@ def csv_table(text: str, title: str) -> str:
     return _page(title, body, "Load it into a radio with CHIRP: File → Import (download the .csv first).")
 
 
+def band_plan_page(title: str, rows: list[dict], who: str, sources: list[str], note: str = "") -> str:
+    """A band plan for one band as a readable page (Einstein's band_plan file): rows {freq, type, use, extra, by, you}."""
+    body = (f"<h1><span>{_e(title)}</span><span style=\"font-weight:normal;font-size:12px\">{len(rows)} rows</span></h1>"
+            + (f"<p>{_e(who)}</p>" if who else "")
+            + "<div style=\"overflow-x:auto\"><table><tr><th>MHz</th><th>Type</th><th>Use</th><th>Offset / tone</th>"
+              "<th>Plan</th><th>You may</th></tr>"
+            + "".join(f"<tr><td>{_e(r['freq'])}</td><td>{_e(r['type'])}</td><td>{_e(r['use'])}</td><td>{_e(r['extra'])}</td>"
+                      f"<td>{_e(r['by'])}</td><td>{_e(r['you'])}</td></tr>" for r in rows)
+            + "</table></div>" + (f"<p class=note>From: {_e('; '.join(sources))}</p>" if sources else ""))
+    return _page(title, body, note)
+
+
 def text_page(text: str, title: str) -> str:
     return _page(title, f"<h1><span>{_e(title)}</span></h1><div class=\"msg\" style=\"padding:10px;min-height:0\">"
                         f"{_e(text)}</div>")

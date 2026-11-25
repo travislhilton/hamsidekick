@@ -616,3 +616,42 @@ def test_one_request_for_a_chirp_file_sends_one_file(tmp_path):
     assert len(rows) == 3 and csv.count("146.520000") == 1 and "446.000000" in csv and rows[2].startswith("3,")
     same = E.one_file_each([{"name": "a.csv", "data": b"1"}, {"name": "a.csv", "data": b"2"}, {"name": "a.csv", "data": b"1"}])
     assert [f["name"] for f in same] == ["a.csv", "a-2.csv"]
+
+
+def test_a_band_plan_asked_for_comes_as_a_file_and_a_promised_file_is_never_missing(tmp_path):
+    """Owner 2026-11-24: asked for the 70 cm band plan, the reply said "Full details in the attached file" and no file
+    was ever made. band_plan as_file makes a page; a reply that claims a file sends what the tools made, or says none was."""
+    table = {"sources": [{"name": "County ARES plan", "authority": "local"}], "bands": [{"rows": [
+        {"type": "segment", "from": 420.0, "to": 450.0, "use": "70 cm", "by": "FCC"},
+        {"type": "channel", "from": 449.625, "to": 449.625, "use": "Linked repeater", "offset_mhz": -5.0, "tone_hz": 103.5,
+         "by": "County ARES plan"}]}]}
+
+    class Plans:
+        def consolidated(self):
+            return table
+    for claim, make, want in (("Full details in the attached file.", True, "file"),
+                              ("Full details in the attached file.", False, "note"),
+                              ("70 cm is 420-450 MHz.", False, "none")):
+        def model(system, user, tools, make=make, claim=claim):
+            tools.run("band_plan", {"band": "70 cm", "as_file": make})
+            return {"reply": claim, "attach": [], "note_for_operator": ""}, {"tools": []}
+        st, rid, m, clk, e = _setup(tmp_path / want, model=model)
+        e.plans = lambda: Plans()
+        e.settings({"radio": rid, "on": True})
+        st.agent.sender.here = False
+        m.check()
+        v = m.vara
+        _link_e(m, v, "K7ABC")
+        m._event("chat", {"peer": "K7ABC", "text": "The band plan for 70 cm for my license"})
+        assert _wait(lambda: e.state(rid)["recent"])
+        time.sleep(0.2)
+        files = [c for c in v.calls if c[0] == "file"]
+        last = [c[1] for c in v.calls if c[0] == "chat"][-1]
+        if want == "file":
+            assert len(files) == 1 and files[0][1].startswith("BandPlan-70-cm") and files[0][1].endswith(".html")
+            page = files[0][2].decode()
+            assert "449.6250" in page and "-5.000" in page and "County ARES plan" in page and "<script" not in page
+        elif want == "note":
+            assert not files and "No file was made" in last
+        else:
+            assert not files and "No file was made" not in last

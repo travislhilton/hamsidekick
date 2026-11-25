@@ -146,7 +146,8 @@ reply on this link: name it in your reply. Use the tools' results as facts; neve
 license data. You can reach the whole internet through search_web (the web and X, live, and any page by its address): \
 use it for any question whose answer is current, local, specific or something you are not sure of (news, events, \
 sports, schedules, products and specs, places, people in the public eye, how-to, a page they name), and name the \
-sources. Never say you cannot browse. Never answer one thing with another (weather is not news): if nothing can do \
+sources. Never say you cannot browse. Only say a file is attached when a tool made it and its id is in attach. \
+Never answer one thing with another (weather is not news): if nothing can do \
 what was asked, say so.
 
 Rules (the station also enforces them in code and will not send a reply that breaks one):
@@ -188,6 +189,8 @@ NOT_VOICE = re.compile(r"packet|aprs|winlink|gateway|d-?star|dmr|fusion|ysf|p25|
                        r"beacon|satellite|not available|input to|repeater input|data", re.I)
 CALLING_MHZ = {146.52, 446.0, 223.5}              # the national FM simplex calling channels
 
+CLAIMS_FILE = re.compile(r"\battach(?:ed|ment)\b|\bfile name:|\bfile (?:follows|is on its way|is coming|sent)\b|"
+                         r"\bin the (?:attached |enclosed )?(?:file|csv|form|page)\b|\bsee the (?:file|csv|form)\b", re.I)
 WEB_MODEL = "grok-4.20-0309-non-reasoning"
 WEB_TIMEOUT_S = 60
 
@@ -218,8 +221,10 @@ class Tools:
         S = _spec
         self.specs = [
             S("band_plan", "The band plan for this station's area for one band or frequency (e.g. '2 m', '70 cm', "
-              "'40 m', '146.52'): the plan's segments and channels and what the asker's license class may use.",
-              {"band": {"type": "string"}}, ["band"]),
+              "'40 m', '146.52'): the plan's segments and channels and what the asker's license class may use. "
+              "as_file true also makes it a page (a table with what their license allows on each row) to attach: "
+              "use it whenever they ask for the band plan.",
+              {"band": {"type": "string"}, "as_file": {"type": "boolean"}}, ["band", "as_file"]),
             S("weather", "Forecast and active alerts for a place (a town with state or country, a US ZIP, a grid "
               "square, 'lat, lon', or 'here' for this station's area). as_form true also makes an ICS-213 file.",
               {"place": {"type": "string"}, "as_form": {"type": "boolean"}}, ["place", "as_form"]),
@@ -291,13 +296,15 @@ class Tools:
                 + (f", about {est:.0f} s on this link" if est else "") + f"). Put \"{fid}\" in attach to send it.")
 
     # ----- tools -----
-    def t_band_plan(self, band: str = "") -> str:
+    def t_band_plan(self, band: str = "", as_file: bool = False) -> str:
         lo, hi, label = _band_range(band)
         if lo is None:
             return "unknown band: say e.g. '2 m', '70 cm', '40 m' or a frequency in MHz"
         t = self.e.plans().consolidated()
         cls = self.sess.get("asker_class")
-        lines = [f"Band plan for {label} in this station's area (from: {', '.join(s['name'] for s in t.get('sources', [])[:6]) or 'ARRL/FCC'})"]
+        srcs = [s["name"] for s in t.get("sources", []) if s.get("authority") not in ("adhoc",)][:12]
+        lines = [f"Band plan for {label} in this station's area (from: {', '.join(srcs[:6]) or 'ARRL/FCC'})"]
+        page = []
         for b in t.get("bands") or []:
             for r in b["rows"]:
                 if r["to"] < lo or r["from"] > hi:
@@ -308,13 +315,26 @@ class Tools:
                     extra += f" offset {r['offset_mhz']:+.3f}"
                 if r.get("tone_hz"):
                     extra += f" tone {r['tone_hz']}"
-                lines.append(f"{f} MHz {r['type']}: {r.get('use') or ''}{extra}" + (f" [{r['by']}]" if r.get("by") else ""))
-                if len(lines) > 60:
-                    break
+                if len(lines) <= 60:
+                    lines.append(f"{f} MHz {r['type']}: {r.get('use') or ''}{extra}" + (f" [{r['by']}]" if r.get("by") else ""))
+                if as_file:
+                    mid = r["from"] if r["type"] == "channel" else (r["from"] + r["to"]) / 2
+                    you = (", ".join(k for k in ("phone", "data", "cw") if bandplan.privileges(mid, k, cls)[0]) or "no")\
+                        if cls else "license class not known"
+                    page.append({"freq": f, "type": r["type"], "use": r.get("use") or "", "extra": extra.strip(),
+                                 "by": r.get("by") or "", "you": you})
         if cls:
             p = [k for k in ("phone", "data", "cw") if bandplan.privileges((lo + hi) / 2, k, cls)[0]]
             lines.append(f"{self.peer} holds a {cls.title()} license: {', '.join(p) or 'no'} privileges in the middle "
                          f"of this range (check each edge).")
+        if as_file and page:
+            who = (f"For {self.peer}, {cls.title()} class: the You may column is what that license allows on each row "
+                   "(check each edge of a range)." if cls else f"For {self.peer}: license class not known.")
+            html_ = forms.band_plan_page(f"Band plan {label}", page, who, srcs,
+                                         f"Sent over VARA by {self.e.call(self.rid)} for {self.e.op_call(self.rid)}, "
+                                         f"{datetime.now():%Y-%m-%d}. The plans are each organisation's; this is a summary.")
+            lines.append(self._file(f"BandPlan-{forms.slug(band)}{('-' + cls.title()) if cls else ''}.html",
+                                    html_.encode(), "band plan " + label))
         return "\n".join(lines)
 
     def t_weather(self, place: str = "", as_form: bool = False) -> str:
@@ -1132,6 +1152,11 @@ class Einstein:
                 files = []
             else:
                 files = one_file_each([tools.files[f] for f in dict.fromkeys(out.get("attach") or []) if f in tools.files])
+                if not files and CLAIMS_FILE.search(reply):   # owner 2026-11-24: "said there was a band plan file. It was never sent"
+                    if tools.files:
+                        files = one_file_each(list(tools.files.values()))
+                    else:
+                        reply += "\n(No file was made with this answer: ask me for it as a file.)"
             if len(reply) > REPLY_CHARS:
                 reply = reply[:REPLY_CHARS - 40].rsplit(" ", 1)[0] + " … (ask for it as a file for the rest)"
             note = str(out.get("note_for_operator") or "").strip()
