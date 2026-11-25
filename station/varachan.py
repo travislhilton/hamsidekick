@@ -232,6 +232,8 @@ class Channel:
             if "presets" in body:
                 ps = [" ".join(str(p).split())[:120] for p in body["presets"] or [] if str(p).strip()][:12]
                 d["presets"] = ps or list(PRESETS)
+            if "share_loc" in body:                       # tell AI stations my grid square at link time
+                d["share_loc"] = bool(body["share_loc"])
             if "asks" in body:                            # the operator's own quick requests for AI stations
                 d["asks"] = clean_asks(body["asks"])
             if "forget" in body:
@@ -483,6 +485,10 @@ class Channel:
             elif name == "auth" and peer:
                 if self._is_einstein(self.local):
                     self.m.einstein().on_auth(self.m.rid, peer, data.get("token"))
+                changed = False
+            elif name == "loc" and peer:
+                if self._is_einstein(self.local):
+                    self.m.einstein().on_loc(self.m.rid, peer, data.get("grid"))
                 changed = False
             elif name == "peer_working" and peer:
                 self._heard(d, peer, "link", working_until=self.clock() + min(180, int(data.get("s") or 30)))
@@ -807,6 +813,16 @@ class Channel:
                     r["owner"] = True
                 except Exception:  # noqa: BLE001
                     pass
+        if "AI" in kv and not kv["AI"] and d.get("share_loc", True):
+            # An AI station answers "near me" for where the ASKER is (owner 2026-11-25: an operator with no internet
+            # asks the other station's Einstein for what they cannot get): tell it this station's grid square.
+            op = (getattr(self.m.st, "_saved", lambda: {})() or {}).get("operator") or {}
+            g = str(op.get("grid") or "").strip()
+            if re.fullmatch(r"[A-Ra-r]{2}\d{2}([A-Xa-x]{2})?", g):
+                try:
+                    self.m.vara.send_note(f"LOC {g.upper()}")
+                except Exception:  # noqa: BLE001
+                    pass
 
     def _ai_owes(self, d: dict, peer: str, now: float) -> bool:
         r = d["roster"].get(peer) or {}
@@ -882,7 +898,7 @@ class Channel:
             nxt = max(0, round((d.get("last_announce") or 0) + d["every_min"] * 60 - now))
         op = (getattr(self.m.st, "_saved", lambda: {})() or {}).get("operator") or {}
         return {"on": d["on"], "every_min": d["every_min"], "next_announce_s": nxt, "presets": d["presets"],
-                "asks": d.get("asks") or [], "asks_max": ASKS_MAX,
+                "asks": d.get("asks") or [], "asks_max": ASKS_MAX, "share_loc": d.get("share_loc", True),
                 "pinned": d.get("pinned"), "roster": roster, "announce_via": d.get("announce_via") or [],
                 "testing": s.get("testing"), "bitrate": s.get("bitrate"),
                 "threads": {c: th[-120:] for c, th in d["threads"].items()},

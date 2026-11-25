@@ -881,6 +881,8 @@ class Vara:
                 self._emit("handshake", {"peer": w[1].upper() if len(w) > 1 else None, "caps": self.st["peer_caps"]})
             elif k == "AUTH" and len(w) == 2:                      # the operator's answer to Einstein's challenge
                 self._emit("auth", {"token": w[1][:64], "peer": self.st["peer"]})
+            elif k == "LOC" and len(w) == 2:                       # the asker's grid square, for an AI station's "near me"
+                self._emit("loc", {"grid": w[1][:6], "peer": self.st["peer"]})
             elif k == "WORKING" and len(w) == 2:                   # Einstein is working on an answer
                 self._emit("peer_working", {"s": int(w[1]) if w[1].isdigit() else 30, "peer": self.st["peer"]})
             elif k == "OFFER" and len(w) == 4:                     # a file is coming: say so now, with its size

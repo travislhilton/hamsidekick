@@ -163,6 +163,12 @@ cannot e-mail, text, phone or post. The one message you take is a note for {op_c
 and that {op_call} has been alerted. Never give medical or legal instructions as fact.
 - Never give out {op_call}'s private details (address, phone, e-mail, exact location); the station's area: {area}.
 - Short replies for the air: under {chars} characters, plain text, no markdown tables (make a file for long material).
+- "Local", "near me", "my area", "today here" mean THEIR location (given above), not yours. Your own tools (nets, \
+band_plan, weather for "here") describe THIS station's area ({area}). They are asking you because you have the \
+internet and they may not: for anything local to them (nets, repeaters, clubs, events, hamfests, road or outage \
+news, services) call search_web with their location in the query, even when it is your area too, and add what your \
+own tools know only if it is the same area. Say which area you answered for. For weather or alerts for them, pass \
+their grid square as the place.
 - Lay it out for a person reading a chat window: the answer itself on the first line; then one point per line, each \
 starting with "- "; a blank line between parts. Never one long paragraph.
 - Say plainly when a tool found nothing or you are unsure.
@@ -639,7 +645,10 @@ class Tools:
         from . import netfind
         body = {"model": WEB_MODEL, "max_tool_calls": 10, "tools": [{"type": "web_search"}, {"type": "x_search"}],
                 "input": [{"role": "user", "content": f"Today is {datetime.now():%A %Y-%m-%d}, local time. A radio "
-                          f"amateur asked: {q}\nSearch the web (and X when it helps; open any page they named) and "
+                          f"amateur asked: {q}\n"
+                          + (f"They are at: {self.asker_where}. \"Local\" and \"near me\" mean there.\n"
+                             if getattr(self, "asker_where", None) else "")
+                          + f"Search the web (and X when it helps; open any page they named) and "
                           "answer from what you find now. Short for the air: the answer first, then at most 6 points, "
                           "each on its own line starting with '- ', each naming its source (e.g. AP, Reuters, BBC, ARRL, the maker, the local paper). "
                           "News as reported, neutral, no opinion. Plain text: no markdown, no links, under 900 "
@@ -1163,10 +1172,47 @@ class Einstein:
                                           "last_id": 0, "log": keep.get("log", [])[-60:], "asked": keep.get("asked", deque()),
                                           "files": keep.get("files", deque()), "packs": keep.get("packs", []),
                                           "history": keep.get("history", [])[-12:], "full_at": keep.get("full_at"),
+                                          "asker_grid": keep.get("asker_grid"),
                                           "asker_class": None, "checked": None}
         self._log(rid, {"kind": "link", "peer": peer})
         self._show(rid)
         return nonce
+
+    def on_loc(self, rid, peer, grid):
+        """The asking station's grid square (its LOC note at link time): where "near me" is for this asker."""
+        from . import wx
+        g = str(grid or "").strip()
+        s = self.sessions.get((rid, peer))
+        if s is not None and wx.grid_latlon(g):
+            s["asker_grid"] = g[:4].upper() + g[4:6].lower()
+
+    def asker_where(self, s: dict, peer: str, rid: str | None = None) -> tuple[str, bool | None]:
+        """(words for where the asker is, same area as this station?) from their grid square; else, on VARA FM, this
+        station's own area (owner 2026-11-25: on FM the two stations are not far from each other; "for VARA HF that
+        does not hold"); else, on HF, the town on their FCC licence (which may not be where they are now); else not
+        known, and it must ask."""
+        from . import wx
+        g, mine = s.get("asker_grid"), self._grid() or ""
+        if g:
+            ll = wx.grid_latlon(g)
+            return (f"grid square {g} (about latitude {ll[0]:.2f}, longitude {ll[1]:.2f})", g[:4].upper() == mine[:4].upper())
+        try:
+            fm = rid is not None and self._modem(rid).cfg().get("kind") != "hf"
+        except Exception:  # noqa: BLE001
+            fm = False
+        if fm and mine:
+            return (f"within VARA FM range of this station (they sent no grid square), so about grid square {mine}: "
+                    "this station's area", True)
+        try:
+            card = self.st.callbook.card(base(peer)) or {}
+            town = ", ".join(x for x in (card.get("city"), card.get("state")) if x)
+        except Exception:  # noqa: BLE001
+            town = ""
+        if town:
+            return (f"{town} by their FCC licence address; this is an HF link, so they may be anywhere (they sent no "
+                    "grid square: say which area you answered for, and that they can send their grid square)"), None
+        return ("not known, and on an HF link they may be anywhere (ask for their town or grid square before answering "
+                "anything local to them)"), None
 
     def on_auth(self, rid, peer, token: str):
         s = self.sessions.get((rid, peer))
@@ -1550,6 +1596,10 @@ class Einstein:
             info = f"{s['asker_class'].title()} class license" if s.get("asker_class") else "license class not known"
             if s["owner"]:
                 info += "; this is the station's own operator, from another of their stations"
+            where, same = self.asker_where(s, peer, rid)
+            tools.asker_where = where
+            info += f"; their location: {where}" + ("; that is this station's own area" if same else
+                                                     "; that is NOT this station's area" if same is False else "")
             system = SYSTEM.format(name=self.name(), kind=("HF" if self._modem(rid).cfg().get("kind") == "hf" else "FM"),
                                    ecall=self.call(rid), of=self.of(rid), op_call=self.op_call(rid), asker=peer,
                                    asker_info=info, area=self.area(), chars=REPLY_CHARS,

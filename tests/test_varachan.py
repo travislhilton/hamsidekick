@@ -450,3 +450,24 @@ def test_cancel_says_when_it_is_too_late(tmp_path):
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert 'class="vtoast ${VA.msg.bad?"bad":"ok"}" role="status"' in idx and "☆ add to quick requests" in idx
     assert 'ad.textContent="★ adding…"' in idx and "mm.bad?12000:7000" in idx
+
+
+def test_the_asking_station_tells_an_ai_station_its_grid_square(tmp_path):
+    """Linked to an AI station, this station sends LOC and its grid square (so "near me" means here), unless the
+    operator switched that off; never to an ordinary station; a LOC that arrives is passed on as an event."""
+    st, m, v, clk = _chan(tmp_path)
+    st._save({"operator": {"grid": "en50wc"}})
+    assert m.chan.view()["share_loc"] is True
+    sent = []
+    v.send_note = lambda line: sent.append(line)
+    d = m.chan.load()
+    d["roster"]["K7ABC-14"] = {"call": "K7ABC-14", "first_at": 0, "unread": 0, "heard_at": None}
+    m.chan._learn_ai(d, "K7ABC-14", ["+AI", "+OF=K7ABC", "+NAME=EINSTEIN", "+NONCE=AB12"])
+    assert sent == ["LOC EN50WC"]
+    d["roster"]["N0CALL"] = {"call": "N0CALL", "first_at": 0, "unread": 0, "heard_at": None}
+    m.chan._learn_ai(d, "N0CALL", ["+AI=N0CALL-14"])                 # an operator who HAS an AI station: not one itself
+    assert sent == ["LOC EN50WC"]
+    m.chan.settings({"share_loc": False})
+    d = m.chan.load()
+    m.chan._learn_ai(d, "K7ABC-14", ["+AI", "+OF=K7ABC"])
+    assert sent == ["LOC EN50WC"] and m.chan.view()["share_loc"] is False

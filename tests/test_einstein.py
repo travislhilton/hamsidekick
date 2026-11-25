@@ -576,6 +576,8 @@ def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
         ("📦 Send your station's band plan", "PACK PLAN"), ("📅 Send your station's nets", "PACK NETS"),
         ("Send your weather as ICS-213", "WX213"), ("What are the HF band conditions now?", "HF"),
         ("⚠ What are the emergency alerts for my area?", "ALERTS {grid}"),
+        ("What nets are near me?", "What amateur radio nets are on the air near me (grid {grid}) today and this week? "
+                                   "Search the web for my area."),
         ("What is the weather forecast for my station?", "WX {grid}")]
     assert "const askFill=c=>vFill(c,ch,one||\"\",m)" in idx and "Set your grid square in Settings → Station" in idx
 
@@ -1063,3 +1065,55 @@ def test_a_quick_message_is_sent_by_one_tap():
     h = idx.split('const pr=t.closest("[data-vpreset]")')[1].split("return}")[0]
     assert "const had=x.value.trim()" in h and "if(!had){const f=x.closest(\"form\");if(f)f.requestSubmit()}" in h
     assert 'title="Sends now: ${esc(vFill(p,ch,one||"",m))}' in idx
+
+
+def test_near_me_is_the_askers_area_and_einstein_searches_the_web_for_it(tmp_path):
+    """Owner 2026-11-25: "if an operator has no internet connectivity they are asking Einstein on the other station
+    for help they can't get. They need Einstein to scan the internet." (Asked for local nets, it answered from its own
+    station's schedule only.) The asking station tells an AI station its grid square at link time (LOC; a tick box
+    turns it off); Einstein is told where the asker is, that "local" means there, and to search the web for it; the
+    web search is told too; with no grid it goes by the town on their FCC licence and says so."""
+    seen = {}
+
+    def model(system, user, tools):
+        seen["system"] = system
+        seen["out"] = tools.run("search_web", {"query": "amateur radio nets near me today"})
+        return {"reply": "Nets near you: ...", "attach": [], "note_for_operator": ""}, {"tools": []}
+    st, rid, m, clk, e = _setup(tmp_path, model=model)
+    web = []
+    e.web_post = lambda key, body, timeout: (web.append(body["input"][0]["content"]), {"output": [{"type": "message", "content": [
+        {"type": "output_text", "text": "- Tuesday Net 146.94 (club site)", "annotations": []}]}]})[1]
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    m._event("loc", {"peer": "K7ABC", "grid": "en50wc"})            # the asker's LOC note
+    assert e.sessions[(rid, "K7ABC")]["asker_grid"] == "EN50wc"
+    _ask(m, v, "K7ABC", "What nets are near me?")
+    assert "their location: grid square EN50wc (about latitude" in seen["system"]
+    assert "that is NOT this station's area" in seen["system"] and "mean THEIR location" in seen["system"]
+    assert "call search_web with their location in the query" in seen["system"]
+    assert "They are at: grid square EN50wc" in web[0] and '"Local" and "near me" mean there.' in web[0]
+    e.on_disconnected(rid, "K7ABC")
+    _link_e(m, v, "K7ABC")                                           # the grid carries to the next link
+    assert e.sessions[(rid, "K7ABC")]["asker_grid"] == "EN50wc"
+    m._event("loc", {"peer": "K7ABC", "grid": "not a grid"})
+    assert e.sessions[(rid, "K7ABC")]["asker_grid"] == "EN50wc"
+    # owner: on VARA FM the two stations are not far apart; "for VARA HF that does not hold"
+    s2 = {"asker_grid": None}
+    e._grid = lambda: "FN31pr"
+    where, same = e.asker_where(s2, "K7ABC", rid)                    # this radio's modem is VARA FM
+    assert where.startswith("within VARA FM range of this station") and "FN31pr" in where and same is True
+    hst, hrid, hm, hclk, he = _setup(tmp_path / "hf", freq=14.105, cls="general", kind="hf", bw=500)
+    he._grid = lambda: "FN31pr"
+    where, same = he.asker_where(s2, "K7ABC", hrid)                  # HF: never assumed
+    assert "not known, and on an HF link they may be anywhere (ask for their town or grid square" in where and same is None
+    hst.callbook = type("CB", (), {"card": lambda self, c: {"call": c, "city": "Springfield", "state": "IL"}})()
+    where, same = he.asker_where(s2, "K7ABC", hrid)
+    assert where.startswith("Springfield, IL by their FCC licence address; this is an HF link") and same is None
+    assert he.asker_where({"asker_grid": "EN50wc"}, "K7ABC", hrid)[1] is False     # a grid they sent always wins
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert '["What nets are near me?","What amateur radio nets are on the air near me (grid {grid})' in idx
+    assert "data-vshareloc" in idx and 'varaAct("channel",{share_loc:t.checked})' in idx

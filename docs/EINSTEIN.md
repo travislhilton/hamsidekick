@@ -68,6 +68,15 @@ conditions now?** (`HF`), **🌐 ⚠ What are the emergency alerts for my area?*
 Settings → Station, so their station looks up the forecast where you are). On the asking station the buttons show this: no mark = works off grid, 🌐 = needs the internet there, 🤖 = a question
 for the AI (put in the box to edit).
 
+**"Near me" is where the asker is** (owner 2026-11-25: an operator with no internet asks the other station for what
+they cannot get). When a HAM Sidekick station links to an AI station it sends its grid square (`LOC`; the channel
+bar's Settings has the tick box *Tell AI stations my grid square*). Einstein is told where the asker is and that
+"local", "near me" and "my area" mean there: for anything local to them (nets, repeaters, clubs, events, road or
+outage news) it searches the web for that area, and adds what its own station knows only when it is the same area.
+With no grid sent: on **VARA FM** the asker is taken to be in this station's area (they are within radio range); on
+**VARA HF** they may be anywhere, so it goes by the town on their FCC licence and says so, or asks. The quick request
+**🤖 What nets are near me?** sends the question with your grid square.
+
 **Your own quick requests** (owner 2026-11-25). After the built-in buttons come yours, marked ★: **＋ Add or edit
 mine…** opens *My quick requests* (what is sent, an optional button label, "send at once" or put in the box to finish,
 ↑ ↓ to order, ✕ to remove, one-tap suggestions for the command words that have no button, fill-ins `{grid}` `{name}`
