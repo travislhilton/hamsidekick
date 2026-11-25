@@ -426,3 +426,27 @@ def test_the_operator_adds_quick_requests_of_their_own(tmp_path):
     assert 'id="askDlg"' in idx and "data-vaskedit" in idx and "data-vaskadd=" in idx and "const AQ_SUG=[" in idx
     assert 'V_ASK.concat((ch.asks||[]).map(a=>[a.label||a.text.trim(),a.text,a.now?"mine":"minebox"' in idx
     assert 'post("/api/vara/channel",{radio:AQ.rid,asks})' in idx and "yours · sends now" in idx
+
+
+def test_cancel_says_when_it_is_too_late(tmp_path):
+    """Owner 2026-11-25: "when I click the cancel link nothing happens". A message that left the queue before the
+    click (already on its way, or delivered) says so instead of doing nothing; and what an action did shows beside
+    the message box, where the operator is looking, not at the top of the panel."""
+    import pytest
+    st, m, v, clk = _chan(tmp_path)
+    d = m.chan.load()
+    d["threads"]["K7ABC"] = [{"id": "a1", "dir": "out", "kind": "chat", "text": "hi", "status": "sent", "at": 1.0},
+                             {"id": "a2", "dir": "out", "kind": "chat", "text": "hi", "status": "delivered", "at": 2.0},
+                             {"id": "a3", "dir": "out", "kind": "chat", "text": "hi", "status": "queued", "at": 3.0}]
+    m.chan.save(d)
+    with pytest.raises(ValueError, match="already on its way"):
+        m.chan.cancel("a1")
+    with pytest.raises(ValueError, match="delivered"):
+        m.chan.cancel("a2")
+    with pytest.raises(ValueError, match="no longer here"):
+        m.chan.cancel("zz")
+    assert [x["status"] for x in m.chan.cancel("a3")["threads"]["K7ABC"]] == ["sent", "delivered", "cancelled"]
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'class="vtoast ${VA.msg.bad?"bad":"ok"}" role="status"' in idx and "☆ add to quick requests" in idx
+    assert 'ad.textContent="★ adding…"' in idx and "mm.bad?12000:7000" in idx

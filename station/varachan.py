@@ -336,17 +336,27 @@ class Channel:
         return self.view()
 
     def cancel(self, mid: str) -> dict:
-        drop = False
+        drop, found, done = False, None, False
         with self.lock:
             d = self.load()
             for th in d["threads"].values():
                 for it in th:
-                    if it["id"] == mid and it["status"] in ("queued", "failed"):
+                    if it["id"] != mid:
+                        continue
+                    found = it
+                    if it["status"] in ("queued", "failed"):
                         it.update(status="cancelled")
-                    elif it["id"] == mid and it["status"] == "sending" and it["dir"] == "out":
+                        done = True
+                    elif it["status"] == "sending" and it["dir"] == "out":
                         it.update(status="cancelled", why="you cancelled it")     # a file or a link test on its way:
-                        drop = True                                               # VARA can only stop it by dropping the link
+                        drop = done = True                                        # VARA can only stop it by dropping the link
             self.save(d)
+        if not done:                                      # owner 2026-11-25: "when I click the cancel link nothing happens"
+            st = (found or {}).get("status")
+            raise ValueError("That message is no longer here to cancel." if not found else
+                             "Too late to cancel: it was delivered." if st == "delivered" else
+                             "It is cancelled already." if st == "cancelled" else
+                             "Too late to cancel: it is already on its way. Abort (⚙ Station) drops the link at once.")
         if drop:
             try:
                 self._vara().abort("the operator cancelled the transfer")
