@@ -1053,3 +1053,13 @@ def test_in_a_narrow_column_the_quick_requests_are_a_button_and_a_readable_list(
     assert "function vQuickPop()" in idx and "#vqPop{display:flex;flex-direction:column;gap:1px;position:fixed" in idx
     assert "up=above>=need||above>=below" in idx and "document.body.appendChild(pop)" in idx
     assert 'class="vqmenu" role="menu"' not in idx and "if(chip)chip.click()" in idx
+
+
+def test_a_quick_message_is_sent_by_one_tap():
+    """Owner 2026-11-25: "When clicking a quick message it should send automatically. User should not have to click
+    the send button." With text already typed in the box it is added to it and left for the operator to send."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    h = idx.split('const pr=t.closest("[data-vpreset]")')[1].split("return}")[0]
+    assert "const had=x.value.trim()" in h and "if(!had){const f=x.closest(\"form\");if(f)f.requestSubmit()}" in h
+    assert 'title="Sends now: ${esc(vFill(p,ch,one||"",m))}' in idx
