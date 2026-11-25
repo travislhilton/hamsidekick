@@ -576,7 +576,7 @@ def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
         ("📦 Send your station's band plan", "PACK PLAN"), ("📅 Send your station's nets", "PACK NETS"),
         ("Send your weather as ICS-213", "WX213"), ("What are the HF band conditions now?", "HF"),
         ("⚠ What are the emergency alerts for my area?", "ALERTS {grid}"),
-        ("What nets are near me?", "What amateur radio nets are on the air near me (grid {grid}) today and this week? "
+        ("What nets are near me?", "What amateur radio nets are on the air near me (grid square {grid}) today and this week? "
                                    "Search the web for my area."),
         ("What is the weather forecast for my station?", "WX {grid}")]
     assert "const askFill=c=>vFill(c,ch,one||\"\",m)" in idx and "Set your grid square in Settings → Station" in idx
@@ -1090,11 +1090,15 @@ def test_near_me_is_the_askers_area_and_einstein_searches_the_web_for_it(tmp_pat
     _link_e(m, v, "K7ABC")
     m._event("loc", {"peer": "K7ABC", "grid": "en50wc"})            # the asker's LOC note
     assert e.sessions[(rid, "K7ABC")]["asker_grid"] == "EN50wc"
-    _ask(m, v, "K7ABC", "What nets are near me?")
-    assert "their location: grid square EN50wc (about latitude" in seen["system"]
+    e.fetch = lambda url: {"properties": {"relativeLocation": {"properties": {"city": "Springfield", "state": "IL"}}}}
+    _ask(m, v, "K7ABC", "What nets are near me? And near FN31pr?")
+    assert "grid squares in their message: FN31PR is near Springfield, IL (grid square FN31PR" in seen["system"]
+    # on the air a web search took a bare grid square for a city 600 miles away: the town and state are looked up
+    assert "their location: near Springfield, IL (grid square EN50wc, latitude" in seen["system"]
     assert "that is NOT this station's area" in seen["system"] and "mean THEIR location" in seen["system"]
     assert "call search_web with their location in the query" in seen["system"]
-    assert "They are at: grid square EN50wc" in web[0] and '"Local" and "near me" mean there.' in web[0]
+    assert "They are at: near Springfield, IL (grid square EN50wc" in web[0] and '"Local" and "near me" mean there.' in web[0]
+    assert "never work a place out from grid-square letters" in web[0]
     e.on_disconnected(rid, "K7ABC")
     _link_e(m, v, "K7ABC")                                           # the grid carries to the next link
     assert e.sessions[(rid, "K7ABC")]["asker_grid"] == "EN50wc"
@@ -1115,5 +1119,5 @@ def test_near_me_is_the_askers_area_and_einstein_searches_the_web_for_it(tmp_pat
     assert he.asker_where({"asker_grid": "EN50wc"}, "K7ABC", hrid)[1] is False     # a grid they sent always wins
     from station.server import STATIC
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert '["What nets are near me?","What amateur radio nets are on the air near me (grid {grid})' in idx
+    assert '["What nets are near me?","What amateur radio nets are on the air near me (grid square {grid})' in idx
     assert "data-vshareloc" in idx and 'varaAct("channel",{share_loc:t.checked})' in idx

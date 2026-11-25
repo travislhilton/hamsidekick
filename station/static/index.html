@@ -2393,7 +2393,7 @@ const V_ASK=[["What can you do?","HELP","now","what it can send and do, and its 
   ["Send your weather as ICS-213","WX213","net","the forecast and alerts where that station is, as an ICS-213 message"],
   ["What are the HF band conditions now?","HF","net","solar flux, K index and what they mean for HF"],
   ["⚠ What are the emergency alerts for my area?","ALERTS {grid}","net","sends your grid square (Settings → Station) so their station looks up everything urgent where you are: official warnings (weather, flood, and civil ones such as hazardous materials, evacuation, shelter in place), earthquakes, wildfires, volcanoes and bad air; it says what it checked and found clear"],
-  ["What nets are near me?","What amateur radio nets are on the air near me (grid {grid}) today and this week? Search the web for my area.","ask","their AI searches the internet for nets near your grid square and adds the ones its own station knows; for when you have no internet yourself"],
+  ["What nets are near me?","What amateur radio nets are on the air near me (grid square {grid}) today and this week? Search the web for my area.","ask","their AI searches the internet for nets near your grid square and adds the ones its own station knows; for when you have no internet yourself"],
   ["What is the weather forecast for my station?","WX {grid}","net","sends your grid square (Settings → Station) so their station looks up the forecast and alerts where you are"]];
 // Einstein on the air (station/einstein.py): this radio's AI assistant at a call of its own
 function vEinBar(m,ch){const e=ch.einstein;if(!e)return"";const rid=m.radio,st=e.state,can=e.can_on||[false,""];

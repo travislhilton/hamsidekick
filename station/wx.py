@@ -114,6 +114,18 @@ def forecast(p: dict, fetch=None, periods: int = 4) -> dict:
     return {"source": "Open-Meteo (open-meteo.com)", "place": p.get("label", ""), "periods": out[:periods], "alerts": []}
 
 
+def town(lat: float, lon: float, fetch=None) -> str | None:
+    """"City, ST" nearest a point, from the US National Weather Service (None outside the US or when it cannot be
+    reached). A web search must be given this, never a bare grid square: on the air 2026-11-25 a search took one for
+    a city 600 miles away."""
+    try:
+        rel = (((fetch or _fetch)(f"https://api.weather.gov/points/{round(lat, 3)},{round(lon, 3)}")["properties"]
+                .get("relativeLocation") or {}).get("properties") or {})
+        return ", ".join(x for x in (rel.get("city"), rel.get("state")) if x) or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 _SEV = {"Extreme": 0, "Severe": 1, "Moderate": 2, "Minor": 3}
 
 

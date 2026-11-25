@@ -646,7 +646,8 @@ class Tools:
         body = {"model": WEB_MODEL, "max_tool_calls": 10, "tools": [{"type": "web_search"}, {"type": "x_search"}],
                 "input": [{"role": "user", "content": f"Today is {datetime.now():%A %Y-%m-%d}, local time. A radio "
                           f"amateur asked: {q}\n"
-                          + (f"They are at: {self.asker_where}. \"Local\" and \"near me\" mean there.\n"
+                          + (f"They are at: {self.asker_where}. \"Local\" and \"near me\" mean there. Search by the "
+                             f"town, county and state; never work a place out from grid-square letters.\n"
                              if getattr(self, "asker_where", None) else "")
                           + f"Search the web (and X when it helps; open any page they named) and "
                           "answer from what you find now. Short for the air: the answer first, then at most 6 points, "
@@ -1186,6 +1187,27 @@ class Einstein:
         if s is not None and wx.grid_latlon(g):
             s["asker_grid"] = g[:4].upper() + g[4:6].lower()
 
+    def grid_place(self, grid: str) -> str:
+        """A grid square in words a web search cannot misread: the town and state (looked up once, when there is
+        internet) and the coordinates."""
+        from . import wx
+        g = str(grid or "").strip()
+        ll = wx.grid_latlon(g)
+        if not ll:
+            return g
+        self._towns = getattr(self, "_towns", {})
+        k = g.upper()
+        if k not in self._towns:
+            t = wx.town(ll[0], ll[1], fetch=self.fetch)
+            if t or len(self._towns) > 500:
+                self._towns[k] = t
+            town = t
+        else:
+            town = self._towns[k]
+        return (f"near {town} (grid square {g}, latitude {ll[0]:.2f}, longitude {ll[1]:.2f})" if town else
+                f"grid square {g} = latitude {ll[0]:.2f}, longitude {ll[1]:.2f} (find the town from the coordinates; "
+                "never guess a place from the grid letters)")
+
     def asker_where(self, s: dict, peer: str, rid: str | None = None) -> tuple[str, bool | None]:
         """(words for where the asker is, same area as this station?) from their grid square; else, on VARA FM, this
         station's own area (owner 2026-11-25: on FM the two stations are not far from each other; "for VARA HF that
@@ -1194,14 +1216,13 @@ class Einstein:
         from . import wx
         g, mine = s.get("asker_grid"), self._grid() or ""
         if g:
-            ll = wx.grid_latlon(g)
-            return (f"grid square {g} (about latitude {ll[0]:.2f}, longitude {ll[1]:.2f})", g[:4].upper() == mine[:4].upper())
+            return self.grid_place(g), g[:4].upper() == mine[:4].upper()
         try:
             fm = rid is not None and self._modem(rid).cfg().get("kind") != "hf"
         except Exception:  # noqa: BLE001
             fm = False
         if fm and mine:
-            return (f"within VARA FM range of this station (they sent no grid square), so about grid square {mine}: "
+            return (f"within VARA FM range of this station (they sent no grid square), so {self.grid_place(mine)}: "
                     "this station's area", True)
         try:
             card = self.st.callbook.card(base(peer)) or {}
@@ -1600,6 +1621,11 @@ class Einstein:
             tools.asker_where = where
             info += f"; their location: {where}" + ("; that is this station's own area" if same else
                                                      "; that is NOT this station's area" if same is False else "")
+            named = {g.upper() for g in re.findall(r"\b[A-Ra-r]{2}\d{2}(?:[A-Xa-x]{2})?\b", text)
+                     if g.upper() != str(s.get("asker_grid") or "").upper()}
+            if named:                                # a grid square typed in the question: say where it is
+                info += "; grid squares in their message: " + "; ".join(f"{g} is {self.grid_place(g)}" for g in sorted(named)[:3])
+                tools.asker_where += ". " + "; ".join(f"{g} is {self.grid_place(g)}" for g in sorted(named)[:3])
             system = SYSTEM.format(name=self.name(), kind=("HF" if self._modem(rid).cfg().get("kind") == "hf" else "FM"),
                                    ecall=self.call(rid), of=self.of(rid), op_call=self.op_call(rid), asker=peer,
                                    asker_info=info, area=self.area(), chars=REPLY_CHARS,
@@ -1609,7 +1635,8 @@ class Einstein:
                               f"They ({peer}): {text}"])
             out, usage = (self.ask_model or self._ask)(system, user, tools)
             self._step(rid, peer, "writing the answer")
-            reply = readable(str(out.get("reply") or "").strip()[:REPLY_CHARS * 2])
+            reply = re.sub(r"[ \t]*\(?\bf\d+\b(?:\s+is)?\s+attached[^.\n]*\.?\)?", "", str(out.get("reply") or ""))   # no file ids
+            reply = readable(reply.strip()[:REPLY_CHARS * 2])
             bad = text_problems(reply)
             if bad:
                 self._log(rid, {"kind": "blocked", "peer": peer, "text": reply, "why": bad})
