@@ -604,14 +604,14 @@ header button.hq{background:transparent;border-color:rgba(255,255,255,.18);font-
 .vtools{border-top:1px solid var(--line);padding-top:3px}.vtools>summary{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vtools[open]{max-height:48%;overflow:auto;overscroll-behavior:contain}.vtools[open]>summary{margin-bottom:4px;white-space:normal}
 .vbar{padding:5px 10px;margin:4px 0;gap:4px 8px}.vbar>span:not([style]){min-width:0}.vwork{display:block;text-align:left;width:100%;font:inherit;font-size:13px;min-height:0;flex:none}
 .vaddbtn{display:none;border-radius:999px;min-height:0;padding:1px 9px}
-.vpre{position:relative}.vqchips{display:contents}.vqbtn,.vqmenu{display:none}
-.vqmenu{flex-direction:column;gap:1px;position:absolute;left:0;right:0;bottom:calc(100% + 4px);max-height:min(62dvh,420px);overflow:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--accent,#1f4fbf);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:6;padding:4px}
-.vpre .vqrow{display:block;width:100%;text-align:left;border:0;border-radius:7px;padding:7px 9px;min-height:40px;font-size:14px;line-height:1.3;white-space:normal;background:none;color:inherit}.vpre .vqrow:hover:not([disabled]),.vpre .vqrow:focus-visible{background:color-mix(in srgb,var(--accent,#1f4fbf) 13%,var(--panel));outline:none}.vpre .vqrow[disabled]{opacity:.55}
+.vqchips{display:contents}.vqbtn{display:none}
+#vqPop{display:flex;flex-direction:column;gap:1px;position:fixed;overflow:auto;overscroll-behavior:contain;background:var(--panel);color:var(--ink);border:1px solid var(--accent,#1f4fbf);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.3);z-index:95;padding:4px;box-sizing:border-box}#vqPop[hidden]{display:none}
+.vqmenu .vqrow{display:block;width:100%;text-align:left;border:0;border-radius:7px;padding:7px 9px;min-height:40px;font-size:14px;line-height:1.3;white-space:normal;background:none;color:inherit}.vqmenu .vqrow:hover:not([disabled]),.vqmenu .vqrow:focus-visible{background:color-mix(in srgb,var(--accent,#1f4fbf) 13%,var(--panel));outline:none}.vqmenu .vqrow[disabled]{opacity:.55}
 .vql{display:block;font-weight:600}.vqh{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
 @container (max-width:520px){.vpanel .vchan{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:4px}
-  .vpanel .vros{display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-height:68px;overflow:auto;padding:3px;border:0}.vpanel .vros h5,.vpanel .vros .vall{display:none}.vpanel .vros .vst{width:auto;padding:1px 8px 1px 4px;border-color:var(--line);border-radius:999px}.vpanel .vros .vst .sub,.vpanel .vros .vai.sm{display:none}.vpanel .vros .vst.aikid{margin-left:0}.vpanel .vros form{margin:0}.vpanel .vros input:not([type=checkbox]){width:7em}
+  .vpanel .vros{display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-height:68px;overflow:auto;padding:3px;border:0}.vpanel .vros h5,.vpanel .vros [data-vall]{display:none}.vpanel .vros .vst{width:auto;padding:1px 8px 1px 4px;border-color:var(--line);border-radius:999px}.vpanel .vros .vst .sub,.vpanel .vros .vai.sm{display:none}.vpanel .vros .vst.aikid{margin-left:0}.vpanel .vros form{margin:0}.vpanel .vros input:not([type=checkbox]){width:7em}
   .vaddbtn{display:inline-block}.vaddcall:not(.show){display:none}.vfl{display:none}.vb{max-width:94%}.vphead h3{font-size:14px}
-  .vqchips{display:none}.vpanel .vqbtn{display:flex;width:100%;align-items:center;gap:6px;text-align:left;font-size:13.5px;padding:5px 10px;border-radius:8px;min-height:32px}.vqcar{margin-left:auto}.vpanel .vqmenu{display:flex}
+  .vqchips{display:none}.vpanel .vqbtn{display:flex;width:100%;align-items:center;gap:6px;text-align:left;font-size:13.5px;padding:5px 10px;border-radius:8px;min-height:32px}.vqcar{margin-left:auto}
   .vpanel:not(.vfocus) [data-vfocus]{background:var(--accent,#1f4fbf);color:#fff;border-color:transparent}}
 /* Focus: the chat takes the whole window */
 body.vfocusing{overflow:hidden}.vpanel.vfocus{position:fixed;inset:0;z-index:70;background:var(--bg,var(--panel));padding:10px 16px;overflow:auto;margin:0;border-radius:0}
@@ -2301,9 +2301,10 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
         :`<button type="button" class="vqrow" role="menuitem" data-vask="${esc(c.replace("{grid}",ch.me.grid||""))}"${how==="now"||how==="net"?" data-vasknow":""} title="${esc(what)}"><span class="vql">${how==="net"?"🌐 ":how==="ai"?"🤖 ":""}${esc(l)}</span><span class="vqh">${how==="now"?"sends now · no AI · works off grid":how==="net"?"sends now · no AI · needs the internet at their station":how==="box"?"puts it in the message box":"goes to the AI: needs the internet at their station"}</span></button>`).join("")
       :(ch.presets||[]).map((p,i)=>(/\{name\}/.test(p)&&!ch.me.name)||(/\{grid\}/.test(p)&&!ch.me.grid)?`<button type="button" class="vqrow" role="menuitem" disabled><span class="vql">${esc(p.replace(/\{\w+\}/g,"…"))}</span><span class="vqh">Set your name and grid square in Settings → Station to use this one</span></button>`
         :`<button type="button" class="vqrow" role="menuitem" data-vpreset="${i}"><span class="vql">${esc(vFill(p,ch,one||"ALL",m))}</span></button>`).join("");
+    (VA.qrows=VA.qrows||{})[rid]=qrows+(isAI?"":'<button type="button" class="vqrow linkish" data-vpedit role="menuitem">✎ Edit these messages…</button>');
     conv=`<div class="vconv"><div class="vchead"><b style="font-size:16px"><span class="mono">${one?esc(one):"Several stations"}</span>${isAI?" 🤖 "+esc(r.ai.name||"AI"):""}</b>${lk}</div>
       ${one?`<div class="vthread" id="vThread-${esc(rid)}" aria-live="polite">${th.map(it=>vBubble(it,one,isAI)).join("")||'<p class="small muted">No messages yet. A quick message below gets things going.</p>'}${r&&r.working_s?`<div class="vb in working" role="status">🤖 ${esc(one)} is working on your question… <span class="meta">it keeps the link open for the answer</span></div>`:""}${vEinWorking(ch,one)}</div>`:""}
-      <div class="vpre" aria-label="${isAI?"Quick requests":"Quick messages"}"><button type="button" class="small vqbtn" data-vqtoggle="${esc(rid)}" aria-haspopup="menu" aria-expanded="${VA.qopen===rid}">⚡ ${isAI?"Quick requests":"Quick messages"} <span class="muted">(${isAI?V_ASK.length:(ch.presets||[]).length})</span><span class="vqcar">${VA.qopen===rid?"▴":"▾"}</span></button>${VA.qopen===rid?`<div class="vqmenu" role="menu" aria-label="${isAI?"Quick requests":"Quick messages"}">${qrows}${isAI?"":'<button type="button" class="vqrow linkish" data-vpedit role="menuitem">✎ Edit these messages…</button>'}</div>`:""}<span class="vqchips">${presets}${isAI?"":' <button class="small linkish" data-vpedit>Edit</button>'}</span></div>
+      <div class="vpre" aria-label="${isAI?"Quick requests":"Quick messages"}"><button type="button" class="small vqbtn" data-vqtoggle="${esc(rid)}" aria-haspopup="menu" aria-expanded="${VA.qopen===rid}">⚡ ${isAI?"Quick requests":"Quick messages"} <span class="muted">(${isAI?V_ASK.length:(ch.presets||[]).length})</span><span class="vqcar">${VA.qopen===rid?"▴":"▾"}</span></button><span class="vqchips">${presets}${isAI?"":' <button class="small linkish" data-vpedit>Edit</button>'}</span></div>
       ${VA.pedit?`<div><textarea id="vPresets-${esc(rid)}" rows="6" style="width:100%" aria-label="Quick messages, one per line">${esc((ch.presets||[]).join("\n"))}</textarea><div class="small muted">One per line, up to 12. Fill-ins: {me} {them} {sn} {name} {grid}.</div><button class="small primary" data-vpsave>Save quick messages</button> <button class="small quiet" data-vpedit>Cancel</button></div>`:""}
       <form class="vcomp" id="vCompose-${esc(rid)}"><textarea id="vMsg-${esc(rid)}" maxlength="4000" placeholder="Message to ${esc(who)} · Enter sends, Shift+Enter new line" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer;white-space:nowrap" title="Choose a file to send (up to 5 MB). It goes out by itself over a link, checked at the other end; the other station needs this program. You are told how long it should take before it goes.">📎<span class="vfl"> Send a file…</span><input type="file" id="vCFile-${esc(rid)}" style="display:none"></label></form>
       ${one?`<details class="vtools small" data-vkeep="tools-${esc(rid)}"${vKeep("tools-"+rid)||(VA.share&&VA.share.to===one?" open":"")}><summary>Link tools <span class="muted">· ${r&&(r.via||[]).length?"via "+r.via.map(esc).join(" › "):"direct"} · ${r&&r.speed?vBps(r.speed.bps):"speed not tested"} · share your band plan and nets · forget</span></summary>`:""}
@@ -2506,6 +2507,7 @@ document.addEventListener("keydown",e=>{if(e.key!=="Escape"||!VA.focus||document
 try{VA.focus=localStorage.getItem("vfocus")||null}catch(x){}
 // The panel is exactly as tall as the column shows, so nothing around the message log needs a scroll bar and a
 // redraw never changes the column's height (the jump while scrolling).
+function vAfterDraw(){vQuickPop()}
 function vFit(box){if(box.classList.contains("vfocus")){box.style.height="";return}const col=box.closest(".rcol");if(!col)return;
   const h=Math.min(col.clientHeight,innerHeight-90);box.style.height=Math.max(400,h-2)+"px"}
 addEventListener("resize",()=>{document.querySelectorAll(".vpanel").forEach(b=>{if(b.firstChild)vFit(b)})});
@@ -2519,7 +2521,8 @@ function renderVaraPanels(){VA.drawLater=false;document.body.classList.toggle("v
   box.innerHTML=vPanelHtml(r);vWire(r.id);vFit(box);
   [".vros",".vstin",".vtools"].forEach((q,i)=>{const x=box.querySelector(q);if(x&&keepS[i])x.scrollTop=keepS[i]});
   const th=$("vThread-"+r.id);if(th)th.scrollTop=atEnd?th.scrollHeight:top0;
-  if(pos){const x=$("vMsg-"+r.id);if(x){x.focus();try{x.setSelectionRange(pos[0],pos[1])}catch(e){}}}}}
+  if(pos){const x=$("vMsg-"+r.id);if(x){x.focus();try{x.setSelectionRange(pos[0],pos[1])}catch(e){}}}}
+  vAfterDraw()}
 function vWire(rid){
   const cm=vI("vMsg",rid);if(cm){cm.oninput=()=>VA.draft[rid]=cm.value;cm.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();vI("vCompose",rid).requestSubmit()}}}
   const cf=vI("vCompose",rid);if(cf)cf.onsubmit=async e=>{e.preventDefault();VA.rid=rid;const t=vI("vMsg",rid).value.trim();if(!t)return;const to=vSel(rid).slice();
@@ -2574,12 +2577,31 @@ async function varaAct(what,body){try{VA.d=await post("/api/vara/"+what,Object.a
 async function varaSet(body){try{VA.d=await post("/api/vara/settings",Object.assign({radio:VA.rid},body));VA.msg=null}catch(e){VA.msg={bad:true,text:e.message};await varaLoad()}renderVara();renderRadios()}
 document.addEventListener("submit",async e=>{const pf=e.target.closest&&e.target.closest("[data-vviaform]");if(!pf)return;e.preventDefault();
   const vp=pf.closest("[data-vpanel]");if(vp)VA.rid=vp.dataset.vpanel;const inp=pf.querySelector("[data-vvia]");inp.blur();await varaAct("channel",{via_for:pf.dataset.vviaform,via:inp.value})});
-// the quick list: its button opens it; choosing one, Esc, or a click anywhere else closes it
+// The quick list. Its button opens it; choosing one, Esc, or a click anywhere else closes it. It is drawn on the
+// window itself, not inside the panel (owner 2026-11-25: in a short window "the window is hidden below the top section
+// and I can't see the list": the conversation box cut it off): above the button when there is room, else below, never
+// taller than the room there is.
+function vQuickPop(){let pop=$("vqPop");if(!pop){pop=document.createElement("div");pop.id="vqPop";pop.className="vqmenu";pop.setAttribute("role","menu");pop.hidden=true;document.body.appendChild(pop)}
+  const btn=VA.qopen?document.querySelector(`[data-vqtoggle="${CSS.escape(VA.qopen)}"]`):null;
+  if(!btn||btn.offsetParent===null||!(VA.qrows||{})[VA.qopen]){VA.qopen=null;pop.hidden=true;return}
+  if(pop.dataset.html!==VA.qrows[VA.qopen]){pop.dataset.html=VA.qrows[VA.qopen];pop.innerHTML=VA.qrows[VA.qopen]}
+  pop.hidden=false;pop.style.maxHeight="none";
+  const r=btn.getBoundingClientRect(),vw=innerWidth,vh=innerHeight,w=Math.min(Math.max(r.width,300),vw-16),need=pop.scrollHeight+2;
+  const above=r.top-12,below=vh-r.bottom-12,up=above>=need||above>=below,room=Math.max(120,up?above:below),h=Math.min(need,room);
+  pop.style.width=w+"px";pop.style.left=Math.max(8,Math.min(r.left,vw-w-8))+"px";pop.style.maxHeight=h+"px";
+  pop.style.top=(up?Math.max(8,r.top-4-h):Math.min(r.bottom+4,vh-h-8))+"px"}
+addEventListener("resize",()=>{if(VA.qopen)vQuickPop()});addEventListener("scroll",e=>{if(VA.qopen&&!(e.target.closest&&e.target.closest("#vqPop")))vQuickPop()},true);
 document.addEventListener("click",e=>{const t=e.target.closest?e.target:null;if(!t)return;const b=t.closest("[data-vqtoggle]");
-  if(b){VA.qopen=VA.qopen===b.dataset.vqtoggle?null:b.dataset.vqtoggle;renderVaraPanels();const f=document.querySelector(".vqmenu .vqrow:not([disabled])");if(f)f.focus();return}
-  if(VA.qopen){VA.qopen=null;setTimeout(renderVaraPanels,0)}});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&VA.qopen){VA.qopen=null;e.stopPropagation();renderVaraPanels()}
-  else if(VA.qopen&&(e.key==="ArrowDown"||e.key==="ArrowUp")){const r=[...document.querySelectorAll(".vqmenu .vqrow:not([disabled])")],i=r.indexOf(document.activeElement);if(r.length){e.preventDefault();r[(i+(e.key==="ArrowDown"?1:r.length-1))%r.length].focus()}}},true);
+  if(b){VA.qopen=VA.qopen===b.dataset.vqtoggle?null:b.dataset.vqtoggle;renderVaraPanels();const f=document.querySelector("#vqPop .vqrow:not([disabled])");if(f&&VA.qopen)f.focus();return}
+  if(!VA.qopen)return;
+  const row=t.closest("#vqPop .vqrow"),box=$("vp-"+VA.qopen);
+  if(row&&!row.disabled&&box){   // the same action as its chip in the panel (hidden in a narrow column, but there)
+    const q=row.dataset.vask!=null?`.vqchips [data-vask="${CSS.escape(row.dataset.vask)}"]`:row.dataset.vpreset!=null?`.vqchips [data-vpreset="${CSS.escape(row.dataset.vpreset)}"]`:".vqchips [data-vpedit]";
+    const chip=box.querySelector(q);VA.qopen=null;vQuickPop();if(chip)chip.click();return}
+  if(t.closest("#vqPop"))return;              // its scroll bar, a greyed-out line
+  VA.qopen=null;setTimeout(renderVaraPanels,0)});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&VA.qopen){const b=document.querySelector(`[data-vqtoggle="${CSS.escape(VA.qopen)}"]`);VA.qopen=null;e.stopPropagation();renderVaraPanels();if(b)b.focus()}
+  else if(VA.qopen&&(e.key==="ArrowDown"||e.key==="ArrowUp")){const r=[...document.querySelectorAll("#vqPop .vqrow:not([disabled])")],i=r.indexOf(document.activeElement);if(r.length){e.preventDefault();r[(i+(e.key==="ArrowDown"?1:r.length-1))%r.length].focus()}}},true);
 document.addEventListener("click",e=>{if(!(e.target.closest&&e.target.closest("[data-vaddtoggle]")))return;VA.addOpen=!VA.addOpen;renderVaraPanels();if(VA.addOpen){const x=document.querySelector(".vaddcall.show input");if(x)x.focus()}});
 document.addEventListener("submit",async e=>{const f=e.target.closest&&e.target.closest("[data-vaddcall]");if(!f)return;e.preventDefault();VA.addOpen=false;{const vp=f.closest("[data-vpanel]");if(vp)VA.rid=vp.dataset.vpanel}
   const c=(f.querySelector("input").value||"").trim().toUpperCase();if(!/^[A-Z0-9]{3,7}(-([1-9]|1[0-5]))?$/.test(c)){VA.msg={bad:true,text:"That is not a callsign."};renderVara();return}

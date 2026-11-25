@@ -1044,8 +1044,12 @@ def test_in_a_narrow_column_the_quick_requests_are_a_button_and_a_readable_list(
     list (Esc or a click elsewhere too). Wide: the chips. No horizontal scroller."""
     from station.server import STATIC
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert "data-vqtoggle=" in idx and 'class="vqmenu" role="menu"' in idx and 'class="vqrow" role="menuitem" data-vask=' in idx
+    assert "data-vqtoggle=" in idx and 'class="vqrow" role="menuitem" data-vask=' in idx
     assert "sends now · no AI · works off grid" in idx and "needs the internet at their station" in idx
-    assert ".vqchips{display:none}" in idx and ".vqbtn,.vqmenu{display:none}" in idx       # narrow: the list; wide: the chips
+    assert ".vqchips{display:none}" in idx and ".vqchips{display:contents}.vqbtn{display:none}" in idx   # narrow: the list; wide: chips
     assert ".vpanel .vpre{flex-wrap:nowrap;overflow-x:auto" not in idx
-    assert "if(VA.qopen){VA.qopen=null;setTimeout(renderVaraPanels,0)}" in idx
+    # "the window is hidden below the top section and I can't see the list": it is drawn on the window, not in the
+    # panel (which cut it off), above the button when there is room, else below, never taller than the room there is
+    assert "function vQuickPop()" in idx and "#vqPop{display:flex;flex-direction:column;gap:1px;position:fixed" in idx
+    assert "up=above>=need||above>=below" in idx and "document.body.appendChild(pop)" in idx
+    assert 'class="vqmenu" role="menu"' not in idx and "if(chip)chip.click()" in idx
