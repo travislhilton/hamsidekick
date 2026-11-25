@@ -251,7 +251,13 @@ def make_handler(station):
                     page = forms.html_for(forms.read_winlink_xml(data))
                 elif ext == ".csv":
                     page = forms.csv_table(data.decode("utf-8", "replace"), title)
-                elif ext in (".txt", ".md", ".json", ".xml", ".hsadhoc", ".log"):
+                elif ext == ".hsnets":
+                    from . import netshare
+                    try:
+                        page = forms.text_page(netshare.text(p), title)
+                    except ValueError:
+                        page = forms.text_page(data.decode("utf-8", "replace"), title)
+                elif ext in (".txt", ".md", ".json", ".xml", ".hsadhoc", ".log", ".ics"):
                     page = forms.text_page(data.decode("utf-8", "replace"), title)
                 else:
                     return self._json({"error": "this kind of file is downloaded, not viewed"}, 415)
@@ -277,6 +283,15 @@ def make_handler(station):
                     start = None
                 data, ctype, name = _plans(station).radio_export((q.get("radio") or [None])[0], start)
                 return self._send(200, data, ctype, {"Content-Disposition": f'attachment; filename="{name}"'})
+            if u.path in ("/api/nets/share/export", "/api/nets/share/export.ics"):   # the net schedule to send (netshare.py)
+                import json as _j
+                from . import netshare
+                call = str(((station._saved() or {}).get("operator") or {}).get("callsign") or station.me or "").upper()
+                if u.path.endswith(".ics"):
+                    return self._send(200, netshare.ics(station, call).encode(), "text/calendar; charset=utf-8",
+                                      {"Content-Disposition": f'attachment; filename="{call or "station"}-nets.ics"'})
+                return self._send(200, _j.dumps(netshare.export(station, call), indent=1).encode(), "application/json",
+                                  {"Content-Disposition": f'attachment; filename="{call or "station"}-nets{netshare.SUFFIX}"'})
             if u.path in ("/api/adhoc/export", "/api/adhoc/export.csv"):     # reserved ad hoc channels (adhoc.py)
                 data, ctype, name = _plans(station).adhoc_export("csv" if u.path.endswith(".csv") else "json",
                                                                  radio=parse_qs(u.query).get("radio") == ["1"])
@@ -391,7 +406,7 @@ def make_handler(station):
                       "/api/aicost", "/api/aicost/refresh", "/api/localplans/settings", "/api/localplans/search",
                       "/api/localplans/keep", "/api/localplans/drop", "/api/localplans/file", "/api/localplans/net",
                       "/api/localplans/copies", "/api/localplans/ingest", "/api/localplans/source",
-                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio",
+                      "/api/localplans/choose", "/api/adhoc", "/api/adhoc/import", "/api/adhoc/install", "/api/radio", "/api/nets/share/preview", "/api/nets/share/install",
                       "/api/einstein/settings", "/api/einstein/notes", "/api/einstein/ownerkey",
                       "/api/remote/peers", "/api/remote/presence", "/api/remote/stop"} | {f"/api/vara/{w}" for w in ("settings", "connect", "disconnect", "abort",
                       "listen", "cq", "chat", "file", "adhoc", "handoff", "takeback", "join", "leave",
@@ -510,6 +525,12 @@ def make_handler(station):
                     return self._json(_plans(station).radio_set(body))
                 if u.path == "/api/adhoc":                       # reserve / unreserve / rename (adhoc.py)
                     return self._json(_plans(station).adhoc_set(body))
+                if u.path in ("/api/nets/share/preview", "/api/nets/share/install"):   # {"name": a .hsnets file in a VARA inbox}
+                    from . import netshare
+                    p = station.vara.inbox_file(str(body.get("name") or ""))
+                    if not p:
+                        raise ValueError("that file is no longer in the VARA inbox")
+                    return self._json((netshare.preview if u.path.endswith("preview") else netshare.install)(station, p))
                 if u.path == "/api/adhoc/install":               # {"name": a .hsadhoc file in a VARA inbox}
                     return self._json(_plans(station).adhoc_install(station.vara.inbox_file(str(body.get("name") or ""))))
                 if u.path == "/api/adhoc/import":                # {"data": an export, "replace": bool}

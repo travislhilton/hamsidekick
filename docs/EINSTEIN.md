@@ -22,6 +22,7 @@ list. Files arrive after its answer and open with **View** (a form as the form, 
 
 | Ask for | It sends |
 |---|---|
+| "Local EMCOMM CHIRP file (2m/70cm/ad hoc)" | one CHIRP file for a handheld: per band (2 m, then 70 cm) the FM voice repeaters, then simplex, from the local plans you chose (ARES, RACES, ICS-205, club) and the plan channels you kept, then the national calling channel, then your reserved ad hoc channels. Never packet, APRS, Winlink gateways, D-Star / DMR or weak-signal channels |
 | "CHIRP file of the 2 m simplex channels for a Baofeng" | a CHIRP memory CSV: your radio list, the band plan's channels, your ad hoc channels, or channels the asker lists |
 | "The band plan for 70 cm for my license" | the area band plan, with the asker's privileges (their class from the FCC database) |
 | "Weather for Springfield, IL as an ICS-213" | an ICS-213 General Message from the US National Weather Service (Open-Meteo outside the US), with active alerts; plus Winlink Express form data when Express is on the station PC |
@@ -29,9 +30,17 @@ list. Files arrive after its answer and open with **View** (a form as the form, 
 | "An ICS-205 of the ad hoc channels for the drill" | an ICS-205 Incident Radio Communications Plan |
 | "An ICS-309 log of this session" | an ICS-309 Communications Log of the conversation |
 | "When are this station's nets?" | the nets on your schedule and when they meet next |
+| "Your net schedule as a calendar file" | two files: a calendar (.ics, each meeting of the next 8 weeks: any phone or computer calendar opens it) and a HAM Sidekick net file (.hsnets: their station shows **📅 Add N nets…**, previews them and adds them like Share settings: never deletes, waits in Nets for a radio). Only the nets' name, frequency, offset, tone, times, repeat rule, cancellations and net control travel |
 | "Look up K7ABC" | the public FCC (or country) entry: name, class, city, state (never a street address) |
 | "Leave a message for the operator: …" | a note in **✉ Notes** on your VARA panel (the only message it takes) |
 | library questions | only when you tick "Einstein may search this station's library" |
+
+## Watching it work
+
+On the station running Einstein, a question shows under the 🤖 bar the moment it comes in: who asked, what, and
+Einstein's step as it goes (reading the question, thinking, the tool it is using, writing, sending the answer and its
+files) with a running clock; then the outcome and how long it took, or why it turned the question away. The last
+questions fold below. The asking station sees "… is working on your question…" in the chat.
 
 ## Part 97, in code
 

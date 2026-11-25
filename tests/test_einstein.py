@@ -458,3 +458,101 @@ def test_einstein_activity_is_drawn_on_the_panel():
     assert "is working" not in act and "asked" in act and "linked to Einstein" in act and 'data-vkeep="einrec-' in act
     assert '"peer_working","einstein"]' in idx                                   # an einstein event redraws the panel
     assert "is working on your question…" in idx                                 # and the asker sees it in the chat
+
+
+def test_a_chirp_file_of_the_local_emcomm_channels(tmp_path):
+    """Owner 2026-11-24: "a quick request for a CHIRP file for local frequencies including 2m, 70cm EMCOMM repeater and
+    simplex frequencies and adhoc frequencies that I have allocated on my bandplan"."""
+    def ch(f, use, auth="local", off=None, tone=None, kept=False, mode="FM", org="County ARES"):
+        return {"type": "channel", "from": f, "to": f, "use": use, "authority": auth, "offset_mhz": off, "tone_hz": tone,
+                "kept": kept, "mode": mode, "org": org}
+    table = {"bands": [{"rows": [
+        ch(144.39, "APRS national"), ch(145.03, "Packet/Winlink primary"), ch(144.97, "Winlink gateway K7ABC-10"),
+        ch(145.15, "D-Star C", off=-0.6), ch(146.94, "Command net", off=-0.6, tone=100.0),
+        ch(146.46, "Tac 1"), ch(146.52, "National simplex calling", auth="coordinator", org="State VHF Society"),
+        ch(146.56, "Simplex", auth="coordinator", kept=True, org="State VHF Society"),
+        ch(146.58, "Simplex", auth="coordinator", org="State VHF Society"),            # not chosen, not kept: out
+        ch(144.2, "SSB weak signal calling", auth="coordinator", mode="USB")]},
+        {"rows": [ch(446.0, "70 cm calling", auth="coordinator", org=None), ch(449.625, "Linked repeater", off=-5.0, tone=103.5),
+                  ch(447.0, "DMR digital", off=-5.0)]},
+        {"rows": [ch(7.2, "HF ARES net", mode="LSB")]}]}
+
+    class Plans:
+        def consolidated(self):
+            return table
+
+        def adhoc(self):
+            return [{"kind": "voice", "freq_mhz": 147.42, "alias": "ADHOC1", "name": "ad hoc 1"},
+                    {"kind": "data", "freq_mhz": 446.6, "alias": "VARAFM", "name": "ad hoc VARA"}]
+    st, rid, m, clk, e = _setup(tmp_path)
+    e.plans = lambda: Plans()
+    t = E.Tools(e, rid, "K7ABC", {"log": [], "asker_class": "general", "owner": False})
+    got = [r["freq_mhz"] for r in t._channels("local", "", None)]
+    assert got == [146.94, 146.46, 146.56, 146.52, 147.42, 449.625, 446.0, 446.6]   # per band: rpt, simplex, calling, ad hoc
+    assert [r["freq_mhz"] for r in t._channels("local", "70 cm", None)] == [449.625, 446.0, 446.6]
+    out = t.t_make_chirp("local", "", "ht", "local EMCOMM")
+    assert out.startswith("8 channels") and "made file f1" in out
+    csv = t.files["f1"]["data"].decode()
+    assert "146.940000" in csv and "103.5" in csv and "144.390000" not in csv and "145.150000" not in csv
+    assert t.files["f1"]["name"] == "CHIRP-local-EMCOMM.csv"
+    assert "local EMCOMM 2 m and 70 cm" in E.HELP
+
+
+def test_einstein_sends_the_net_schedule_as_a_calendar_and_a_net_file(tmp_path):
+    st, rid, m, clk, e = _setup(tmp_path)
+    t = E.Tools(e, rid, "K7ABC", {"log": [], "asker_class": "general", "owner": False})
+    st.cfg["schedule"] = []
+    assert t.t_make_net_schedule() == "no nets on this station's schedule"
+    st.cfg["schedule"] = [{"id": "n1", "name": "Tuesday Net", "freq_mhz": 146.94, "mode": "FM", "start": "19:00",
+                           "duration_min": 60, "repeat": {"freq": "weekly", "weekdays": ["Tue"]}}]
+    out = t.t_make_net_schedule()
+    assert "1 nets" in out and "f1" in out and "f2" in out
+    assert t.files["f1"]["name"].endswith("-nets.ics") and t.files["f2"]["name"].endswith("-nets.hsnets")
+    assert b"BEGIN:VEVENT" in t.files["f1"]["data"] and b'"kind": "nets"' in t.files["f2"]["data"]
+    assert {".ics", ".hsnets"} <= E.SAFE_EXT
+
+
+def test_a_received_net_file_shows_add_views_and_installs_over_http(tmp_path):
+    import json as _j
+    import threading
+    import urllib.request
+    from station import netshare
+    from station.server import serve
+    from tests.test_varalink import _post
+    st, rid, m, clk, e = _setup(tmp_path)
+    st.cfg["schedule"] = []
+    doc = {"schema": "hamsidekick-settings/1", "kind": "nets", "from": "K7ABC", "radios": [],
+           "nets": [{"name": "Thursday ARES Net", "freq_mhz": 146.94, "mode": "FM", "start": "20:00", "duration_min": 30,
+                     "repeat": {"freq": "weekly", "weekdays": ["Thu"]}}]}
+    inbox = st.data / "vara" / "radios" / rid / "inbox"
+    inbox.mkdir(parents=True)
+    (inbox / "K7ABC-nets.hsnets").write_text(_j.dumps(doc), encoding="utf-8")
+    f = next(x for x in m.view()["inbox"] if x["name"] == "K7ABC-nets.hsnets")
+    assert f["nets"] == {"from": "K7ABC", "nets": 1, "names": ["Thursday ARES Net"]}
+    srv = serve(st, "127.0.0.1", 0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/api/vara/view/K7ABC-nets.hsnets") as r:
+            assert b"Thursday ARES Net" in r.read()
+        pv = _post(base, "/api/nets/share/preview", {"name": "K7ABC-nets.hsnets"})
+        assert pv["nets"]["add"] == 1 and pv["source"] == "K7ABC"
+        r = _post(base, "/api/nets/share/install", {"name": "K7ABC-nets.hsnets"})
+        assert r["added"] == 1 and any(n["name"] == "Thursday ARES Net" for n in st.cfg["schedule"])
+        d = _j.loads(urllib.request.urlopen(base + "/api/nets/share/export").read())
+        assert d["kind"] == "nets" and d["nets"][0]["name"] == "Thursday ARES Net"
+        cal = urllib.request.urlopen(base + "/api/nets/share/export.ics").read().decode()
+        assert "SUMMARY:Thursday ARES Net" in cal
+    finally:
+        srv.shutdown()
+    assert netshare.SUFFIX == ".hsnets"
+
+
+def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "data-vsendnets" in idx and "📅 Send my net schedule" in idx and '"/api/nets/share/export.ics"' in idx
+    assert idx.count("${vNetsBtn(f)}") == 2 and "data-vnetsinst" in idx and '"/api/nets/share/install"' in idx
+    ask = idx.split("const V_ASK=[")[1].split("];")[0]
+    assert "Local EMCOMM CHIRP file (2m/70cm/ad hoc)" in ask and "Your net schedule as a calendar file" in ask
+    assert len("Local EMCOMM CHIRP file (2m/70cm/ad hoc)") <= 40 and len("Your net schedule as a calendar file") <= 40   # not cut

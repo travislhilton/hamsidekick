@@ -82,7 +82,7 @@ _BUSINESS = re.compile(r"\b(for sale by me|i (will|can|'ll) (sell|buy|order) (it
                        re.I)
 _THIRD = re.compile(r"\b(i('ll| will| can) (relay|pass|forward|deliver|e-?mail|text|phone) (your|the|this|a) "
                     r"(message|traffic|note)|i('ll| will) (e-?mail|text|call|phone) (him|her|them|your \w+))\b", re.I)
-SAFE_EXT = {".txt", ".csv", ".html", ".xml", ".md", ".json", ".hsadhoc"}
+SAFE_EXT = {".txt", ".csv", ".html", ".xml", ".md", ".json", ".hsadhoc", ".hsnets", ".ics"}
 
 
 def base(call: str) -> str:
@@ -126,9 +126,10 @@ def disclosure(name: str, ecall: str, of: str, op_call: str) -> str:
 
 
 HELP = ("I can: answer questions (radio, emergency comms, technical, anything); send a CHIRP file of channels "
-        "(\"CHIRP file of the 2 m simplex channels for a Baofeng\"); give the band plan here for your license class; "
+        "(\"CHIRP file of the local EMCOMM 2 m and 70 cm channels\": repeaters, simplex and ad hoc; or \"the 2 m "
+        "simplex channels for a Baofeng\"); give the band plan here for your license class; "
         "weather or HF conditions as an ICS-213 report (\"weather for Springfield, IL as an ICS-213\"); make an "
-        "ICS-205 radio plan or an ICS-309 log of our session; list this station's nets; look up a callsign; take a "
+        "ICS-205 radio plan or an ICS-309 log of our session; list this station's nets or send them as a calendar file (and a HAM Sidekick net file to add them to your schedule); look up a callsign; take a "
         "note for the control operator (\"leave a message for the operator: ...\"). Files arrive after my reply; "
         "on HAM Sidekick Station open them with View.")
 OWNER_HELP = " As the station's operator you can also send STATUS, MESSAGES, PAUSE or RESUME."
@@ -178,10 +179,14 @@ def text_problems(text: str) -> list[str]:
 
 
 # ---------------------------------------------------------------- the tools ------------------------------------------
+NOT_VOICE = re.compile(r"packet|aprs|winlink|gateway|d-?star|dmr|fusion|ysf|p25|digital|weak.?signal|ssb|\bcw\b|"
+                       r"beacon|satellite|not available|input to|repeater input|data", re.I)
+CALLING_MHZ = {146.52, 446.0, 223.5}              # the national FM simplex calling channels
+
 TOOL_STEP = {"band_plan": "reading the band plan", "weather": "looking up the weather", "hf_conditions":
              "looking up HF conditions", "make_chirp": "making a CHIRP file", "make_ics213": "writing an ICS-213",
              "make_ics205": "making an ICS-205 radio plan", "make_ics309": "making an ICS-309 log",
-             "nets": "looking at the nets", "lookup_call": "looking up a call", "leave_message": "taking a note for you",
+             "nets": "looking at the nets", "make_net_schedule": "making the net schedule files", "lookup_call": "looking up a call", "leave_message": "taking a note for you",
              "search_library": "searching the library"}
 
 
@@ -203,10 +208,13 @@ class Tools:
               {"place": {"type": "string"}, "as_form": {"type": "boolean"}}, ["place", "as_form"]),
             S("hf_conditions", "Space weather now (solar flux, K index, NOAA scales) and what it means for HF. "
               "as_form true also makes an ICS-213 file.", {"as_form": {"type": "boolean"}}, ["as_form"]),
-            S("make_chirp", "Make a CHIRP memory CSV. source: 'radio_list' (this station's radio channels), "
-              "'band_plan' (the area plan's channels, optionally one band), 'adhoc' (reserved ad hoc channels) or "
-              "'custom' (the channels given). radio: 'ht' (2 m / 70 cm handheld: Baofeng, Quansheng) or 'any'.",
-              {"source": {"type": "string", "enum": ["radio_list", "band_plan", "adhoc", "custom"]},
+            S("make_chirp", "Make a CHIRP memory CSV. source: 'local' (the area's EMCOMM channels for a handheld: "
+              "2 m and 70 cm FM voice repeaters and simplex from the local ARES / RACES / club plans, the calling "
+              "channel, and this station's reserved ad hoc channels; band empty = both bands; use it for 'local' or "
+              "'EMCOMM' channels), 'radio_list' (this station's radio channels), 'band_plan' (every channel in the "
+              "area plan, optionally one band), 'adhoc' (reserved ad hoc channels) or 'custom' (the channels given). "
+              "radio: 'ht' (2 m / 70 cm handheld: Baofeng, Quansheng) or 'any'.",
+              {"source": {"type": "string", "enum": ["local", "radio_list", "band_plan", "adhoc", "custom"]},
                "band": {"type": "string"}, "radio": {"type": "string", "enum": ["ht", "any"]},
                "title": {"type": "string"},
                "channels": {"type": "array", "items": _CHAN}}, ["source", "band", "radio", "title", "channels"]),
@@ -222,6 +230,9 @@ class Tools:
             S("make_ics309", "An ICS-309 Communications Log of this VARA session.", {"incident": {"type": "string"}},
               ["incident"]),
             S("nets", "This station's scheduled nets and when they meet next.", {}, []),
+            S("make_net_schedule", "This station's net schedule as two files: a calendar (.ics, the next 8 weeks; any "
+              "phone or computer calendar opens it) and a HAM Sidekick net file (.hsnets; another HAM Sidekick station "
+              "adds the nets to its schedule). Attach both.", {}, []),
             S("lookup_call", "A callsign's public FCC (US) or country entry: name, license class, city and state.",
               {"call": {"type": "string"}}, ["call"]),
             S("leave_message", "Take a note for the station's control operator (the only message you may take).",
@@ -336,6 +347,8 @@ class Tools:
                             "mode": R.mode_of(f, c.get("mode")), "alias": R.alias(c.get("alias") or R.fmt_f(f)),
                             "name": R.long_name(c.get("name") or "")})
             return out[:R.MAX]
+        if source == "local":
+            return self._local(P, band)
         if source == "adhoc":
             items = [r for r in R.listing(P.adhoc(), [], []) if r["src"] == "adhoc"]
         elif source == "radio_list":
@@ -356,6 +369,39 @@ class Tools:
         if lo is not None:
             items = [r for r in items if lo <= r["freq_mhz"] <= hi]
         return items
+
+    def _local(self, P, band: str) -> list[dict]:
+        """The area's EMCOMM channels for a handheld (owner 2026-11-24: "a quick request for a CHIRP file for local
+        frequencies including 2m, 70cm EMCOMM repeater and simplex frequencies and adhoc frequencies that I have
+        allocated on my bandplan"). Per band: the FM voice repeaters, then simplex, from the local plans the operator
+        chose (ARES, RACES, ICS-205, club) and the channels they kept; the national calling channel; then the operator's
+        reserved ad hoc channels. Never packet, APRS, Winlink gateways, digital voice or weak-signal calling."""
+        from . import radiochan as R
+        bands = [band] if band else ["2 m", "70 cm"]
+        rngs = [r[:2] for r in (_band_range(b) for b in bands) if r[0] is not None]
+        if not rngs:
+            return []
+        out = []
+        t = P.consolidated()
+        rows = [r for b in t.get("bands") or [] for r in b["rows"] if r["type"] == "channel"]
+        ad = [r for r in R.listing(P.adhoc(), [], []) if r["src"] == "adhoc"]
+        for lo, hi in rngs:
+            rep_, simp, call_ = [], [], []
+            for r in rows:
+                f = r["from"]
+                if not lo <= f <= hi or NOT_VOICE.search(str(r.get("use") or "")) or \
+                        R.mode_of(f, r.get("mode")) not in ("FM", "NFM"):
+                    continue
+                local = r.get("authority") == "local" or r.get("kept")
+                if not local and f not in CALLING_MHZ:
+                    continue
+                it = {"freq_mhz": f, "offset_mhz": r.get("offset_mhz"), "tone_hz": r.get("tone_hz"),
+                      "mode": R.mode_of(f, r.get("mode")),
+                      "alias": R.suggest_alias({"freq_mhz": f, "offset_mhz": r.get("offset_mhz"), "org": r.get("org")}),
+                      "name": R.long_name(r.get("use") or "")}
+                (rep_ if r.get("offset_mhz") else simp if local else call_).append(it)
+            out += rep_ + simp + call_ + [a for a in ad if lo <= a["freq_mhz"] <= hi]
+        return out[:R.MAX]
 
     def t_make_chirp(self, source: str = "band_plan", band: str = "", radio: str = "ht", title: str = "",
                      channels=None) -> str:
@@ -415,6 +461,16 @@ class Tools:
             out.append(f"{n.get('name')}: {f'{f:.3f} MHz ' if f else ''}{n.get('mode') or ''}"
                        + (f", next {nxt[0]['start']:%a %b %d %H:%M} local" if nxt else ""))
         return "\n".join(out) or "no nets on this station's schedule"
+
+    def t_make_net_schedule(self) -> str:
+        from . import netshare
+        call = self.e.op_call(self.rid)
+        nets = netshare.export(self.e.st, call)
+        if not nets["nets"]:
+            return "no nets on this station's schedule"
+        a = self._file(f"{call}-nets.ics", netshare.ics(self.e.st, call).encode(), "net calendar")
+        b = self._file(f"{call}-nets{netshare.SUFFIX}", json.dumps(nets, indent=1).encode(), "HAM Sidekick net file")
+        return f"{len(nets['nets'])} nets. " + a + " " + b
 
     def t_lookup_call(self, call: str = "") -> str:
         cb = getattr(self.e.st, "callbook", None)
