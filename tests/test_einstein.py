@@ -1035,3 +1035,17 @@ def test_alerts_is_followed_by_an_ai_search_of_the_local_news(tmp_path):
     r = _ask(m, v, "K7ABC", "ALERTS EN50")
     time.sleep(0.3)
     assert "Local news not searched: the AI search is not available here now." in r and len(chats()) == n + 1
+
+
+def test_in_a_narrow_column_the_quick_requests_are_a_button_and_a_readable_list():
+    """Owner 2026-11-25: "there is a horizontal scroll bar ... for quick actions. It is hard to read those actions on a
+    horizontal scroll bar ... a better way to select those quick requests in a small space". Narrow: one button opens
+    a list above the message box, a request to a line with what it does under it; one tap sends it and closes the
+    list (Esc or a click elsewhere too). Wide: the chips. No horizontal scroller."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "data-vqtoggle=" in idx and 'class="vqmenu" role="menu"' in idx and 'class="vqrow" role="menuitem" data-vask=' in idx
+    assert "sends now · no AI · works off grid" in idx and "needs the internet at their station" in idx
+    assert ".vqchips{display:none}" in idx and ".vqbtn,.vqmenu{display:none}" in idx       # narrow: the list; wide: the chips
+    assert ".vpanel .vpre{flex-wrap:nowrap;overflow-x:auto" not in idx
+    assert "if(VA.qopen){VA.qopen=null;setTimeout(renderVaraPanels,0)}" in idx
