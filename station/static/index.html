@@ -230,7 +230,8 @@ section h2{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:va
 .tx .who{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px}
 .call{font-weight:700;background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:0 6px;cursor:pointer;font-family:ui-monospace,Consolas,monospace}
 .call.spk{border-color:var(--accent)}
-.hovercard{position:fixed;z-index:60;max-width:min(360px,calc(100vw - 16px));background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:8px 10px;font-size:13px}.hovercard .station{margin:0}.hovercard .tip{margin:0 0 6px;color:var(--muted)}.hovercard .hint{margin-top:6px;font-size:11px;color:var(--muted)}
+#icsTip{z-index:96;pointer-events:none;max-width:min(340px,calc(100vw - 16px))}
+.hovercard{position:fixed;z-index:97;max-width:min(360px,calc(100vw - 16px));background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:8px 10px;font-size:13px}.hovercard .station{margin:0}.hovercard .tip{margin:0 0 6px;color:var(--muted)}.hovercard .hint{margin-top:6px;font-size:11px;color:var(--muted)}
 .spkr{font-weight:700;font-family:ui-monospace,Consolas,monospace;cursor:pointer}.spkr.inf{font-weight:400;color:var(--muted)}
 .spkr.op::after{content:" ✎";color:var(--muted);font-weight:400}.whob{font-size:12px;padding:0 6px;color:var(--muted)}
 .maybe{font-size:12px;color:var(--muted);display:inline-flex;gap:3px;align-items:center;margin-left:4px}.maybe .call{font-size:11px;opacity:.75}
@@ -507,7 +508,7 @@ a.btn,label.btn{display:inline-block;padding:4px 10px;border:1px solid var(--lin
 .vst{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;width:100%;border:1px solid transparent;background:none;color:inherit;font:inherit;text-align:left;min-height:0}
 .vst:hover{border-color:var(--line)}.vst.sel{background:color-mix(in srgb,var(--accent,#1f4fbf) 12%,var(--panel));border-color:var(--accent,#1f4fbf)}
 .vst input[type=checkbox]{width:auto;flex:none;margin:0;min-height:0}.vbar .nw{white-space:nowrap}.vbar select{width:auto;min-height:0;padding:0 4px;display:inline-block;margin:0}.vbar>span.small{flex:1 1 16em}
-.vst .c{font-weight:700;font-family:ui-monospace,Consolas,monospace}.vst .sub{font-size:11.5px;color:var(--muted);display:block;font-weight:400}.vst .grow{flex:1;min-width:0}
+[data-callh]{cursor:help}.vst .c{font-weight:700;font-family:ui-monospace,Consolas,monospace}.vst .sub{font-size:11.5px;color:var(--muted);display:block;font-weight:400}.vst .grow{flex:1;min-width:0}
 .vst.quiet,.vst.gone,.vst.unheard{opacity:.55}.vst.quiet .c{text-decoration:none}
 .pd{width:10px;height:10px;border-radius:50%;flex:none;border:2px solid #2e8b57;background:#2e8b57}.pd.quiet{background:transparent;border-color:#8a96a3}.pd.gone,.pd.unheard{background:transparent;border-color:#c0c7cf;border-style:dashed}.pd.linked{background:var(--accent,#1f4fbf);border-color:var(--accent,#1f4fbf)}
 .vbadge{font-size:11px;font-weight:700;border-radius:999px;padding:0 6px;background:var(--accent,#1f4fbf);color:#fff}.vbadge.w{background:#8a96a3}.vbadge.f{background:var(--bad,#b3261e)}
@@ -2009,32 +2010,87 @@ async function lookup(call){
   try{const n=await api("/api/station/nets?call="+enc(call));   // the nets this station takes part in (station/history.py)
     if(n.nets.length)$("lookup").insertAdjacentHTML("beforeend",`<h4>Nets</h4><ul class="small nlist">${n.nets.map(x=>`<li><b>${esc(x.name)}</b>: ${x.times} of ${x.held} time${x.held===1?"":"s"}, last ${esc(fmtDate(x.last))} <button class="linkish" data-goto="analysis" data-net="${esc(x.net_id)}">Who takes part ›</button></li>`).join("")}</ul>`)}catch(e){}
 }
+// ---------- Hover an ICS form's name, anywhere it is written: what the form is for (owner 2026-11-25) ----------
+const ICS_FORMS={"201":["Incident Briefing","The first picture of an incident: a sketch map, the situation, objectives, current actions, the organisation and resources. Used to brief the incoming commander."],
+  "202":["Incident Objectives","The objectives, priorities and safety message for one operational period."],
+  "203":["Organization Assignment List","Who holds each position in the incident organisation for the period."],
+  "204":["Assignment List","One division's or group's assignment: its people, work, special instructions and its radio channels."],
+  "205":["Incident Radio Communications Plan","Every radio channel in use for the incident: its function, frequency, tone and mode, and who is assigned to it. The plan operators program their radios from."],
+  "205A":["Communications List","How to reach each person or unit: phone, radio, e-mail. The contact list that goes with the ICS-205."],
+  "206":["Medical Plan","Aid stations, ambulances, hospitals and the medical emergency procedure for the incident."],
+  "207":["Incident Organization Chart","The incident organisation as a wall chart."],
+  "208":["Safety Message / Plan","The safety message and hazards for the operational period."],
+  "209":["Incident Status Summary","The incident's status for the agencies above it: size, damage, resources, the outlook."],
+  "210":["Resource Status Change","A change in a resource's status or location, passed to the resources unit."],
+  "211":["Incident Check-In List","Who and what has arrived at the incident: the check-in record."],
+  "213":["General Message","The general-purpose message form: To, From, Subject, the message and the reply. The form most traffic on an emergency net is written on."],
+  "213RR":["Resource Request Message","A request for people, equipment or supplies: what, how many, when and where, with approval and order tracking."],
+  "214":["Activity Log","What a unit or a person did, and when: the running log kept through the period."],
+  "215":["Operational Planning Worksheet","The planning section's worksheet: resources needed against resources on hand, by assignment."],
+  "215A":["Incident Action Plan Safety Analysis","Hazards and their mitigations for each assignment."],
+  "217A":["Communications Resource Availability Worksheet","Every radio channel and repeater available in an area, with its frequencies and tones: the reference an ICS-205 is built from."],
+  "218":["Support Vehicle / Equipment Inventory","The vehicles and equipment assigned to the incident."],
+  "221":["Demobilization Check-Out","The sign-off sheet a resource completes before it is released."],
+  "309":["Communications Log","The radio operator's log: each message handled, with the time, from, to and subject. Kept by net control and by each station passing traffic."]};
+const IT={el:null,timer:0,key:null};
+function icsAt(x,y){let node,off;
+  if(document.caretPositionFromPoint){const p=document.caretPositionFromPoint(x,y);if(p){node=p.offsetNode;off=p.offset}}
+  else if(document.caretRangeFromPoint){const r=document.caretRangeFromPoint(x,y);if(r){node=r.startContainer;off=r.startOffset}}
+  if(!node||node.nodeType!==3)return null;const t=node.nodeValue,re=/\bICS[\s-]?(\d{3})(RR|A)?(?![0-9])/gi;let m;
+  while((m=re.exec(t))){if(off>=m.index-1&&off<=m.index+m[0].length+1){const k=m[1]+(m[2]||"").toUpperCase();
+      if(!ICS_FORMS[k]&&!ICS_FORMS[m[1]])return null;
+      const r=document.createRange();r.setStart(node,m.index);r.setEnd(node,m.index+m[0].length);const b=r.getBoundingClientRect();
+      if(x<b.left-3||x>b.right+3||y<b.top-3||y>b.bottom+3)return null;return {key:ICS_FORMS[k]?k:m[1],box:b}}}
+  return null}
+function icsHide(){clearTimeout(IT.timer);IT.key=null;if(IT.el)IT.el.hidden=true}
+document.addEventListener("mousemove",e=>{if(e.buttons||(IT.el&&IT.el.contains(e.target))||(e.target.closest&&e.target.closest("input,textarea,select,.hovercard:not(#icsTip)"))){if(IT.key&&!(IT.el&&IT.el.contains(e.target)))icsHide();return}
+  const h=icsAt(e.clientX,e.clientY);if(!h){if(IT.key)icsHide();return}
+  if(h.key===IT.key)return;clearTimeout(IT.timer);IT.key=h.key;
+  IT.timer=setTimeout(()=>{if(IT.key!==h.key)return;if(!IT.el){IT.el=document.createElement("div");IT.el.id="icsTip";IT.el.className="hovercard";IT.el.setAttribute("role","tooltip");document.body.appendChild(IT.el)}
+    const f=ICS_FORMS[h.key];IT.el.innerHTML=`<b>ICS-${esc(h.key)}: ${esc(f[0])}</b><p class="small" style="margin:4px 0 0">${esc(f[1])}</p>`;IT.el.hidden=false;
+    const w=IT.el.offsetWidth,hh=IT.el.offsetHeight;let top=h.box.bottom+6;if(top+hh>innerHeight-8)top=h.box.top-hh-6;
+    IT.el.style.top=Math.max(8,top)+"px";IT.el.style.left=Math.max(8,Math.min(h.box.left,innerWidth-w-8))+"px"},350)},{passive:true});
+// a panel redrawing itself puts its scroll position back, which is not the operator scrolling: cards stay open
+let REDRAW_UNTIL=0;const userScroll=()=>Date.now()>REDRAW_UNTIL;
+addEventListener("scroll",()=>{if(userScroll())icsHide()},true);addEventListener("keydown",e=>{if(e.key==="Escape")icsHide()});
 // ---------- Hover a callsign: its callbook card in a small card beside it (click still opens the full lookup) ----------
 const HC={cache:new Map(),timer:0,hideT:0,anchor:null,el:null};
 const canHover=()=>matchMedia("(hover:hover) and (pointer:fine)").matches;
-function hcFetch(call){if(!HC.cache.has(call))HC.cache.set(call,fetch("/api/lookup?call="+encodeURIComponent(call)).then(r=>r.json()).catch(()=>({error:"Lookup failed."})));return HC.cache.get(call)}
+// (owner 2026-11-25: "Wherever we present call signs in the UX let a hover over it show the lookup. Handle
+// appropriately if not on the network.") data-call = hover + click opens the full lookup; data-callh = hover only
+// (the click there does something else: choosing a station). A call with an SSID (K7ABC-14) is looked up by its
+// licence call. The callbook is the station's own FCC database and country list: it answers with no internet; QRZ is
+// extra and says so when it cannot be reached.
+const hcCall=a=>((a.dataset.call||a.dataset.callh||"").trim().toUpperCase());
+function hcFetch(call){if(!HC.cache.has(call)){const p=fetch("/api/lookup?call="+encodeURIComponent(call)).then(r=>r.json()).catch(()=>{HC.cache.delete(call);return {error:"This browser cannot reach the station just now: try again in a moment."}});HC.cache.set(call,p)}return HC.cache.get(call)}
+function hcNet(c){return c.qrz_error&&!(c.sources||[]).includes("QRZ")?`<p class="small muted">QRZ.com could not be reached (no internet?): this is from the station's own callbook${(c.sources||[]).length?"":", which does not list this call"}.</p>`:""}
 function hcPlace(){const a=HC.anchor,el=HC.el;if(!a||!el)return;const r=a.getBoundingClientRect(),h=el.offsetHeight,w=el.offsetWidth;
   let top=r.bottom+6;if(top+h>innerHeight-8&&r.top-h-6>8)top=r.top-h-6;
   el.style.top=Math.max(8,Math.min(top,innerHeight-h-8))+"px";el.style.left=Math.max(8,Math.min(r.left,innerWidth-w-8))+"px"}
 async function hcOpen(a){
-  const call=(a.dataset.call||"").trim().toUpperCase();if(!call||!a.isConnected)return;
-  HC.anchor=a;if(!HC.el){HC.el=document.createElement("div");HC.el.className="hovercard";HC.el.setAttribute("role","tooltip");
+  const full=hcCall(a),call=full.replace(/-\d{1,2}$/,"");if(!call||!a.isConnected||!/^[A-Z0-9\/]{3,12}$/.test(call))return;
+  HC.anchor=a;HC.full=full;if(!HC.el){HC.el=document.createElement("div");HC.el.className="hovercard";HC.el.setAttribute("role","tooltip");
     HC.el.addEventListener("mouseenter",()=>clearTimeout(HC.hideT));HC.el.addEventListener("mouseleave",hcHideSoon);document.body.appendChild(HC.el)}
-  const tip=a.dataset.tip?`<p class="tip small">${esc(a.dataset.tip)}</p>`:"";
+  const tip=(a.dataset.tip?`<p class="tip small">${esc(a.dataset.tip)}</p>`:"")+(a.dataset.callnote?`<p class="tip small">${esc(a.dataset.callnote)}</p>`:"")+(full!==call?`<p class="small muted">${esc(full)} is a station of ${esc(call)} (the -${esc(full.split("-").pop())} is its own station number).</p>`:"");
   HC.el.innerHTML=tip+'<p class="muted small">Looking up '+esc(call)+'…</p>';HC.el.hidden=false;hcPlace();
   const c=await hcFetch(call);if(HC.anchor!==a)return;
-  HC.el.innerHTML=tip+(c.error?`<p class="bad small">${esc(c.error)}</p>`:cardHtml(c))+'<div class="hint">Click for the nets it takes part in</div>';hcPlace()}
+  HC.el.innerHTML=tip+(c.error?`<p class="bad small">${esc(c.error==="bad callsign"?"That does not look like a callsign.":c.error)}</p>`:cardHtml(c)+hcNet(c))+(a.dataset.call?'<div class="hint">Click for the nets it takes part in</div>':"");hcPlace()}
+// a panel that redraws under the mouse replaces the element: the card moves to the new one (or closes)
+function hcReanchor(){if(!HC.anchor||HC.anchor.isConnected||!HC.el||HC.el.hidden)return;
+  const u=HC.xy?document.elementFromPoint(HC.xy[0],HC.xy[1]):null,n=u&&u.closest?u.closest("[data-callh],[data-call]"):null;
+  if(n&&hcCall(n)===HC.full){HC.anchor=n;if(n.title){n.dataset.tip=n.title;n.removeAttribute("title")}}else hcHide()}
+document.addEventListener("mousemove",e=>{HC.xy=[e.clientX,e.clientY]},{passive:true});
 function hcHide(){clearTimeout(HC.timer);clearTimeout(HC.hideT);HC.anchor=null;if(HC.el)HC.el.hidden=true}
 function hcHideSoon(){clearTimeout(HC.hideT);HC.hideT=setTimeout(hcHide,250)}
 document.addEventListener("mouseover",e=>{
   if(!canHover()||(HC.el&&HC.el.contains(e.target)))return;
-  const a=e.target.closest("[data-call]");if(!a||a===HC.anchor){if(a)clearTimeout(HC.hideT);return}
+  const a=e.target.closest("[data-call],[data-callh]");if(!a||a===HC.anchor){if(a)clearTimeout(HC.hideT);return}
   if(a.title){a.dataset.tip=a.title;a.removeAttribute("title")}          // the card shows it; no second (native) tooltip
   clearTimeout(HC.timer);clearTimeout(HC.hideT);HC.timer=setTimeout(()=>hcOpen(a),350)});
-document.addEventListener("mouseout",e=>{const a=e.target.closest&&e.target.closest("[data-call]");if(!a)return;
+document.addEventListener("mouseout",e=>{const a=e.target.closest&&e.target.closest("[data-call],[data-callh]");if(!a)return;
   if(e.relatedTarget&&(a.contains(e.relatedTarget)||(HC.el&&HC.el.contains(e.relatedTarget))))return;
   clearTimeout(HC.timer);if(HC.anchor===a)hcHideSoon()});
-addEventListener("scroll",hcHide,true);addEventListener("keydown",e=>{if(e.key==="Escape")hcHide()});
+addEventListener("scroll",()=>{if(userScroll())hcHide()},true);addEventListener("keydown",e=>{if(e.key==="Escape")hcHide()});
 document.addEventListener("click",e=>{
   const c=e.target.closest("[data-call]");if(c){hcHide();lookup(c.dataset.call)}
   const rt=e.target.closest("#rtabs [data-r]");if(rt)selectRadio(rt.dataset.r);
@@ -2300,7 +2356,7 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
   const grp=k=>ros.filter(r=>k==="gone"?r.state==="gone":r.state!=="gone");
   const row=r=>{const spd=(r.speed?" · "+vBps(r.speed.bps):"")+((r.via||[]).length?" · via "+r.via.join(" › "):"");const sub=r.working_s?"🤖 working on your answer…":r.linked?"🔗 linked"+(r.sn!=null?" · S/N "+r.sn+" dB":""):r.state==="here"?"here · "+vAge(r.age_s)+spd:r.state==="quiet"?"quiet · last heard "+vAge(r.age_s):r.state==="unheard"?"not heard yet":"last heard "+vAge(r.age_s);
     const ai=r.ai?`<span class="vai" title="An AI assistant answering automatically${r.ai.of?" for "+esc(r.ai.of):""}: ask it anything, ask for files (CHIRP, ICS forms, weather). Type HELP for its list.">🤖 ${esc(r.ai.name||"AI")}</span>`:r.einstein?`<span class="vai sm" title="This operator's AI assistant answers at ${esc(r.einstein)}">🤖 at ${esc(r.einstein)}</span>`:"";
-    return `<div class="vst ${r.state}${r.ai&&r.ai.of?" aikid":""}${sel.includes(r.call)?" sel":""}" data-vpick="${esc(r.call)}" role="button" tabindex="0" aria-pressed="${sel.includes(r.call)}" title="${r.state==="quiet"?"No keep-alive heard: may have left the channel":""}"><input type="checkbox" data-vmulti="${esc(r.call)}"${sel.includes(r.call)?" checked":""} aria-label="Also send to ${esc(r.call)}"><span class="pd ${r.linked?"linked":r.state}"></span><span class="grow"><span class="c">${esc(r.call)}</span> ${ai}<span class="sub">${sub}</span></span>${r.unread?`<span class="vbadge" title="unread">${r.unread}</span>`:""}${r.waiting?`<span class="vbadge w" title="waiting to go">⏳${r.waiting}</span>`:""}${r.failed?`<span class="vbadge f" title="not sent">⚠${r.failed}</span>`:""}</div>`};
+    return `<div class="vst ${r.state}${r.ai&&r.ai.of?" aikid":""}${sel.includes(r.call)?" sel":""}" data-vpick="${esc(r.call)}" role="button" tabindex="0" aria-pressed="${sel.includes(r.call)}" title="${r.state==="quiet"?"No keep-alive heard: may have left the channel":""}"><input type="checkbox" data-vmulti="${esc(r.call)}"${sel.includes(r.call)?" checked":""} aria-label="Also send to ${esc(r.call)}"><span class="pd ${r.linked?"linked":r.state}"></span><span class="grow"><span class="c" data-callh="${esc(r.call)}"${r.ai?` data-callnote="🤖 An AI station${r.ai.of?" of "+esc(r.ai.of):""} (${esc(r.ai.name||"AI")}): it answers automatically."`:""}>${esc(r.call)}</span> ${ai}<span class="sub">${sub}</span></span>${r.unread?`<span class="vbadge" title="unread">${r.unread}</span>`:""}${r.waiting?`<span class="vbadge w" title="waiting to go">⏳${r.waiting}</span>`:""}${r.failed?`<span class="vbadge f" title="not sent">⚠${r.failed}</span>`:""}</div>`};
   const here=ros.filter(r=>r.state==="here"&&!r.linked||r.linked);
   const roster=`<div class="vros" aria-label="Stations on the channel"><h5>On the channel (${grp("here").filter(r=>r.state==="here"||r.linked).length})</h5>${grp("here").map(row).join("")||'<p class="small muted" style="margin:4px">Nobody heard yet. Join, or wait for a station to announce.</p>'}
     ${here.length>1?`<button class="small linkish" data-vall>Select everyone here (${here.length})</button>`:""}
@@ -2325,7 +2381,7 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
       :(ch.presets||[]).map((p,i)=>(/\{name\}/.test(p)&&!ch.me.name)||(/\{grid\}/.test(p)&&!ch.me.grid)?`<button type="button" class="vqrow" role="menuitem" disabled><span class="vql">${esc(p.replace(/\{\w+\}/g,"…"))}</span><span class="vqh">Set your name and grid square in Settings → Station to use this one</span></button>`
         :`<button type="button" class="vqrow" role="menuitem" data-vpreset="${i}" title="Sends now (with text already in the message box it is added to it and not sent)"><span class="vql">${esc(vFill(p,ch,one||"ALL",m))}</span></button>`).join("");
     (VA.qrows=VA.qrows||{})[rid]=qrows+(isAI?'<button type="button" class="vqrow linkish" data-vaskedit role="menuitem">＋ Add or edit my requests…</button>':'<button type="button" class="vqrow linkish" data-vpedit role="menuitem">✎ Edit these messages…</button>');
-    conv=`<div class="vconv"><div class="vchead"><b style="font-size:16px"><span class="mono">${one?esc(one):"Several stations"}</span>${isAI?" 🤖 "+esc(r.ai.name||"AI"):""}</b>${lk}</div>
+    conv=`<div class="vconv"><div class="vchead"><b style="font-size:16px"><span class="mono"${one?` data-callh="${esc(one)}"`:""}>${one?esc(one):"Several stations"}</span>${isAI?" 🤖 "+esc(r.ai.name||"AI"):""}</b>${lk}</div>
       ${one?`<div class="vthread" id="vThread-${esc(rid)}" aria-live="polite">${th.map(it=>vBubble(it,one,isAI)).join("")||'<p class="small muted">No messages yet. A quick message below gets things going.</p>'}${r&&r.working_s?`<div class="vb in working" role="status">🤖 ${esc(one)} is working on your question… <span class="meta">it keeps the link open for the answer</span></div>`:""}${vEinWorking(ch,one)}</div>`:""}
       ${VA.msg&&VA.rid===rid&&!$("varaDlg").open?`<p class="vtoast ${VA.msg.bad?"bad":"ok"}" role="status">${esc(VA.msg.text)}<button class="linkish small" data-vmsgx aria-label="Dismiss" title="Dismiss">✕</button></p>`:""}
       <div class="vpre" aria-label="${isAI?"Quick requests":"Quick messages"}"><button type="button" class="small vqbtn" data-vqtoggle="${esc(rid)}" aria-haspopup="menu" aria-expanded="${VA.qopen===rid}">⚡ ${isAI?"Quick requests":"Quick messages"} <span class="muted">(${isAI?ASKS.length:(ch.presets||[]).length})</span><span class="vqcar">${VA.qopen===rid?"▴":"▾"}</span></button><span class="vqchips">${presets}${isAI?"":' <button class="small linkish" data-vpedit>Edit</button>'}</span></div>
@@ -2364,7 +2420,7 @@ function vEinAct(e,rid,part){const w=e.working||[],rec=e.recent||[],lk=e.linked|
   const q=t=>`“${esc(t.length>90?t.slice(0,88)+"…":t)}”`;
   const work=w.map(j=>`<button class="vwork linkish" role="status" data-vpick="${esc(j.peer)}" title="Show the conversation with ${esc(j.peer)}: the question and what Einstein is doing are in it">🤖 working for <b class="mono">${esc(j.peer)}</b>: ${esc(j.step)}… <span class="muted" data-vsince="${j.at+off}">${vDur(Math.max(0,(e.clock||0)-j.at))}</span></button>`).join("");
   const link=!w.length&&lk.length?`<div class="muted">🔗 ${lk.map(esc).join(", ")} linked to Einstein: waiting for a question</div>`:"";
-  const one=r=>`${vHm(r.at)} <b class="mono">${esc(r.peer)}</b> ${q(r.text)} → <span class="${r.ok?"":"no"}">${esc(r.outcome)}</span> <span class="muted">in ${vDur(r.took_s)}${(r.tools||[]).length?" · "+r.tools.map(esc).join(", "):""}${(r.files||[]).length?" · 📎 "+r.files.map(esc).join(", "):""}</span>`;
+  const one=r=>`${vHm(r.at)} <b class="mono" data-callh="${esc(r.peer)}">${esc(r.peer)}</b> ${q(r.text)} → <span class="${r.ok?"":"no"}">${esc(r.outcome)}</span> <span class="muted">in ${vDur(r.took_s)}${(r.tools||[]).length?" · "+r.tools.map(esc).join(", "):""}${(r.files||[]).length?" · 📎 "+r.files.map(esc).join(", "):""}</span>`;
   const recent=rec.length?`<details class="vrec" data-vkeep="einrec-${esc(rid)}"${vKeep("einrec-"+rid)}><summary>What it answered: ${one(rec[0])}${rec.length>1?` <span class="muted">· ${rec.length} since the station started</span>`:""}</summary><ul>${rec.map(r=>`<li>${one(r)}</li>`).join("")}</ul></details>`:"";
   if(part==="recent")return recent?`<div class="vact">${recent}</div>`:"";
   return work||link?`<div class="vact">${work}${link}</div>`:""}
@@ -2421,7 +2477,7 @@ function vEinBar(m,ch){const e=ch.einstein;if(!e)return"";const rid=m.radio,st=e
       <p><b>When you are away</b> (no keyboard or mouse here for 3 minutes, or at none of your stations' dashboards), only Einstein's call answers: that is automatic control, which Part 97 allows on 6 m and shorter, in the HF automatic-control data segments, and elsewhere on HF only answering at 500 Hz (97.221). It never calls anyone. <b>With no internet</b> it stays on the air for its command words; questions in words come back with the internet.</p>
       <p>From another of your stations, link to <b class="mono">${esc(e.call)}</b>: with the same owner key on both you can also send STATUS, MESSAGES, PAUSE and RESUME.</p>${vEinAct(e,rid,"recent")}</div></details>
     <span style="flex:1"></span>${e.unread?`<button class="small" data-veinnotes="${esc(rid)}" title="Notes stations left for you">✉ ${e.unread} note${e.unread===1?"":"s"}</button>`:`<button class="small quiet" data-veinnotes="${esc(rid)}" title="Notes stations left for you (MSG)">Notes</button>`}${btn}${vEinAct(e,rid)}</div>
-    ${VA.notes&&VA.notes.rid===rid?`<div class="vnotes small"><b>Notes for you</b> <button class="small quiet" data-veinnotes="">Close</button>${(VA.notes.list||[]).slice().reverse().map(n=>`<div class="${n.kind==="alert"?"bad":""}">${vHm(n.at)} <b class="mono">${esc(n.from)}</b>: ${esc(n.text)}</div>`).join("")||'<p class="muted">None yet.</p>'}</div>`:""}`}
+    ${VA.notes&&VA.notes.rid===rid?`<div class="vnotes small"><b>Notes for you</b> <button class="small quiet" data-veinnotes="">Close</button>${(VA.notes.list||[]).slice().reverse().map(n=>`<div class="${n.kind==="alert"?"bad":""}">${vHm(n.at)} <b class="mono" data-callh="${esc(n.from)}">${esc(n.from)}</b>: ${esc(n.text)}</div>`).join("")||'<p class="muted">None yet.</p>'}</div>`:""}`}
 setInterval(()=>{document.querySelectorAll("[data-vnext]").forEach(x=>{x.textContent=vClock(+x.dataset.vnext-Date.now()/1000)})},1000);
 // ----- Einstein on the air: owner key, library, my other stations (station/einstein.py, station/remote.py) -----
 async function renderEinSet(msg){const box=$("einSet");if(!box)return;let d,r;try{[d,r]=await Promise.all([api("/api/einstein"),api("/api/remote")])}catch(e){box.textContent=e.message;return}
@@ -2534,11 +2590,11 @@ document.addEventListener("keydown",e=>{if(e.key!=="Escape"||!VA.focus||document
 try{VA.focus=localStorage.getItem("vfocus")||null}catch(x){}
 // The panel is exactly as tall as the column shows, so nothing around the message log needs a scroll bar and a
 // redraw never changes the column's height (the jump while scrolling).
-function vAfterDraw(){vQuickPop()}
+function vAfterDraw(){vQuickPop();if(typeof hcReanchor==="function")hcReanchor()}
 function vFit(box){if(box.classList.contains("vfocus")){box.style.height="";return}const col=box.closest(".rcol");if(!col)return;
   const h=Math.min(col.clientHeight,innerHeight-90);box.style.height=Math.max(400,h-2)+"px"}
 addEventListener("resize",()=>{document.querySelectorAll(".vpanel").forEach(b=>{if(b.firstChild)vFit(b)})});
-function renderVaraPanels(){VA.drawLater=false;
+function renderVaraPanels(){VA.drawLater=false;if(typeof REDRAW_UNTIL!=="undefined")REDRAW_UNTIL=Date.now()+250;
   if(VA.msg&&!VA.msg.timer){const mm=VA.msg;mm.timer=setTimeout(()=>{if(VA.msg===mm){VA.msg=null;renderVaraPanels()}},mm.bad?12000:7000)}   /* a notice clears by itself */
   document.body.classList.toggle("vfocusing",!!(VA.focus&&$("vp-"+VA.focus)&&!$("vp-"+VA.focus).hidden));for(const r of (S.radios||[])){const box=$("vp-"+r.id);if(!box||r.role!=="winlink")continue;
   box.classList.toggle("vfocus",VA.focus===r.id);
@@ -2968,7 +3024,7 @@ async function renderPlans(full){
     if(b.in)return `<div>${tick} <span class="muted">(${b.segments} range${b.segments===1?"":"s"}, ${b.channels} channel${b.channels===1?"":"s"})</span> <select class="bpas" data-plauth="${esc(key)}" aria-label="Whose plan this is"><option value="coordinator"${b.authority==="coordinator"?" selected":""}>as the state coordinator's plan</option><option value="local"${b.authority!=="coordinator"?" selected":""}>as a local plan</option></select> <button class="linkish small" data-plagain="${esc(key)}" title="Read it again with xAI (a few cents), e.g. after the plan changed">read again</button></div>`;
     if(b.error)return `<div>${tick} <span class="warnc">could not be read: ${esc(b.error)}</span></div>`;
     return `<div>${tick}${b.read?' <span class="muted">(left out)</span>':' <span class="muted">(read once with xAI, a few cents)</span>'}</div>`};
-  const gwRow=g=>{const w=g.gateway;return `<li>${bpMhz(g.freq_mhz)} ${esc(g.mode||"")} · <b>${esc(w?w.call:g.use||"")}</b>${w?` <span class="muted">${esc(w.modes.join(" / "))} · ${dText(w.km)} ${esc(w.dir)} · grid ${esc(w.grid)}${w.hours&&w.hours!=="00-23"?" · "+esc(w.hours)+" UTC":""}${w.reach?` · <span title="Worked out for your antenna, power and today's solar flux, every 2 hours UTC, with the real sun over each hop">reach <b>${w.reach.pct}%</b> ${esc(w.reach.when)}, ${w.reach.hops} hop${w.reach.hops>1?"s":""}</span>${w.reach.sea?` · 🌊 ${w.reach.sea} on sea water`:""}${w.reach.gray?` · <span title="Hours in which it is sunrise or sunset at your end or theirs">🌅 gray line ${esc(w.reach.gray)}</span>`:""}`:""}</span>${w.service==="EMCOMM"?' <span class="np k-tune" style="padding:0 6px">EMCOMM</span>':""}`:""}${g.source_url?` · <a href="${esc(g.source_url)}" target="_blank" rel="noopener noreferrer">source</a>`:""}</li>`};
+  const gwRow=g=>{const w=g.gateway;return `<li>${bpMhz(g.freq_mhz)} ${esc(g.mode||"")} · <b${w?` data-callh="${esc(w.call)}" data-callnote="A Winlink gateway (an RMS station that passes radio e-mail)."`:""}>${esc(w?w.call:g.use||"")}</b>${w?` <span class="muted">${esc(w.modes.join(" / "))} · ${dText(w.km)} ${esc(w.dir)} · grid ${esc(w.grid)}${w.hours&&w.hours!=="00-23"?" · "+esc(w.hours)+" UTC":""}${w.reach?` · <span title="Worked out for your antenna, power and today's solar flux, every 2 hours UTC, with the real sun over each hop">reach <b>${w.reach.pct}%</b> ${esc(w.reach.when)}, ${w.reach.hops} hop${w.reach.hops>1?"s":""}</span>${w.reach.sea?` · 🌊 ${w.reach.sea} on sea water`:""}${w.reach.gray?` · <span title="Hours in which it is sunrise or sunset at your end or theirs">🌅 gray line ${esc(w.reach.gray)}</span>`:""}`:""}</span>${w.service==="EMCOMM"?' <span class="np k-tune" style="padding:0 6px">EMCOMM</span>':""}`:""}${g.source_url?` · <a href="${esc(g.source_url)}" target="_blank" rel="noopener noreferrer">source</a>`:""}</li>`};
   const gw=(d.gateways||[]).map(G=>`<li><b>${esc(G.title)}</b> <span class="np" style="padding:0 6px">Winlink</span> · ${G.list.length} gateway channel${G.list.length===1?"":"s"}${G.express&&G.list_at?` <span class="muted small">(list updated ${esc(new Date(G.list_at*1000).toLocaleDateString())}: Winlink Express → Channel Selection → Update Table Via Internet refreshes it)</span>`:""}${bpCtl(G.key,G.band,true,true)}<details><summary class="muted">The gateways${G.express?", nearest first":""}</summary><ul>${G.list.map(gwRow).join("")}</ul></details></li>`).join("");
   const docs=wlListNote(d.winlink_list)+((d.documents||[]).length||(d.files||[]).length||(d.gateways||[]).length?`<h4 id="plDocs">Plans and documents</h4><p class="small muted">Tick <b>In the band plan</b> on each plan you want in the band plan table (header → Band plan). Each is read once, then it is in; untick to leave it out. ${inBP?`<b>${inBP}</b> in the band plan now. <button class="linkish small" data-bpfromplans>Open the band plan</button>`:"None in the band plan yet."}</p><ul class="small pldocs">${gw}${(d.files||[]).map(x=>`<li><b>${esc(x.name)}</b> <span class="np" style="padding:0 6px">your file</span> · ${x.found} frequenc${x.found===1?"y":"ies"} read · <a href="/api/localplans/doc/${esc(x.id)}">download</a>${bpCtl("file:"+x.id,x.band,x.band&&(x.band.read||x.band.error))}</li>`).join("")}${(d.documents||[]).map(x=>`<li><b>${esc(x.title)}</b> <span class="np" style="padding:0 6px">${esc((d.doc_kinds||{})[x.kind]||x.kind)}</span>${x.org?" · "+esc(x.org):""}${x.date?" · "+esc(x.date):""} · <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">open</a>${!x.public?' · <span class="muted">members only: not copied (add it below as a file if you have it)</span>':x.saved&&x.saved.path?` · <a href="/api/localplans/doc/${esc(x.saved.id)}">offline copy</a> <span class="muted">(saved ${esc(new Date(x.saved.at*1000).toLocaleDateString())})</span>`:x.saved&&x.saved.error?` · <span class="warnc" title="${esc(x.saved.error)}">copy failed</span> <button class="linkish small" data-plcopy="${esc(x.url)}">try again</button>`:` · <button class="linkish small" data-plcopy="${esc(x.url)}">save an offline copy</button>`}${bpCtl(x.url,x.band,x.public&&d.key)}</li>`).join("")}</ul>`:"");
   const clubs=(d.clubs||[]).length?`<details class="small"${PL.clubsOpen?" open":""} data-plclubs><summary><b>Clubs and groups (${d.clubs.length})</b></summary><ul>${d.clubs.map(c=>`<li><b>${c.url?`<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${esc(c.name)}</a>`:esc(c.name)}</b>${c.emcomm?' <span class="badge emergency">EMCOMM</span>':""}${c.area?" · "+esc(c.area):""}${c.meets?` · <span class="muted">${esc(c.meets)}</span>`:""}${c.repeaters.length?`<div class="muted">${esc(c.repeaters.join("; "))}</div>`:""}</li>`).join("")}</ul></details>`:"";

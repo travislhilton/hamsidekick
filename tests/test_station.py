@@ -787,3 +787,22 @@ def test_one_units_setting_for_every_distance_km_by_default(tmp_path):
     assert "units:f.units.value" in idx and "S.units=d.units" in idx
     for old in ('> km</label>', "/1.609)} mi", '${d.km} km away', "Reach (km)"):
         assert old not in idx, old                                   # no distance is hard-wired to one unit
+
+
+def test_hover_a_callsign_anywhere_and_an_ics_form_name_for_what_it_is():
+    """Owner 2026-11-25: "in the ON THE CHANNEL I want to hover over a call sign and see who it is. Wherever we
+    present call signs in the UX let a hover over it show the lookup. Handle appropriately if not on the network."
+    and "wherever we use ICS form names in the UX let a hover over the form name pop a description". The card takes
+    hover-only anchors (a click there chooses the station), looks a call with an SSID up by its licence call, says
+    when QRZ or the station cannot be reached, and survives the panel redrawing under the pointer."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    for mark in ('<span class="c" data-callh="${esc(r.call)}"', ' class="mono"${one?` data-callh="${esc(one)}"`:""}',
+                 '<b class="mono" data-callh="${esc(r.peer)}">', '<b class="mono" data-callh="${esc(n.from)}">',
+                 '<b${w?` data-callh="${esc(w.call)}"'):
+        assert mark in idx, mark
+    assert 'closest("[data-call],[data-callh]")' in idx and 'full.replace(/-\\d{1,2}$/,"")' in idx
+    assert "QRZ.com could not be reached (no internet?)" in idx and "cannot reach the station just now" in idx
+    assert "function hcReanchor()" in idx and "if(userScroll())hcHide()" in idx and "REDRAW_UNTIL=Date.now()+250" in idx
+    assert '"213":["General Message"' in idx and '"205":["Incident Radio Communications Plan"' in idx
+    assert '"309":["Communications Log"' in idx and "function icsAt(x,y)" in idx and 'IT.el.id="icsTip"' in idx
