@@ -867,14 +867,17 @@ def test_a_new_link_keeps_the_limits_and_identifies_briefly_and_a_pack_is_announ
     first = _ask(m, v, "K7ABC", "NETS")
     assert first.startswith("W9XYZ-14 Einstein here: an automated AI assistant")
     for _ in range(2):
+        e.on_disconnected(rid, "K7ABC")                          # the link closes after each answer, as on the air
         _link_e(m, v, "K7ABC")                                   # a new link each time
         r = _ask(m, v, "K7ABC", "PACK PLAN")
         assert r.startswith("W9XYZ-14 Einstein:\n") and "automated AI assistant" not in r
     time.sleep(0.2)
     kinds = [c[0] for c in v.calls if c[0] in ("chat", "file")]
     assert kinds[-2:] == ["chat", "file"]                         # the words, then the file
+    e.on_disconnected(rid, "K7ABC")
     _link_e(m, v, "K7ABC")
     _ask(m, v, "K7ABC", "PACK PLAN")
+    e.on_disconnected(rid, "K7ABC")
     _link_e(m, v, "K7ABC")
     assert "3 times this hour" in _ask(m, v, "K7ABC", "PACK PLAN")   # the limit outlives the links
     clk.t += 700

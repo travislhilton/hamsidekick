@@ -1055,7 +1055,7 @@ class Einstein:
         """A station linked to Einstein's call: a new session; returns the per-link challenge (+NONCE=...)."""
         nonce = _rand.token_hex(8).upper()
         with self.lock:
-            old = self.sessions.get((rid, peer)) or {}
+            old = self.sessions.get((rid, peer)) or getattr(self, "past", {}).get((rid, peer)) or {}
             keep = old if old and self.clock() - old.get("at", 0) < SESSION_KEEP_S else {}
             # A quick request is its own short link (found on the air 2026-11-25): the hourly limits, what was said and
             # when the full identification last went out carry over; the challenge and the owner proof never do.
@@ -1080,7 +1080,12 @@ class Einstein:
 
     def on_disconnected(self, rid, peer):
         with self.lock:
-            self.sessions.pop((rid, peer), None)
+            s = self.sessions.pop((rid, peer), None)
+            if s:                                    # what the next link within the hour carries on from (on_connected)
+                self.past = getattr(self, "past", {})
+                self.past[(rid, peer)] = dict(s, at=self.clock())
+                for k in [k for k, v in self.past.items() if self.clock() - v["at"] > SESSION_KEEP_S]:
+                    del self.past[k]
         self._show(rid)
 
     def on_chat(self, rid: str, peer: str, text: str, send):
