@@ -655,3 +655,40 @@ def test_a_band_plan_asked_for_comes_as_a_file_and_a_promised_file_is_never_miss
             assert not files and "No file was made" in last
         else:
             assert not files and "No file was made" not in last
+
+
+def test_pack_sends_the_station_pack_by_code_as_the_operator_chose(tmp_path):
+    """Owner 2026-11-24: the other operator taps the request for the band plan and nets, it goes to Einstein, it comes
+    back, and they can install it. PACK is answered by code (no model), sends one .hspack, follows the owner's share
+    choices and goes at most 3 times an hour to one station."""
+    from station import stationpack as SP
+    from tests.test_stationpack import _sender
+
+    def model(system, user, tools):
+        raise AssertionError("PACK never reaches the model")
+    st, rid, m, clk, e = _setup(tmp_path, model=model)
+    _sender(st)
+    st.cfg["schedule"] = [{"id": "n1", "name": "Tuesday Net", "freq_mhz": 146.94, "mode": "FM", "start": "19:00",
+                           "duration_min": 60, "repeat": {"freq": "weekly", "weekdays": ["Tue"]}}]
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    reply = _ask(m, v, "K7ABC", "PACK")
+    assert _wait(lambda: any(c[0] == "file" for c in v.calls))
+    f = next(c for c in v.calls if c[0] == "file")
+    assert f[1] == "W9XYZ-station-pack.hspack"
+    doc = SP.parse(f[2])
+    assert [p["title"] for p in doc["plans"]] == ["County ARES Plan"] and doc["nets"]["nets"][0]["name"] == "Tuesday Net"
+    assert "1 local plan (2 channels" in reply and "1 net" in reply and "Review and install" in reply
+    assert e.state(rid)["recent"][0]["outcome"] == "answered: sent the station pack"
+    e.settings({"share": {"nets": False, "own_files": True}})
+    assert e.share() == {"plans": True, "kept": True, "adhoc": True, "nets": False, "own_files": True}
+    _ask(m, v, "K7ABC", "pack please")
+    doc = SP.parse([c for c in v.calls if c[0] == "file"][-1][2])
+    assert "nets" not in doc and len(doc["plans"]) == 2
+    _ask(m, v, "K7ABC", "PACK")
+    assert "3 times this hour" in _ask(m, v, "K7ABC", "PACK")
+    assert len([c for c in v.calls if c[0] == "file"]) == 3
+    assert "PACK" in E.HELP

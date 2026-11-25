@@ -131,7 +131,7 @@ HELP = ("I can: answer questions (radio, emergency comms, technical, anything); 
         "weather or HF conditions as an ICS-213 report (\"weather for Springfield, IL as an ICS-213\"); make an "
         "ICS-205 radio plan or an ICS-309 log of our session; list this station's nets or send them as a calendar file (and a HAM Sidekick net file to add them to your schedule); look up a callsign; take a "
         "note for the control operator (\"leave a message for the operator: ...\"). Files arrive after my reply; "
-        "on HAM Sidekick Station open them with View. Ask me anything: I can search the internet (news, events, facts, a web page).")
+        "on HAM Sidekick Station open them with View. Send PACK for this station's band plan and nets to install on yours. Ask me anything: I can search the internet (news, events, facts, a web page).")
 OWNER_HELP = " As the station's operator you can also send STATUS, MESSAGES, PAUSE or RESUME."
 
 SYSTEM = """You are {name}, an AI assistant answering licensed radio amateurs over a VARA {kind} keyboard link, at \
@@ -202,6 +202,9 @@ def _web_post(key: str, body: dict, timeout: float) -> dict:
     from . import aicost
     return aicost.xai_json(req, timeout, "einstein_web", body.get("model") or "")
 
+
+PACKS_PER_HOUR = 3
+SHARE_DEFAULT = {"plans": True, "kept": True, "adhoc": True, "nets": True, "own_files": False}
 
 TOOL_STEP = {"band_plan": "reading the band plan", "weather": "looking up the weather", "hf_conditions":
              "looking up HF conditions", "make_chirp": "making a CHIRP file", "make_ics213": "writing an ICS-213",
@@ -641,6 +644,10 @@ class Einstein:
     def rcfg(self, rid: str) -> dict:
         return dict({"on": False, "call": None, "paused": None}, **(self.cfg["radios"].get(rid) or {}))
 
+    def share(self) -> dict:
+        """What Einstein sends for PACK: the owner's choice (Settings → Einstein & AI), by default all but own files."""
+        return dict(SHARE_DEFAULT, **{k: bool(v) for k, v in (self.cfg.get("share") or {}).items() if k in SHARE_DEFAULT})
+
     def name(self) -> str:
         a = getattr(self.st, "agent", None)
         return getattr(a, "name", None) or "Einstein"
@@ -690,6 +697,9 @@ class Einstein:
         with self.lock:
             if "share_library" in body:
                 self.cfg["share_library"] = bool(body["share_library"])
+            if isinstance(body.get("share"), dict):          # what PACK sends (station/stationpack.py)
+                self.cfg["share"] = {k: bool(body["share"].get(k, v)) for k, v in self.share().items()}
+                self._save()
             if rid:
                 r = dict(self.cfg["radios"].get(rid) or {})
                 if "call" in body:
@@ -830,7 +840,7 @@ class Einstein:
         self._show(rid)
 
     def view(self) -> dict:
-        out = {"name": self.name(), "share_library": bool(self.cfg.get("share_library")),
+        out = {"name": self.name(), "share_library": bool(self.cfg.get("share_library")), "share": self.share(),
                "owner_key_set": bool(self.owner_key()), "radios": {}, "alerts": list(self.alerts)}
         try:
             for m in self.st.vara.data_radios():
@@ -1024,6 +1034,10 @@ class Einstein:
                 f"emergency net or repeater. I am an automated station and cannot send help; I have alerted "
                 f"{self.op_call(rid)}, the control operator.")
         cmd = text.strip().upper()
+        if re.match(r"PACK\b", cmd):                 # owner 2026-11-24: the band plan and nets, to install there
+            say(self._pack(rid, peer, send))
+            quick("answered: sent the station pack" if s.get("pack_sent") else "answered PACK: nothing to send", ok=True)
+            return
         if cmd in ("HELP", "?", "MENU"):
             say(HELP + (OWNER_HELP if s["owner"] else ""))
             quick("answered: its HELP list")
@@ -1059,6 +1073,42 @@ class Einstein:
         self._step(rid, peer, "thinking")
         threading.Thread(target=self._think, args=(rid, peer, s, text, send), daemon=True,
                          name=f"einstein-{peer}").start()
+
+    def _pack(self, rid, peer, send) -> str:
+        """PACK: this station's band plan (the local plans read here, kept channels, ad hoc channels) and net schedule
+        as one station pack, as the operator chose in Settings; made by code, no model, the same every time. The
+        file follows the reply; a HAM Sidekick station shows 📦 Review and install… on it."""
+        from . import stationpack as SP
+        sh = self.share()
+        parts = [k for k in SP.PARTS if sh.get(k)]
+        s = self.sessions.get((rid, peer)) or {}
+        s["pack_sent"] = False
+        now = self.clock()
+        sent = [t for t in s.get("packs") or [] if now - t < 3600]
+        if len(sent) >= PACKS_PER_HOUR and not s.get("owner"):
+            return f"I sent you the station pack {len(sent)} times this hour: it has not changed since; try later."
+        if not parts:
+            return f"{self.op_call(rid)} shares nothing this way: ask them on the air."
+        doc = SP.build(self.st, parts, bool(sh.get("own_files")))
+        c = SP.counts(doc)
+        if not any(c[k] for k in ("plans", "kept", "adhoc", "nets")):
+            return "This station has no band plan or nets to share yet."
+        data = SP.dumps(doc)
+        if len(data) > self.cfg.get("file_max", FILE_MAX):
+            return f"The station pack is {len(data) // 1024} KB, more than I send ({FILE_MAX // 1024} KB)."
+        est = self.airtime_s(rid, peer, len(data))
+        what = ", ".join(x for x in (
+            f"{c['plans']} local plan{'s' if c['plans'] != 1 else ''} ({c['channels']} channels, {c['segments']} ranges)" if c["plans"] else "",
+            f"{c['kept']} kept channel{'s' if c['kept'] != 1 else ''}" if c["kept"] else "",
+            f"{c['adhoc']} ad hoc channel{'s' if c['adhoc'] != 1 else ''}" if c["adhoc"] else "",
+            f"{c['nets']} net{'s' if c['nets'] != 1 else ''}" if c["nets"] else "") if x)
+        send(name=SP.name_for(doc), data=data)
+        s["pack_sent"] = True
+        s["packs"] = sent + [now]
+        self._log(rid, {"kind": "pack", "peer": peer, "bytes": len(data), "counts": c})
+        return (f"Sending {base(self.of(rid))}'s station pack: {what}. {len(data) / 1024:.1f} KB"
+                + (f", about {est:.0f} s" if est else "") + ". On HAM Sidekick Station open it with 📦 Review and "
+                "install: you choose what goes into your band plan and schedule; nothing of yours is deleted.")
 
     def _wrap(self, rid, peer, s, text) -> str:
         """Disclosure first, then the call every 10 minutes (97.119(a), 97.113(a)(4)), as code, never the model."""

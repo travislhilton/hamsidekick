@@ -147,3 +147,10 @@ def test_the_panel_has_share_and_review():
     assert 'id="packDlg"' in idx and "function vSharePanel(one,r)" in idx and '"/api/pack/build"' in idx
     assert 'data-vpack="${esc(it.name)}"' in idx and 'data-vpack="${esc(f.name)}"' in idx            # chat and inbox
     assert '"/api/pack/review"' in idx and '"/api/pack/install"' in idx and "data-vsp=" in idx
+
+
+def test_the_ask_side_taps_pack_and_the_owner_chooses_what_it_shares():
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'const V_ASK=["PACK",' in idx and "data-vasknow" in idx and "f.requestSubmit()" in idx
+    assert "📦 Band plan &amp; nets for my station" in idx and "data-einshare=" in idx
