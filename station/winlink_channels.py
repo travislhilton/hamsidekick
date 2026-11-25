@@ -108,7 +108,11 @@ def as_frequencies(rows: list[dict], title: str, unit: str = "km") -> list[dict]
                            f"grid {r['grid']}" + (f", {r['hours']} UTC" if r.get("hours") and r["hours"] != "00-23"
                                                   else "") + (" · EMCOMM" if r["service"] == "EMCOMM" else "")
                            + (f" · reach {r['reach']['pct']}% {r['reach']['when']}, {r['reach']['hops']} hop"
-                              f"{'s' if r['reach']['hops'] != 1 else ''}" if r.get("reach") else ""),
+                              f"{'s' if r['reach']['hops'] != 1 else ''}"
+                              + (f", {r['reach']['sea']} bounce{'s' if r['reach']['sea'] != 1 else ''} on sea water"
+                                 if r["reach"].get("sea") else "")
+                              + (f", gray line {r['reach']['gray']}" if r["reach"].get("gray") else "")
+                              if r.get("reach") else ""),
                     "gateway": dict({k: r[k] for k in ("call", "grid", "km", "dir", "modes", "service", "hours")},
                                     **({"reach": r["reach"]} if r.get("reach") else {}))})
     return out

@@ -300,7 +300,7 @@ class Plans:
                 continue
             by_phys = kind == "hf" and phys
             sig = [str(p), mt, km[kind], [round(where[0], 3), round(where[1], 3)], un] + (
-                ["v2", day, round(sfi / 5) * 5, hf["antenna"], hf["height_m"], hf["power_w"], hf["ground"],
+                ["v3", hf.get("wire_deg"), day, round(sfi / 5) * 5, hf["antenna"], hf["height_m"], hf["power_w"], hf["ground"],
                  list(hf["good_km"] or [])] if by_phys else [])
             if prev and prev.get("sig") == sig:
                 continue
@@ -324,10 +324,11 @@ class Plans:
                         continue
                     e = hfprop.reach_day(r["freq_mhz"], (where[0], where[1]), there, hf["antenna"], hf["height_m"],
                                          hf["power_w"], sfi, tuple(hf["good_km"]) if hf.get("good_km") else None,
-                                         hf["ground"])
+                                         hf["ground"], None, hf.get("wire_deg"))
                     if e["hours"]:
                         kept.append(dict(r, reach={"pct": e["pct"], "when": hfprop.hours_words(e["hours"]),
-                                                   "hops": e["hops"], "hours": e["hours"]}))
+                                                   "hops": e["hops"], "hours": e["hours"], "sea": e["sea"],
+                                                   "gray": hfprop.hours_words(e["gray"])}))
                 # the surest first; one gateway's best few frequencies; a list a person can read
                 kept.sort(key=lambda r: (-len(r["reach"]["hours"]), -r["reach"]["pct"], r["km"]))
                 # every band it reaches has its share (40 m is open all day and filled the list; 20 m, the distance

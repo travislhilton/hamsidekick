@@ -38,7 +38,9 @@ EXCESS_DB = 6.0              # polarization, defocusing, deviative losses (ITU-R
 RESIDUAL_K = 650.0           # + K/(f+1.4)^2 once per path: the absorption left at night (E / lower F region): 24 dB
 #                              on 80 m, 9 on 40, 3 on 20. Together: 100 W dipoles over 500 km at night on 80 m ~S8, as
 #                              before (2026-11-14: the flat 30 dB that did that closed every 20 m DX path)
-GROUND_DB = 1.0              # per ground reflection between hops
+GROUND_DB = 1.0              # per ground reflection between hops, on land
+SEA_DB = 0.3                 # ... on sea water (ground_loss; the land / sea map is station/landmask.py)
+GRAY_DEG = 8.0               # the sun within this many degrees of the horizon at an end of the path: the gray line
 NCS = {"antenna": "dipole", "height_m": 15.0, "power_w": 100.0}
 TYPICAL_SFI = 130.0
 
@@ -98,15 +100,27 @@ def _whip_eff(f: float) -> float:
     return pts[-1][1]
 
 
-def gain(antenna: str, f: float, height_m: float, theta: float, ground: str = "average") -> float:
-    """dBi at elevation `theta` degrees, averaged over azimuth (the net's direction is not known; a beam is aimed)."""
+WIRE_FLOOR = {"dipole": 0.1, "invv": 0.32, "efhw": 0.2, "random": 0.25}     # how deep the nulls off the ends go
+
+
+def gain(antenna: str, f: float, height_m: float, theta: float, ground: str = "average",
+         off_broadside: float | None = None) -> float:
+    """dBi at elevation `theta` degrees. Averaged over azimuth unless `off_broadside` is given: the angle (0-90
+    degrees) between the path and the wire's broadside, for a straight wire whose direction the operator set. A
+    wire fires best at right angles to itself at low angles; a low wire (under about 0.15 wavelength) and any wire
+    at high angles fire the same all round. A beam is aimed."""
     _, kind, g0, adj, az = ANTENNAS.get(antenna, ANTENNAS[DEFAULT["antenna"]])
     lam = 300.0 / f
     deg = max(0.5, min(90.0, theta))
     th = math.radians(deg)
     if antenna in ("beam", "hexbeam") and f < 13.9:
         return -25.0                                               # a 20-10 m beam is no antenna on 40 or 80 m
-    azp = az * max(0.0, min(1.0, (60.0 - deg) / 45.0))             # end nulls matter at low angles, not overhead
+    low = max(0.0, min(1.0, (60.0 - deg) / 45.0))                  # end nulls matter at low angles, not overhead
+    azp = az * low
+    if off_broadside is not None and antenna in WIRE_FLOOR:
+        tall = max(0.0, min(1.0, (max(1.0, height_m) / lam - 0.15) / 0.25))
+        pat = 20 * math.log10(max(WIRE_FLOOR[antenna], abs(math.cos(math.radians(off_broadside)))))
+        azp = low * tall * pat + az * low * (1 - tall)
     if kind == "h":                                                # horizontal over ground: direct + reflected wave
         h = max(1.0, height_m) * (0.8 if antenna == "invv" else 1.0)
         rho = _rho(f)
@@ -242,6 +256,24 @@ def control_points(a: tuple, b: tuple, n: int, long: bool = False) -> list[tuple
     return [destination(a, brg, d * (i + 0.5) / n) for i in range(n)]
 
 
+def ground_points(a: tuple, b: tuple, n: int, long: bool = False) -> list[tuple]:
+    """Where the signal comes down and bounces between n hops from a to b (n - 1 points)."""
+    d = great_circle_km(a, b)
+    brg = bearing(a, b)
+    if long:
+        d, brg = EARTH_KM - d, (brg + 180) % 360
+    return [destination(a, brg, d * i / n) for i in range(1, n)]
+
+
+def ground_loss(a: tuple, b: tuple, n: int, long: bool = False) -> tuple[float, int]:
+    """(dB lost at the ground reflections between n hops, how many of them are on sea water). Sea water is close to
+    a mirror at HF; land is not (owner 2026-11-25: "when traveling over water/oceans it can bounce many times")."""
+    from .landmask import is_land
+    pts = ground_points(a, b, n, long)
+    sea = sum(1 for p in pts if not is_land(p[0], p[1]))
+    return sea * SEA_DB + (len(pts) - sea) * GROUND_DB, sea
+
+
 def control(when_utc, lat: float, lon: float) -> dict:
     """sun_over at one hop's control point, plus its geomagnetic latitude and what that does to the layers."""
     c = sun_over(when_utc, lat, lon)
@@ -273,7 +305,7 @@ def _sec_at(theta: float, h: float) -> float:
 
 
 def path(f: float, km: float, hour: float, sfi: float, n: int | None = None, sun: dict | None = None,
-         controls: list[dict] | None = None) -> dict:
+         controls: list[dict] | None = None, ground_db: float | None = None) -> dict:
     """The path over `n` hops (None: the fewest the geometry allows). `controls`: one `control()` per hop (a long
     path): the lowest hop's MUF limits the path, absorption and auroral loss add up hop by hop."""
     if n is None:
@@ -296,7 +328,8 @@ def path(f: float, km: float, hour: float, sfi: float, n: int | None = None, sun
     slant = n * 2 * math.hypot(hop / 2, H_F2)
     spread = 32.45 + 20 * math.log10(f) + 20 * math.log10(slant)
     residual = RESIDUAL_K / (f + 1.4) ** 2
-    loss = spread + absorb + aurora + residual + GROUND_DB * (n - 1) + EXCESS_DB + (muf_db or 0.0)
+    loss = (spread + absorb + aurora + residual + (GROUND_DB * (n - 1) if ground_db is None else ground_db)
+            + EXCESS_DB + (muf_db or 0.0))
     return {"hops": n, "takeoff": th, "fof2": fo, "muf": muf, "absorb": absorb, "aurora": aurora, "loss": loss,
             "open": muf_db is not None}
 
@@ -319,7 +352,7 @@ def chance_pct(snr: float | None) -> int:
 
 def estimate(f: float, km: float | None, start: str, antenna: str, height_m: float, power_w: float,
              sfi: float = TYPICAL_SFI, good_km: tuple | None = None, when_utc=None, mid: tuple | None = None,
-             ground: str = "average", ends: tuple | None = None) -> dict:
+             ground: str = "average", ends: tuple | None = None, wire_deg: float | None = None) -> dict:
     """{"chance": hear, "checkin": be heard, "pct_hear", "pct_send", "why", "band", "takeoff", "gain", "muf", "hops",
     "snr_hear", "snr_send"}. `good_km` = (from, to): where the operator hears stations well; it then defines the
     antenna's pattern instead of the model. The best of 1-6 hops is used (a long path may ride several short hops)."""
@@ -336,19 +369,27 @@ def estimate(f: float, km: float | None, start: str, antenna: str, height_m: flo
     d = 400.0 if km is None else max(20.0, float(km))
     n_min, _ = hops(d)
     sun = sun_over(when_utc, mid[0], mid[1]) if when_utc is not None and mid else None
-    g_of = (lambda th: measured_gain(good, th)) if good else (lambda th: gain(antenna, f, height_m, th, ground))
+    off = [None]                                   # the path's angle off the wire's broadside (set per way below)
+    g_of = (lambda th: measured_gain(good, th)) if good else (
+        lambda th: gain(antenna, f, height_m, th, ground, off[0]))
     dbm = lambda w: 10 * math.log10(max(0.1, w) * 1000)          # noqa: E731
     nz = noise_dbm(f)
     best = None
     # both ends known with the net's date: a control point per hop (the short path; past 8,000 km the long path too)
     per_hop = ends is not None and when_utc is not None and None not in (*ends[0], *ends[1])
     ways = [(False, d)] + ([(True, EARTH_KM - d)] if per_hop and d > 8000 else [])
+    have_ends = ends is not None and None not in (*ends[0], *ends[1])
     for long_way, dd in ways:
         n0, _ = hops(dd)
+        if wire_deg is not None and have_ends:
+            brg = (bearing(ends[0], ends[1]) + (180 if long_way else 0)) % 360
+            a = abs(((brg - (float(wire_deg) + 90.0)) + 90.0) % 180.0 - 90.0)      # 0 = at right angles to the wire
+            off[0] = a
         for n in range(n0, n0 + (6 if not long_way else 3)):
             ctl = [control(when_utc, *pt) for pt in control_points(ends[0], ends[1], n, long_way)] if per_hop else None
-            p = path(f, dd, hour, sfi, n, sun, ctl)
-            p["long"], p["km"] = long_way, dd
+            gdb, sea = ground_loss(ends[0], ends[1], n, long_way) if have_ends else (None, 0)
+            p = path(f, dd, hour, sfi, n, sun, ctl, gdb)
+            p["long"], p["km"], p["sea"], p["off"] = long_way, dd, sea, off[0]
             if not p["open"]:
                 if best is None:
                     best = {"p": p, "hear": None, "send": None, "g": g_of(p["takeoff"])}
@@ -385,11 +426,23 @@ def estimate(f: float, km: float | None, start: str, antenna: str, height_m: flo
                f"{round(d / p['hops'])} km, takeoff {th:.0f}°; highest usable frequency {p['muf']:.1f} MHz (solar flux "
                f"{round(sfi)}); daytime absorption {p['absorb']:.0f} dB"
                + (f"; through the auroral zone {p['aurora']:.0f} dB" if p.get("aurora") else "")
+               + (f"; {p['sea']} of {p['hops'] - 1} ground bounce{'s' if p['hops'] != 2 else ''} on sea water"
+                  if p.get("sea") else "")
                + f". {ant_words[0].upper() + ant_words[1:]}: "
                f"{g_me:+.0f} dBi at {th:.0f}°.{zone} Signal over noise: hearing {hear:+.0f} dB, checking in with "
                f"{power_w:g} W {send:+.0f} dB")
+    gray = None                                    # sunrise or sunset at an end of the path, at this time
+    if per_hop:
+        me = abs(90 - sun_over(when_utc, *ends[0])["zenith"]) <= GRAY_DEG
+        them = abs(90 - sun_over(when_utc, *ends[1])["zenith"]) <= GRAY_DEG
+        gray = "both ends" if me and them else "your end" if me else "their end" if them else None
+        if gray and hear is not None:
+            why += (f". Gray line at {gray} (sunrise or sunset): the daytime absorption is gone there while the "
+                    "upper layer still returns the signal")
+    if p.get("off") is not None and not good and hear is not None and antenna in WIRE_FLOOR:
+        why += f". The path is {p['off']:.0f}° off your wire's broadside"
     return {"chance": _word(hear), "checkin": _word(send), "pct_hear": chance_pct(hear), "pct_send": chance_pct(send),
-            "why": why, "band": band_of(f), "takeoff": round(th), "gain": round(g_me, 1), "muf": round(p["muf"], 1),
+            "gray": gray, "sea": p.get("sea") or 0, "why": why, "band": band_of(f), "takeoff": round(th), "gain": round(g_me, 1), "muf": round(p["muf"], 1),
             "hops": p["hops"], "km": round(d), "long_path": bool(p.get("long")), "dark": (not sun["sun_up"]) if sun else None, "snr_hear": None if hear is None else round(hear),
             "snr_send": None if send is None else round(send)}
 
@@ -404,6 +457,12 @@ def invv_height(apex_m: float, ends_m: float | None) -> float:
     if ends_m is None or ends_m >= apex_m:
         return float(apex_m)
     return round(apex_m - (apex_m - max(0.0, ends_m)) / 3.0, 2)
+
+
+def invv_model_height(apex_m: float, ends_m: float | None) -> float:
+    """The height to give gain() for an inverted V: with the ends known, its effective height (gain() takes 0.8 of
+    an inverted V's height when it knows only the apex, so that is undone here)."""
+    return float(apex_m) if ends_m is None or ends_m >= apex_m else round(invv_height(apex_m, ends_m) / 0.8, 2)
 
 
 FOOT_BANDS = (("160 m", 1.9), ("80 m", 3.8), ("40 m", 7.18), ("20 m", 14.25), ("17 m", 18.13), ("15 m", 21.3),
@@ -447,7 +506,8 @@ def regional_km(foot: list[dict]) -> int | None:
 
 
 def reach_day(f: float, home: tuple, there: tuple, antenna: str, height_m: float, power_w: float,
-              sfi: float = TYPICAL_SFI, good_km: tuple | None = None, ground: str = "average", day=None) -> dict:
+              sfi: float = TYPICAL_SFI, good_km: tuple | None = None, ground: str = "average", day=None,
+              wire_deg: float | None = None) -> dict:
     """The best this setup does to one place on one frequency over a day, every 2 hours UTC, with the real sun over
     each hop (so sunrise and sunset, the gray line, count): {"pct" (the worse of hearing and being heard, at the
     best hour), "hours": [UTC hours it reaches], "km", "hops", "why"}."""
@@ -455,19 +515,34 @@ def reach_day(f: float, home: tuple, there: tuple, antenna: str, height_m: float
     day = day or datetime.now(timezone.utc)
     km = great_circle_km(home, there)
     mid = control_points(home, there, 1)[0] if km > 50 else home
-    best, hours = None, []
+    best, hours, gray = None, [], []
     for h in range(0, 24, 2):
         when = day.replace(hour=h, minute=0, second=0, microsecond=0)
         local = (h + mid[1] / 15.0) % 24
         e = estimate(f, km, f"{int(local):02d}:{int(local % 1 * 60):02d}", antenna, height_m, power_w, sfi, good_km,
-                     when, mid, ground, (home, there))
+                     when, mid, ground, (home, there), wire_deg)
         pct = min(e["pct_hear"], e["pct_send"])
         if e["pct_hear"] >= REACH_PCT and e["pct_send"] >= REACH_SEND_PCT:
             hours.append(h)
         if best is None or pct > best[0]:
             best = (pct, e)
-    return {"pct": best[0], "hours": hours, "km": round(km), "hops": best[1]["hops"], "why": best[1]["why"],
-            "band": best[1]["band"]}
+    twilight = sun_events(day, *home) + sun_events(day, *there)   # each end's sunrise and sunset: the gray line
+    gray = [h for h in hours if any(h <= t < h + 2 for t in twilight)]
+    return {"pct": best[0], "hours": hours, "gray": gray, "km": round(km), "hops": best[1]["hops"],
+            "sea": best[1].get("sea") or 0, "why": best[1]["why"], "band": best[1]["band"]}
+
+
+def sun_events(day, lat: float, lon: float) -> list[float]:
+    """The UTC hours (decimal) of sunrise and sunset at a place on this UTC day (none in polar day or night)."""
+    out, prev = [], None
+    base = day.replace(hour=0, minute=0, second=0, microsecond=0)
+    from datetime import timedelta
+    for i in range(0, 24 * 6 + 1):                                # every 10 minutes
+        up = sun_over(base + timedelta(minutes=10 * i), lat, lon)["zenith"] < 90.0
+        if prev is not None and up != prev:
+            out.append(round(i / 6.0, 2) % 24)
+        prev = up
+    return out
 
 
 def hours_words(hours: list[int]) -> str:

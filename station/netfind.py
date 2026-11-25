@@ -100,8 +100,9 @@ def hf_setup(st, d: dict | None = None) -> dict:
     ant = h.get("antenna") if h.get("antenna") in hfprop.ANTENNAS else hfprop.DEFAULT["antenna"]
     apex = h.get("height_m") or hfprop.DEFAULT["height_m"]
     ends = h.get("ends_m") if ant == "invv" else None
-    return {"antenna": ant, "height_m": hfprop.invv_height(apex, ends) if ends is not None else apex,
-            "apex_m": apex, "ends_m": ends, "unit": h.get("unit") or "si",
+    wire = h.get("wire_deg") if ant in hfprop.WIRE_FLOOR else None
+    return {"antenna": ant, "height_m": hfprop.invv_model_height(apex, ends) if ends is not None else apex,
+            "apex_m": apex, "ends_m": ends, "unit": h.get("unit") or "si", "wire_deg": wire,
             "power_w": h.get("power_w") or _power_default(st), "good_km": h.get("good_km"),
             "ground": h.get("ground") if h.get("ground") in hfprop.GROUNDS else hfprop.DEFAULT["ground"], "set": bool(h)}
 
@@ -502,7 +503,7 @@ def _mark(st, nets: list[dict], hf: dict | None = None, sfi: float = hfprop.TYPI
                 if home.get("lat") is not None and n.get("lat") is not None else None   # a control point per hop
             n["prop"] = hfprop.estimate(n["freq_mhz"], n.get("distance_km"), n["start"], hf["antenna"], hf["height_m"],
                                         hf["power_w"], sfi, tuple(hf["good_km"]) if hf.get("good_km") else None,
-                                        when, mid, hf.get("ground") or "average", ends)
+                                        when, mid, hf.get("ground") or "average", ends, hf.get("wire_deg"))
             if n.get("region"):
                 n["region_label"] = hfprop.REGIONS[n["region"]][0]
     return nets
@@ -541,6 +542,7 @@ class Finder:
             return None
         h = self._hf(d)
         return (round(loc["lat"], 1), round(loc["lon"], 1), h["antenna"], h["height_m"], h["power_w"], h["ground"],
+                h.get("wire_deg"),
                 tuple(h["good_km"] or ()), round(sfi / 5) * 5, date.today().isoformat())
 
     def reach_table(self, d: dict | None = None, sfi: float | None = None, wait: bool = False) -> list[dict] | None:
@@ -653,8 +655,12 @@ class Finder:
                         raise ValueError(f"where you hear HF stations well: give both distances, like 400 to 600 {du}")
                     good = [int(round(lo * mi)), int(round(hi * mi))]
                 gr = h.get("ground") if h.get("ground") in hfprop.GROUNDS else hfprop.DEFAULT["ground"]
+                wire = _num(h.get("wire_deg")) if h.get("wire_deg") not in (None, "") else None
+                if wire is not None and not 0 <= wire <= 360:
+                    raise ValueError("the direction the wire runs is a compass bearing, 0 to 360 degrees")
                 d["hf"] = {"antenna": h["antenna"], "height_m": round(ht * ft, 1), "power_w": int(p), "good_km": good,
                            "ground": gr, "unit": "us" if us else "si",
+                           "wire_deg": None if wire is None else round(wire) % 180,
                            "ends_m": None if ends is None else round(ends * ft, 1)}
             if "dx" in body:
                 d["dx"] = bool(body.get("dx"))

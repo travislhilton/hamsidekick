@@ -183,7 +183,8 @@ def test_hf_gateways_are_chosen_by_what_the_antenna_reaches_not_by_a_circle(tmp_
     netfind.Finder(st).settings({"hf": {"antenna": "invv", "height_m": 40, "ends_m": 10, "unit": "us", "power_w": 100,
                                         "good_from_km": 400, "good_to_km": 600}})
     h = netfind.hf_setup(st)
-    assert h["unit"] == "us" and h["apex_m"] == 12.2 and h["ends_m"] == 3.0 and h["height_m"] == 9.13   # feet in
+    assert h["unit"] == "us" and h["apex_m"] == 12.2 and h["ends_m"] == 3.0 and h["height_m"] == 11.41   # feet in
+    # (11.41 m given to the model = an effective 9.13 m: a third of the way down from the apex to the ends)
     assert h["good_km"] == [644, 966]                                                                 # miles in
     hf = {g["key"]: g for g in p.state()["gateways"]}["express:hf"]
     assert "your antenna reaches today" in hf["title"] and "600 km" not in hf["title"]
