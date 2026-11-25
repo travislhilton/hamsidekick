@@ -390,3 +390,71 @@ def test_view_einstein_and_my_other_stations_over_http(tmp_path):
             r.set_peers(["not a url at all"])
     finally:
         srv.shutdown()
+
+
+def test_weather_here_uses_the_whole_grid_locator_not_its_square(tmp_path):
+    """Owner 2026-11-24: a 6-character locator came back as the weather of a town in another state — Einstein cut it
+    to the 4-character square (1 x 2 degrees), whose middle is far from the station."""
+    st, rid, m, clk, e = _setup(tmp_path)
+    st._saved = lambda: {"operator": {"grid": "FN31pr"}}
+    h = e.here()
+    assert abs(h["lat"] - 41.729) < 0.01 and abs(h["lon"] - (-72.708)) < 0.01      # FN31pr, not FN31's middle 41.5, -73
+    assert "FN31pr" in h["label"] and e.area() == "grid square FN31pr"
+    seen = []
+    t = E.Tools(e, rid, "K7ABC", {"log": [], "asker_class": "general", "owner": False})
+    t.e.fetch = lambda url: (seen.append(url), _fetch(url))[1]
+    t.t_weather("here")
+    assert any("/points/41.73,-72.71" in u for u in seen)
+    st._saved = lambda: {"operator": {"grid": "FN31"}}
+    assert e.area() == "grid square FN31"
+    st._saved = lambda: {"operator": {"grid": "fn31pr12"}}                         # 8 characters: the 6 we can read
+    assert e.area() == "grid square fn31pr"
+
+
+def test_the_dashboard_sees_a_question_come_in_einstein_work_and_answer(tmp_path):
+    """Owner 2026-11-24: "when a station is running Einstein over VARA chat it would be good to see that a request has
+    come into Einstein and that einstein is working on it". state() carries who is linked, the question being worked
+    on and its step (a tool's own words), and the last answers; each change goes to the dashboards as a vara event."""
+    import threading
+    gate, steps = threading.Event(), []
+
+    def model(system, user, tools):
+        tools.run("weather", {"place": "Springfield, IL", "as_form": True})
+        steps.append(e.state(rid)["working"][0]["step"])
+        gate.wait(3)
+        return {"reply": "Clear tonight.", "attach": ["f1"], "note_for_operator": ""}, {"tools": []}
+    st, rid, m, clk, e = _setup(tmp_path, model=model)
+    e.settings({"radio": rid, "on": True})
+    m.check()
+    v = m.vara
+    shown = []
+    pub = st.vara._publish
+    st.vara._publish = lambda name, r=None: (shown.append(name), pub(name, r))
+    _link_e(m, v, "K7ABC")
+    assert e.state(rid)["linked"] == ["K7ABC"] and "einstein" in shown
+    m._event("chat", {"peer": "K7ABC", "text": "Weather please"})
+    assert _wait(lambda: steps)
+    w = e.state(rid)["working"]
+    assert len(w) == 1 and w[0]["peer"] == "K7ABC" and w[0]["text"] == "Weather please"
+    assert steps == ["looking up the weather"]
+    gate.set()
+    assert _wait(lambda: not e.state(rid)["working"] and e.state(rid)["recent"])
+    r = e.state(rid)["recent"][0]
+    assert r["outcome"] == "answered" and r["ok"] and r["tools"] == ["weather"] and r["files"][0].startswith("ICS213")
+    assert m.chan.view()["einstein"]["recent"][0]["peer"] == "K7ABC"               # what the panel draws
+    _ask(m, v, "K7ABC", "HELP")
+    assert e.state(rid)["recent"][0]["outcome"] == "answered: its HELP list"
+    m._event("disconnected", {"peer": "K7ABC"})
+    e.on_disconnected(rid, "K7ABC")
+    assert e.state(rid)["linked"] == [] and not e.state(rid)["working"]
+
+
+def test_einstein_activity_is_drawn_on_the_panel():
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    bar = idx.split("function vEinBar(m,ch)")[1].split("\nfunction ")[0]
+    assert "${vEinAct(e,rid)}" in bar
+    act = idx.split("function vEinAct(e,rid)")[1].split("\nsetInterval")[0]
+    assert "is working" not in act and "asked" in act and "linked to Einstein" in act and 'data-vkeep="einrec-' in act
+    assert '"peer_working","einstein"]' in idx                                   # an einstein event redraws the panel
+    assert "is working on your question…" in idx                                 # and the asker sees it in the chat

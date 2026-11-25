@@ -178,6 +178,13 @@ def text_problems(text: str) -> list[str]:
 
 
 # ---------------------------------------------------------------- the tools ------------------------------------------
+TOOL_STEP = {"band_plan": "reading the band plan", "weather": "looking up the weather", "hf_conditions":
+             "looking up HF conditions", "make_chirp": "making a CHIRP file", "make_ics213": "writing an ICS-213",
+             "make_ics205": "making an ICS-205 radio plan", "make_ics309": "making an ICS-309 log",
+             "nets": "looking at the nets", "lookup_call": "looking up a call", "leave_message": "taking a note for you",
+             "search_library": "searching the library"}
+
+
 class Tools:
     """The tools the model may call for one question. Files made are kept in self.files until the reply names them."""
 
@@ -226,6 +233,7 @@ class Tools:
 
     def run(self, name: str, arguments) -> str:
         self.calls.append(str(name))
+        self.e._step(self.rid, self.peer, TOOL_STEP.get(str(name), "using " + str(name)))
         try:
             args = json.loads(arguments) if isinstance(arguments, str) else dict(arguments or {})
             fn = getattr(self, "t_" + str(name), None)
@@ -486,6 +494,8 @@ class Einstein:
         self._probe_stop = threading.Event()
         self._probing = False
         self.alerts: deque = deque(maxlen=20)
+        self.now: dict[tuple, dict] = {}         # (rid, peer) -> the question being worked on (the dashboard shows it)
+        self.recent: dict[str, deque] = {}      # rid -> the last questions and what became of them
 
     # ----- settings -----
     def _save(self):
@@ -655,7 +665,35 @@ class Einstein:
                why_on if not ok_on else r["answer"][1] if not r["answer"][0] else self._modem(rid).base_ok()[1])
         return {"on": rc["on"], "call": self.call(rid), "call_set": bool(rc.get("call")), "state": word, "why": why,
                 "announce": r["announce"], "answer": r["answer"], "can_on": self.can_switch_on(rid),
-                "unread": sum(1 for x in self.mail(rid) if not x.get("read"))}
+                "unread": sum(1 for x in self.mail(rid) if not x.get("read")),
+                "linked": sorted(p for (r_, p) in list(self.sessions) if r_ == rid),
+                "working": [dict(v, peer=p) for (r_, p), v in sorted(list(self.now.items()), key=lambda x: x[1]["at"])
+                            if r_ == rid],
+                "recent": list(self.recent.get(rid) or [])[::-1], "clock": self.clock()}
+
+    # ----- what Einstein is doing, for the dashboard (owner 2026-11-24: "see that a request has come into Einstein and
+    # that einstein is working on it") -----
+    def _show(self, rid):
+        try:
+            self.st.vara._publish("einstein", rid)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _step(self, rid, peer, step: str):
+        with self.lock:
+            j = self.now.get((rid, peer))
+            if j is not None:
+                j["step"] = step
+        self._show(rid)
+
+    def _done(self, rid, peer, text, outcome: str, ok: bool = True, tools=(), files=(), started=None):
+        with self.lock:
+            j = self.now.pop((rid, peer), None)
+            at = (j or {}).get("at") or started or self.clock()
+            self.recent.setdefault(rid, deque(maxlen=12)).append(
+                {"peer": peer, "text": str(text)[:200], "at": at, "took_s": round(self.clock() - at, 1),
+                 "outcome": outcome, "ok": ok, "tools": list(tools), "files": list(files)})
+        self._show(rid)
 
     def view(self) -> dict:
         out = {"name": self.name(), "share_library": bool(self.cfg.get("share_library")),
@@ -709,13 +747,19 @@ class Einstein:
     # ----- where is "here" (rounded) -----
     def here(self) -> dict | None:
         from . import wx
-        g = str(((self.st._saved() or {}).get("operator") or {}).get("grid") or "")[:4]
+        g = self._grid()
         ll = wx.grid_latlon(g) if g else None
         return {"lat": ll[0], "lon": ll[1], "label": f"this station's area (grid {g})", "us": None} if ll else None
 
     def area(self) -> str:
-        g = str(((self.st._saved() or {}).get("operator") or {}).get("grid") or "")[:4]
+        g = self._grid()
         return f"grid square {g}" if g else "not given"
+
+    def _grid(self) -> str:
+        """The operator's locator as set (FN31pr), at most 6 characters. The 4-character square is 1 x 2 degrees: its
+        middle can be another state (owner 2026-11-24: a 6-character locator, weather came back for a town in the next state)."""
+        g = re.sub(r"\s+", "", str(((self.st._saved() or {}).get("operator") or {}).get("grid") or ""))
+        return g[:6] if re.fullmatch(r"[A-Ra-r]{2}\d{2}([A-Xa-x]{2})?", g[:6]) else g[:4]
 
     def plans(self):
         from .server import _plans
@@ -787,6 +831,7 @@ class Einstein:
                                           "last_id": 0, "log": [], "asked": deque(), "files": deque(),
                                           "history": [], "asker_class": None, "checked": None}
         self._log(rid, {"kind": "link", "peer": peer})
+        self._show(rid)
         return nonce
 
     def on_auth(self, rid, peer, token: str):
@@ -802,6 +847,7 @@ class Einstein:
     def on_disconnected(self, rid, peer):
         with self.lock:
             self.sessions.pop((rid, peer), None)
+        self._show(rid)
 
     def on_chat(self, rid: str, peer: str, text: str, send):
         """A message typed to Einstein. send(text=None, name=None, data=None) puts something on this link (and keeps
@@ -815,6 +861,15 @@ class Einstein:
         s["log"].append({"role": "asker", "text": text, "at": self.clock()})
         self._log(rid, {"kind": "in", "peer": peer, "text": text})
         out = []
+        t0 = self.clock()
+        if not self.busy.get((rid, peer)):
+            with self.lock:
+                self.now[(rid, peer)] = {"text": text[:200], "at": t0, "step": "reading the question"}
+            self._show(rid)
+
+        def quick(outcome, ok=True):
+            if not self.busy.get((rid, peer)):
+                self._done(rid, peer, text, outcome, ok=ok, started=t0)
 
         def say(t):
             t = self._wrap(rid, peer, s, t)
@@ -826,6 +881,7 @@ class Einstein:
             s["checked"] = self._licensed(peer, s)
         if s["checked"] is not True:
             say(f"Sorry {peer}: {s['checked']} I answer licensed amateurs only (Part 97).")
+            quick("turned away: " + str(s["checked"]), ok=False)
             return
         if EMERGENCY.search(text):
             self.alerts.appendleft({"rid": rid, "peer": peer, "text": text[:300], "at": self.clock()})
@@ -836,12 +892,15 @@ class Einstein:
         cmd = text.strip().upper()
         if cmd in ("HELP", "?", "MENU"):
             say(HELP + (OWNER_HELP if s["owner"] else ""))
+            quick("answered: its HELP list")
             return
         if cmd in ("STATUS", "MESSAGES", "PAUSE", "RESUME"):
             if not s["owner"]:
                 say(f"{cmd} is for this station's operator, from one of their own stations with the owner key set.")
+                quick(f"turned away: {cmd} needs the owner key", ok=False)
                 return
             say(self._owner(rid, cmd))
+            quick(f"answered your {cmd} (owner key)")
             return
         now = self.clock()
         while s["asked"] and now - s["asked"][0] > 3600:
@@ -850,9 +909,11 @@ class Einstein:
             self.day.popleft()
         if len(s["asked"]) >= int(self.cfg.get("per_hour") or PER_STATION_HOUR) and not s["owner"]:
             say(f"That is {len(s['asked'])} questions this hour, my limit for one station: try again later.")
+            quick("turned away: its limit of questions an hour", ok=False)
             return
         if len(self.day) >= PER_DAY:
             say("I have answered my limit of questions for today: try again tomorrow.")
+            quick("turned away: the day's limit of questions", ok=False)
             return
         if self.busy.get((rid, peer)):
             say("Still working on your last question: one at a time, please.")
@@ -861,6 +922,7 @@ class Einstein:
         self.day.append(now)
         send(note="WORKING 30")
         self.busy[(rid, peer)] = True
+        self._step(rid, peer, "thinking")
         threading.Thread(target=self._think, args=(rid, peer, s, text, send), daemon=True,
                          name=f"einstein-{peer}").start()
 
@@ -946,6 +1008,7 @@ class Einstein:
             user = "\n".join([*(f"{'They' if m['role'] == 'asker' else 'You'}: {m['text']}" for m in hist),
                               f"They ({peer}): {text}"])
             out, usage = (self.ask_model or self._ask)(system, user, tools)
+            self._step(rid, peer, "writing the answer")
             reply = str(out.get("reply") or "").strip()[:REPLY_CHARS * 2]
             bad = text_problems(reply)
             if bad:
@@ -965,7 +1028,11 @@ class Einstein:
             s["log"].append({"role": "einstein", "text": reply, "at": self.clock()})
             self._log(rid, {"kind": "out", "peer": peer, "text": reply, "tools": tools.calls,
                             "files": [f["name"] for f in files]})
+            self._step(rid, peer, "sending the answer" + (f" and {len(files)} file{'s' if len(files) != 1 else ''}"
+                                                          if files else ""))
             send(text=reply)
+            self._done(rid, peer, text, "blocked: " + "; ".join(bad) if bad else "answered", ok=not bad,
+                       tools=tools.calls, files=[f["name"] for f in files])
             now = self.clock()
             while s["files"] and now - s["files"][0] > 3600:
                 s["files"].popleft()
@@ -979,6 +1046,8 @@ class Einstein:
                 send(name=f["name"], data=f["data"])
         except Exception as e:  # noqa: BLE001
             self._log(rid, {"kind": "error", "peer": peer, "error": f"{type(e).__name__}: {str(e)[:200]}"})
+            self._done(rid, peer, text, "could not answer: " + ("no internet" if "URLError" in type(e).__name__
+                                                                  else f"{type(e).__name__}: {str(e)[:80]}"), ok=False)
             try:
                 send(text=self._wrap(rid, peer, s, "Sorry, I could not work that out just now "
                                      f"({'no internet' if 'URLError' in type(e).__name__ else 'an error'}); "
@@ -987,6 +1056,8 @@ class Einstein:
                 pass
         finally:
             self.busy[(rid, peer)] = False
+            if (rid, peer) in self.now:                   # never left showing "working"
+                self._done(rid, peer, text, "answered")
 
     def _ask(self, system, user, tools):
         from .agent import call_xai_tools
