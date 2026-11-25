@@ -734,3 +734,21 @@ def test_an_open_dashboard_reloads_after_an_update_unless_something_is_typed():
     i = idx.index("async function pageCheck()")
     body = idx[i:i + 1600]
     assert 'String(ae.value||"").trim()!==""' in body and "window._pageRetry=setInterval(pageCheck,5000)" in body
+
+
+def test_a_fold_in_a_vara_panel_stays_open_across_redraws():
+    """Owner 2026-11-24: "When I click on the arrow next to 'What Einstein does on the air' an explanation briefly pops up
+    and goes away" — the panel is redrawn every few seconds and drew every <details> closed. Each fold in the VARA panels
+    and window now carries data-vkeep and is drawn open while the operator has it open."""
+    import re
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    vara = idx.split("const VA={")[1].split("\nasync function varaAct")[0]
+    folds = re.findall(r"<details[^>]*>", vara)
+    assert len(folds) >= 6
+    for d in folds:
+        assert "data-vkeep=" in d or "data-vsetupd" in d or "data-vdirect" in d, d
+        if "data-vkeep=" in d:
+            assert "vKeep(" in d, d
+    assert 'data-vkeep="ein-' in vara and "What Einstein does on the air" in vara
+    assert 'document.addEventListener("toggle",e=>{const d=e.target;if(d.dataset&&d.dataset.vkeep' in idx
