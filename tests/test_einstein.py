@@ -148,11 +148,11 @@ def test_automatic_control_follows_97_221(f, kind, bw, cls, answer, announce):
     assert r["answer"][0] is answer and r["announce"][0] is announce
 
 
-def test_switched_on_from_a_dashboard_with_the_internet_only(tmp_path):
+def test_switched_on_from_a_dashboard_and_off_grid_it_still_sends_packs(tmp_path):
+    """Owner 2026-11-24: "If Einstein can assemble the pack from the station without the internet that will be good
+    for off grid pack sharing". With no internet (or no xAI key) its call stays on the modem and the station's code
+    answers PACK, HELP and the owner's commands; any other question is told plainly why not."""
     st, rid, m, clk, e = _setup(tmp_path)
-    e._key = lambda: None
-    with pytest.raises(ValueError, match="xAI key"):
-        e.settings({"radio": rid, "on": True})
     e._key = lambda: "k"
     st.agent.sender.here = False
     with pytest.raises(ValueError, match="dashboard"):
@@ -166,10 +166,22 @@ def test_switched_on_from_a_dashboard_with_the_internet_only(tmp_path):
     assert v["radios"][rid]["state"] == "answering" and v["radios"][rid]["call"] == "W9XYZ-14"
     from station.online import Online
     st.agent.online["xai"] = o = Online("xai")
-    o.failed("down")                                           # no internet: its call comes off the modem
-    assert e.state(rid)["state"] == "waiting" and "internet" in e.state(rid)["why"]
+    o.failed("down")                                           # no internet: still on the air, for PACK and HELP
+    assert e.state(rid)["state"] == "answering" and "PACK" in e.state(rid)["why"]
     m.einstein_sync()
-    assert m.vara.st["calls"] == ["W9XYZ-7"]
+    assert "W9XYZ-14" in m.vara.st["calls"]
+    e.ask_model = lambda *a: (_ for _ in ()).throw(AssertionError("no model off grid"))
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    assert "No internet here right now" in _ask(m, v, "K7ABC", "What is the weather?")
+    assert "PACK" in _ask(m, v, "K7ABC", "HELP")
+    st.cfg["schedule"] = [{"id": "n1", "name": "Tuesday Net", "freq_mhz": 146.94, "mode": "FM", "start": "19:00",
+                           "duration_min": 60, "repeat": {"freq": "weekly", "weekdays": ["Tue"]}}]
+    assert "station pack" in _ask(m, v, "K7ABC", "PACK")
+    assert _wait(lambda: any(c[0] == "file" and c[1].endswith(".hspack") for c in v.calls))
+    e._key = lambda: None                                      # no key at all: the same
+    assert e.state(rid)["state"] == "answering" and e.can_switch_on(rid)[0]
 
 
 def test_with_the_operator_away_only_einsteins_call_answers(tmp_path):

@@ -11,9 +11,11 @@ under your call, with a 🤖. A plain VARA terminal can talk to it too.
 3. In the radio's VARA panel, **🤖 Einstein on the air** → **Switch on**. Its call is suggested (SSID 15, 14,
    13 … whichever is free); change it in the same bar.
 
-It switches on only with the xAI key and the internet, and only from a dashboard with transmitting allowed (the
-radio's Transmit switch on, your license class with data privileges at its frequency). With no internet it stops
-answering (its call comes off the modem) and comes back by itself when the internet does.
+It switches on only from a dashboard with transmitting allowed (the radio's Transmit switch on, your license class
+with data privileges at its frequency). **Off grid** (no internet, or no xAI key) its call stays on the air for what
+the station's code answers by itself: **PACK** (your band plan and nets, to install on theirs), **HELP**, and your
+owner-key commands; any other question gets "No internet here right now…" and questions come back by themselves
+with the internet.
 
 ## What other stations can ask
 

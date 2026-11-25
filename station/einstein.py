@@ -131,7 +131,8 @@ HELP = ("I can: answer questions (radio, emergency comms, technical, anything); 
         "weather or HF conditions as an ICS-213 report (\"weather for Springfield, IL as an ICS-213\"); make an "
         "ICS-205 radio plan or an ICS-309 log of our session; list this station's nets or send them as a calendar file (and a HAM Sidekick net file to add them to your schedule); look up a callsign; take a "
         "note for the control operator (\"leave a message for the operator: ...\"). Files arrive after my reply; "
-        "on HAM Sidekick Station open them with View. Send PACK for this station's band plan and nets to install on yours. Ask me anything: I can search the internet (news, events, facts, a web page).")
+        "on HAM Sidekick Station open them with View. Send PACK for this station's band plan and nets to install on yours \
+(PACK works with no internet too). Ask me anything: I can search the internet (news, events, facts, a web page).")
 OWNER_HELP = " As the station's operator you can also send STATUS, MESSAGES, PAUSE or RESUME."
 
 SYSTEM = """You are {name}, an AI assistant answering licensed radio amateurs over a VARA {kind} keyboard link, at \
@@ -204,6 +205,9 @@ def _web_post(key: str, body: dict, timeout: float) -> dict:
 
 
 PACKS_PER_HOUR = 3
+OFFLINE_WHY = "no internet: answers PACK, HELP and your owner-key commands only"
+OFFLINE_SAY = ("No internet here right now, so I can't answer questions. I can still send PACK: this station's band "
+               "plan and nets, to install on yours. HELP lists the rest. Questions again when the internet is back.")
 SHARE_DEFAULT = {"plans": True, "kept": True, "adhoc": True, "nets": True, "own_files": False}
 
 TOOL_STEP = {"band_plan": "reading the band plan", "weather": "looking up the weather", "hf_conditions":
@@ -775,9 +779,6 @@ class Einstein:
         c = m.cfg()
         if not c.get("enabled") or c.get("use") == "winlink":
             return False, "set up this radio's VARA modem for chat first (Set up the VARA modem…)"
-        ok, why = self.online()
-        if not ok:
-            return False, why
         ok, why = m.operator_ok()
         if not ok:
             return False, "switch Einstein on from a dashboard with transmitting allowed: " + why
@@ -796,8 +797,10 @@ class Einstein:
         return bool(ok and self.rules(rid)["answer"][0])
 
     def answering(self, rid: str) -> bool:
-        """Its call is on the modem: active and online."""
-        return self.active(rid) and self.online()[0]
+        """Its call is on the modem: active. With no internet (or no xAI key) it stays on the air for what the station's
+        code answers by itself: PACK, HELP and the owner's commands (owner 2026-11-24: "If Einstein can assemble the
+        pack from the station without the internet that will be good for off grid pack sharing")."""
+        return self.active(rid)
 
     def state(self, rid: str) -> dict:
         rc = self.rcfg(rid)
@@ -805,8 +808,9 @@ class Einstein:
         r = self.rules(rid)
         word = ("off" if not rc["on"] else "paused" if rc.get("paused") else
                 "answering" if self.answering(rid) else "waiting")
-        why = ("" if word in ("off", "answering") else rc.get("paused") if word == "paused" else
-               why_on if not ok_on else r["answer"][1] if not r["answer"][0] else self._modem(rid).base_ok()[1])
+        why = ("" if word == "off" else ("" if ok_on else OFFLINE_WHY) if word == "answering" else
+               rc.get("paused") if word == "paused" else
+               r["answer"][1] if not r["answer"][0] else self._modem(rid).base_ok()[1])
         return {"on": rc["on"], "call": self.call(rid), "call_set": bool(rc.get("call")), "state": word, "why": why,
                 "announce": r["announce"], "answer": r["answer"], "can_on": self.can_switch_on(rid),
                 "unread": sum(1 for x in self.mail(rid) if not x.get("read")),
@@ -1062,6 +1066,10 @@ class Einstein:
         if len(self.day) >= PER_DAY:
             say("I have answered my limit of questions for today: try again tomorrow.")
             quick("turned away: the day's limit of questions", ok=False)
+            return
+        if not self.online()[0]:                     # off grid: what the station's code does needs no internet
+            say(OFFLINE_SAY)
+            quick("not answered: no internet here (PACK and HELP still work)", ok=False)
             return
         if self.busy.get((rid, peer)):
             say("Still working on your last question: one at a time, please.")
