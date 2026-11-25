@@ -122,7 +122,7 @@ def auto_control(freq_mhz, vara_kind: str, bw, license_class) -> dict:
 
 def disclosure(name: str, ecall: str, of: str, op_call: str) -> str:
     return (f"{ecall} {name} here: an automated AI assistant at amateur station {of}; the station's licensee and "
-            f"control operator is {op_call}. Type HELP for what I can do.")
+            f"control operator is {op_call}.\nType HELP for what I can do.\n")
 
 
 HELP = ("I can: answer questions (radio, emergency comms, technical, anything); send a CHIRP file of channels "
@@ -162,6 +162,8 @@ cannot e-mail, text, phone or post. The one message you take is a note for {op_c
 and that {op_call} has been alerted. Never give medical or legal instructions as fact.
 - Never give out {op_call}'s private details (address, phone, e-mail, exact location); the station's area: {area}.
 - Short replies for the air: under {chars} characters, plain text, no markdown tables (make a file for long material).
+- Lay it out for a person reading a chat window: the answer itself on the first line; then one point per line, each \
+starting with "- "; a blank line between parts. Never one long paragraph.
 - Say plainly when a tool found nothing or you are unsure.
 Now: {now}. Return JSON: reply (the text to send), attach (ids of files your tools made to send with it), \
 note_for_operator ("" unless they ask to leave {op_call} a message or something needs {op_call}'s attention; \
@@ -209,17 +211,24 @@ PACKS_PER_HOUR = 3
 # all but WX / HF (the internet, not the AI). A word may stand first in a message: "CHIRP 2M", "WX213", "MSG …".
 DIRECT_RE = re.compile(r"\s*(CHIRP|BAND\s*PLAN|ICS[\s-]?205|ICS[\s-]?309|NETS|CALENDAR|CAL|MSG|MESSAGE|WX\s*213|WX|"
                        r"HF\s*213|HF|CALL|LOOKUP)\b[\s:,-]*(.*)", re.I | re.S)
-ASK_HELP = ("Or ask me anything in words (radio, emergency comms, technical; I search the internet for news, facts "
-            "or a web page). Files arrive after my reply; on HAM Sidekick Station open them with View.")
+ASK_HELP = ("\n\nOr ask me anything in words: radio, emergency comms, technical, news and facts (I search the "
+            "internet).\nFiles arrive after my reply: on HAM Sidekick Station open them with View.")
 DIRECT_ALIAS = {"CAL": "CALENDAR", "MESSAGE": "MSG", "LOOKUP": "CALL"}
-DIRECT_HELP = ("Command words (answered by this station without the AI; all but WX and HF work with no internet): "
-               "PACK (band plan + nets to install; PACK PLAN or PACK NETS for one), CHIRP or CHIRP 2M / 70CM (local EMCOMM channels for a handheld), "
-               "BANDPLAN 70CM (any band, for your license), ICS205 (ad hoc channels), ICS309 (this session's log), NETS, "
-               "CALENDAR (nets as a calendar file), CALL K7ABC (callbook), MSG your note (for the operator), "
-               "WX or WX213 [place] (weather, as an ICS-213), HF or HF213 (band conditions). ")
+DIRECT_HELP = ("What I can send (type the word; all but WX and HF work with no internet here):\n"
+               "- PACK PLAN: this station's band plan, to install on yours\n"
+               "- PACK NETS: its net schedule, to install on yours\n"
+               "- CHIRP (or CHIRP 2M / CHIRP 70CM): local EMCOMM channels for a handheld\n"
+               "- BANDPLAN 70CM (any band): the band plan for your license\n"
+               "- NETS: the nets and when they meet; CALENDAR: as a calendar file\n"
+               "- ICS205: ad hoc channel plan; ICS309: log of this session\n"
+               "- CALL K7ABC: callbook lookup\n"
+               "- MSG your note: a message for the operator\n"
+               "- WX or WX213 [place]: weather (as an ICS-213)\n"
+               "- HF: HF band conditions")
 OFFLINE_WHY = "no internet: answers its command words (PACK, CHIRP, BANDPLAN, NETS …) and your owner-key commands only"
-OFFLINE_SAY = ("No internet here right now, so I can't answer questions in words. My command words still work: PACK, "
-               "CHIRP, BANDPLAN 70CM, ICS205, ICS309, NETS, CALENDAR, CALL, MSG. HELP says what each sends.")
+OFFLINE_SAY = ("No internet here right now, so I can't answer questions in words.\n"
+               "My command words still work: PACK PLAN, PACK NETS, CHIRP, BANDPLAN 70CM, ICS205, ICS309, NETS, CALENDAR, "
+               "CALL, MSG.\nHELP says what each sends.")
 SHARE_DEFAULT = {"plans": True, "kept": True, "adhoc": True, "nets": True, "own_files": False}
 
 TOOL_STEP = {"band_plan": "reading the band plan", "weather": "looking up the weather", "hf_conditions":
@@ -543,8 +552,8 @@ class Tools:
         body = {"model": WEB_MODEL, "max_tool_calls": 10, "tools": [{"type": "web_search"}, {"type": "x_search"}],
                 "input": [{"role": "user", "content": f"Today is {datetime.now():%A %Y-%m-%d}, local time. A radio "
                           f"amateur asked: {q}\nSearch the web (and X when it helps; open any page they named) and "
-                          "answer from what you find now. Short for the air: the answer first, then at most 6 one-line "
-                          "points, each naming its source (e.g. AP, Reuters, BBC, ARRL, the maker, the local paper). "
+                          "answer from what you find now. Short for the air: the answer first, then at most 6 points, "
+                          "each on its own line starting with '- ', each naming its source (e.g. AP, Reuters, BBC, ARRL, the maker, the local paper). "
                           "News as reported, neutral, no opinion. Plain text: no markdown, no links, under 900 "
                           "characters."}]}
         try:
@@ -604,6 +613,26 @@ _BANDS = {"160": (1.8, 2.0), "80": (3.5, 4.0), "60": (5.33, 5.41), "40": (7.0, 7
           "20": (14.0, 14.35), "17": (18.068, 18.168), "15": (21.0, 21.45), "12": (24.89, 24.99), "10": (28.0, 29.7),
           "6": (50.0, 54.0), "2": (144.0, 148.0), "1.25": (222.0, 225.0), "220": (222.0, 225.0), "70": (420.0, 450.0),
           "440": (420.0, 450.0), "33": (902.0, 928.0), "23": (1240.0, 1300.0)}
+
+
+_ABBR_END = re.compile(r"\b(?:Mt|St|Dr|Mr|Mrs|Ms|No|vs|approx|e\.g|i\.e|U\.S|a\.m|p\.m|Jr|Sr|Co|Inc|Ave|Rd|Ft)\.$", re.I)
+
+
+def readable(text: str) -> str:
+    """A reply laid out for a person (owner 2026-11-25: "all sentences in a response run together, not friendly for
+    human users"): one that came as a long paragraph gets one sentence per line; "; - " lists get their own lines.
+    A reply that already has line breaks is left as it is."""
+    t = str(text or "").strip()
+    if "\n" in t or len(t) < 160:
+        return t
+    out, start = [], 0
+    for m in re.finditer(r"(?<=[a-z0-9)\]%°\"'])([.!?])\s+(?=[A-Z0-9(\"'])", t):
+        if _ABBR_END.search(t[start:m.end(1)]):
+            continue
+        out.append(t[start:m.end(1)])
+        start = m.end()
+    out.append(t[start:])
+    return "\n".join(x.strip() for x in out if x.strip())
 
 
 def _band_word(text: str) -> str:
@@ -1078,7 +1107,7 @@ class Einstein:
             say(self._pack(rid, peer, send, ("plan" if pw.group(1) == "PLAN" else "nets") if pw else None))
             quick("answered: sent the station pack" if s.get("pack_sent") else "answered PACK: nothing to send", ok=True)
             return
-        if cmd in ("HELP", "?", "MENU"):
+        if re.sub(r"[?!.\s]+$", "", cmd) in ("HELP", "", "MENU", "WHAT CAN YOU DO", "COMMANDS"):
             say(DIRECT_HELP + ASK_HELP + (OWNER_HELP if s["owner"] else ""))
             quick("answered: its HELP list")
             return
@@ -1157,8 +1186,8 @@ class Einstein:
         s["pack_sent"] = True
         s["packs"] = sent + [now]
         self._log(rid, {"kind": "pack", "peer": peer, "bytes": len(data), "counts": c})
-        return (f"Sending {base(self.of(rid))}'s station pack: {what}. {len(data) / 1024:.1f} KB"
-                + (f", about {est:.0f} s" if est else "") + ". On HAM Sidekick Station open it with 📦 Review and "
+        return (f"Sending {base(self.of(rid))}'s station pack: {what}.\n{len(data) / 1024:.1f} KB"
+                + (f", about {est:.0f} s" if est else "") + ".\nOn HAM Sidekick Station open it with 📦 Review and "
                 "install: you choose what goes into your band plan and schedule; nothing of yours is deleted.")
 
     def _send_files(self, s, files, send):
@@ -1232,7 +1261,9 @@ class Einstein:
             self._done(rid, peer, text, f"could not answer {word}", ok=False, started=t0)
             return True
         files = one_file_each(list(tools.files.values()))
-        reply = re.sub(r"made file f\d+: (.+?)\. Put \"f\d+\" in attach to send it\.", r"Sending \1.", out)
+        reply = re.sub(r"\s*made file f\d+: (.+?)\. Put \"f\d+\" in attach to send it\.", r"\nSending \1.", out)
+        reply = readable(reply.replace(". Import in CHIRP:", ".\nImport in CHIRP:").replace(": ", ":\n", 1)
+                         if word == "CHIRP" else reply)
         bad = text_problems(reply)
         if bad:
             reply, files = "I can't send that on amateur radio (" + "; ".join(bad) + ").", []
@@ -1330,7 +1361,7 @@ class Einstein:
                               f"They ({peer}): {text}"])
             out, usage = (self.ask_model or self._ask)(system, user, tools)
             self._step(rid, peer, "writing the answer")
-            reply = str(out.get("reply") or "").strip()[:REPLY_CHARS * 2]
+            reply = readable(str(out.get("reply") or "").strip()[:REPLY_CHARS * 2])
             bad = text_problems(reply)
             if bad:
                 self._log(rid, {"kind": "blocked", "peer": peer, "text": reply, "why": bad})

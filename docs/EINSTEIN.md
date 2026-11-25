@@ -61,11 +61,14 @@ internet, no xAI key) for all but WX and HF, which need the internet (not the AI
 | `HF`, `HF213` | space weather and what it means for HF (as an ICS-213) — needs the internet |
 | `HELP` | all of these |
 
-The quick buttons on the asking station (owner 2026-11-25): **📦 Send your station's band plan** (`PACK PLAN`),
+The quick buttons on the asking station (owner 2026-11-25): **What can you do?** (`HELP`), **📦 Send your station's band plan** (`PACK PLAN`),
 **📅 Send your station's nets** (`PACK NETS`), **🌐 Send your weather as ICS-213** (`WX213`), **🌐 What are the HF band
 conditions now?** (`HF`) and **🌐 What is the weather forecast for my station?** (`WX` + your grid square from
 Settings → Station, so their station looks up the forecast where you are). On the asking station the buttons show this: no mark = works off grid, 🌐 = needs the internet there, 🤖 = a question
 for the AI (put in the box to edit).
+
+Replies are laid out for people (owner 2026-11-25): the answer on the first line, then one point per line; a long
+reply that still comes as one paragraph is split into one sentence per line before it goes out.
 
 ## Watching it work
 

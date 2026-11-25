@@ -152,5 +152,5 @@ def test_the_panel_has_share_and_review():
 def test_the_ask_side_taps_pack_and_the_owner_chooses_what_it_shares():
     from station.server import STATIC
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert 'const V_ASK=[["📦 Send your station\'s band plan","PACK PLAN","now"' in idx and "data-vasknow" in idx
+    assert '["📦 Send your station\'s band plan","PACK PLAN","now"' in idx and "data-vasknow" in idx
     assert "f.requestSubmit()" in idx and "data-einshare=" in idx

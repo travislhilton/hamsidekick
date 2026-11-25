@@ -569,7 +569,7 @@ def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
     assert idx.count("${vNetsBtn(f)}") == 2 and "data-vnetsinst" in idx and '"/api/nets/share/install"' in idx
     ask = idx.split("const V_ASK=[")[1].split("]];")[0]                 # owner 2026-11-25: these five, in order
     labels = re.findall(r'\[\"([^"]+)\",\"([^"]+)\",\"(\w+)\"', ask)
-    assert [(l, c) for l, c, _ in labels] == [
+    assert [(l, c) for l, c, _ in labels] == [("What can you do?", "HELP"),
         ("📦 Send your station's band plan", "PACK PLAN"), ("📅 Send your station's nets", "PACK NETS"),
         ("Send your weather as ICS-213", "WX213"), ("What are the HF band conditions now?", "HF"),
         ("What is the weather forecast for my station?", "WX {grid}")]
@@ -805,3 +805,23 @@ def test_pack_plan_and_pack_nets_send_one_part_each(tmp_path):
     time.sleep(0.1)
     d = last()
     assert "1 net" in r and d["nets"]["nets"][0]["name"] == "Tuesday Net" and not d.get("plans")
+
+
+def test_replies_are_laid_out_for_people(tmp_path):
+    """Owner 2026-11-25: "all sentences in a response run together, not friendly for human users". A long paragraph
+    gets one sentence per line (abbreviations and decimals kept whole); HELP is a list; the prompt asks for the
+    answer first, then one point per line; "What can you do?" is answered with HELP by code."""
+    r = E.readable("For 70 cm under a General license: all modes. Key segments: 432.0-432.3 MHz weak signal. "
+                   "Avoid Mt. Hood 449.625 (-5 MHz). Simplex at 446.0 and 446.5 MHz. Details are in the file.")
+    assert r.split("\n") == ["For 70 cm under a General license: all modes.", "Key segments: 432.0-432.3 MHz weak signal.",
+                              "Avoid Mt. Hood 449.625 (-5 MHz).", "Simplex at 446.0 and 446.5 MHz.", "Details are in the file."]
+    assert E.readable("Short one. Two.") == "Short one. Two." and E.readable("a\nb. C is long " * 20).count("\n") == 20
+    assert E.DIRECT_HELP.count("\n- ") >= 10 and "one point per line" in E.SYSTEM
+    st, rid, m, clk, e = _setup(tmp_path, model=lambda *a: (_ for _ in ()).throw(AssertionError("no model")))
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    h = _ask(m, v, "K7ABC", "What can you do?")
+    assert "- PACK PLAN:" in h and "\nType HELP for what I can do.\n" in h
