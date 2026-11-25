@@ -31,7 +31,7 @@ list. Files arrive after its answer and open with **View** (a form as the form, 
 | "An ICS-309 log of this session" | an ICS-309 Communications Log of the conversation |
 | "When are this station's nets?" | the nets on your schedule and when they meet next |
 | "Your net schedule as a calendar file" | two files: a calendar (.ics, each meeting of the next 8 weeks: any phone or computer calendar opens it) and a HAM Sidekick net file (.hsnets: their station shows **📅 Add N nets…**, previews them and adds them like Share settings: never deletes, waits in Nets for a radio). Only the nets' name, frequency, offset, tone, times, repeat rule, cancellations and net control travel |
-| "What is the latest in the news today?" | a live web search (news, events, anything current) summarised in a few lines with the sources named (AP, Reuters, ARRL…), neutral, no links; never the weather in its place. Each search is in Settings → AI costs as *Einstein web search* |
+| Anything current or specific: "What is the latest in the news today?", "When does the next solar cycle peak?", "What does this page say: example.org/…" | the whole internet when the station has it: a live search of the web and X (and any page named), answered in a few lines with the sources named (AP, Reuters, ARRL, the maker…), neutral, no links; never something else in its place (weather is not news). Each search is in Settings → AI costs as *Einstein web search* (about half a cent per search) |
 | "Look up K7ABC" | the public FCC (or country) entry: name, class, city, state (never a street address) |
 | "Leave a message for the operator: …" | a note in **✉ Notes** on your VARA panel (the only message it takes) |
 | library questions | only when you tick "Einstein may search this station's library" |

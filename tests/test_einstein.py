@@ -569,7 +569,7 @@ def test_news_is_searched_on_the_web_never_answered_with_the_weather(tmp_path):
         sent.append(body)
         return {"output": [{"type": "web_search_call", "action": {"url": "https://apnews.com/article/x"}},
                            {"type": "message", "content": [{"type": "output_text",
-                            "text": "- Storm moves east (AP) [[1]](https://apnews.com/article/x)\n- ARRL announces contest results "
+                            "text": "**Latest:**\n- Storm moves east (AP) [[1]](https://apnews.com/article/x) see https://x.example/y\n- ARRL announces contest results "
                                     "([ARRL](https://www.arrl.org/news))", "annotations": [{"url": "https://www.arrl.org/news"}]}]}]}
     e.web_post = web
     t = E.Tools(e, rid, "K7ABC", {"log": [], "asker_class": "general", "owner": False})
@@ -577,9 +577,11 @@ def test_news_is_searched_on_the_web_never_answered_with_the_weather(tmp_path):
     out = t.run("search_web", {"query": "latest news today"})
     assert "Storm moves east (AP)" in out and "http" not in out.split("(searched")[0] and "ARRL announces" in out
     assert "apnews.com" in out and "arrl.org" in out
-    assert sent[0]["tools"] == [{"type": "web_search"}] and "latest news today" in sent[0]["input"][0]["content"]
+    assert "**" not in out and "Latest:" in out
+    assert sent[0]["tools"] == [{"type": "web_search"}, {"type": "x_search"}] and "latest news today" in sent[0]["input"][0]["content"]
     assert e.state(rid)["working"] == [] and t.calls == ["search_web"]
     e.web_post = lambda *a: (_ for _ in ()).throw(OSError("down"))
     assert "could not be done" in t.run("search_web", {"query": "news"})
     assert "weather is not news" in E.SYSTEM and "answering a question is not a note" in E.SYSTEM
-    assert E.TOOL_STEP["search_web"] == "searching the web" and "news" in E.HELP
+    assert E.TOOL_STEP["search_web"] == "searching the web" and "search the internet" in E.HELP
+    assert "whole internet" in E.SYSTEM and "Never say you cannot browse" in E.SYSTEM

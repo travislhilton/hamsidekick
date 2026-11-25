@@ -131,7 +131,7 @@ HELP = ("I can: answer questions (radio, emergency comms, technical, anything); 
         "weather or HF conditions as an ICS-213 report (\"weather for Springfield, IL as an ICS-213\"); make an "
         "ICS-205 radio plan or an ICS-309 log of our session; list this station's nets or send them as a calendar file (and a HAM Sidekick net file to add them to your schedule); look up a callsign; take a "
         "note for the control operator (\"leave a message for the operator: ...\"). Files arrive after my reply; "
-        "on HAM Sidekick Station open them with View. Ask for today's news or anything current: I search the web.")
+        "on HAM Sidekick Station open them with View. Ask me anything: I can search the internet (news, events, facts, a web page).")
 OWNER_HELP = " As the station's operator you can also send STATUS, MESSAGES, PAUSE or RESUME."
 
 SYSTEM = """You are {name}, an AI assistant answering licensed radio amateurs over a VARA {kind} keyboard link, at \
@@ -143,8 +143,11 @@ Help like an expert, friendly ham: answer anything well (radio, technical, emerg
 knowledge), and use your tools to make files when asked: CHIRP memory files, ICS forms (ICS-213 general message for \
 any report, ICS-205 radio plan, ICS-309 log of this session), weather and HF-conditions reports. A file follows your \
 reply on this link: name it in your reply. Use the tools' results as facts; never invent frequencies, forecasts or \
-license data. For news, current events or anything that may have changed since your training, use search_web and \
-name the sources; never answer one thing with another (weather is not news): if no tool can do what was asked, say so.
+license data. You can reach the whole internet through search_web (the web and X, live, and any page by its address): \
+use it for any question whose answer is current, local, specific or something you are not sure of (news, events, \
+sports, schedules, products and specs, places, people in the public eye, how-to, a page they name), and name the \
+sources. Never say you cannot browse. Never answer one thing with another (weather is not news): if nothing can do \
+what was asked, say so.
 
 Rules (the station also enforces them in code and will not send a reply that breaks one):
 - Plain language: no codes or ciphers, no obscene or indecent words, no song lyrics.
@@ -249,9 +252,11 @@ class Tools:
               "adds the nets to its schedule). Attach both.", {}, []),
             S("lookup_call", "A callsign's public FCC (US) or country entry: name, license class, city and state.",
               {"call": {"type": "string"}}, ["call"]),
-            S("search_web", "Search the web now for current information: today's news and headlines (world, national, "
-              "local, amateur radio), events, sports results, anything that may have changed. Returns a short summary "
-              "with the sources' names. query: what to look up, in words.", {"query": {"type": "string"}}, ["query"]),
+            S("search_web", "The whole internet, live: searches the web and X and reads pages, then answers. Use it for "
+              "any question you cannot answer for certain from what you know: news and headlines (world, national, "
+              "local, amateur radio), events, sports, schedules, products and specs, places, public figures, how-to, "
+              "or a page whose address the asker gives. Returns a short answer with the sources' names. query: the "
+              "question, in words (include any address given).", {"query": {"type": "string"}}, ["query"]),
             S("leave_message", "Take a note for the station's control operator (the only message you may take).",
               {"text": {"type": "string"}}, ["text"]),
         ]
@@ -489,17 +494,20 @@ class Tools:
         if not key:
             return "no xAI key on this station: web search is not available"
         from . import netfind
-        body = {"model": WEB_MODEL, "max_tool_calls": 8, "tools": [{"type": "web_search"}], "input": [{"role": "user",
-                "content": f"Today is {datetime.now():%A %Y-%m-%d}. For a radio amateur who asked: {q}\n"
-                           "Search the web now and answer from what you find today: at most 6 short items, each one "
-                           "line with its source's name (e.g. AP, Reuters, BBC, ARRL, the local paper). Neutral and "
-                           "factual, as reported; no opinion. Plain text, no links, under 900 characters."}]}
+        body = {"model": WEB_MODEL, "max_tool_calls": 10, "tools": [{"type": "web_search"}, {"type": "x_search"}],
+                "input": [{"role": "user", "content": f"Today is {datetime.now():%A %Y-%m-%d}, local time. A radio "
+                          f"amateur asked: {q}\nSearch the web (and X when it helps; open any page they named) and "
+                          "answer from what you find now. Short for the air: the answer first, then at most 6 one-line "
+                          "points, each naming its source (e.g. AP, Reuters, BBC, ARRL, the maker, the local paper). "
+                          "News as reported, neutral, no opinion. Plain text: no markdown, no links, under 900 "
+                          "characters."}]}
         try:
             d = (self.e.web_post or _web_post)(key, body, WEB_TIMEOUT_S)
         except Exception as e:  # noqa: BLE001
             return f"the web search failed ({getattr(e, 'code', None) or type(e).__name__}): say it could not be done"
         text, seen = netfind._text_and_sources(d)
-        text = re.sub(r"\[\[\d+\]\]\([^)]*\)|\[([^\]]+)\]\(https?://[^)]+\)", r"\1", text or "").strip()   # links out
+        text = re.sub(r"\[\[\d+\]\]\([^)]*\)|\[([^\]]+)\]\(https?://[^)]+\)", r"\1", text or "")   # links out
+        text = re.sub(r"https?://\S+", "", re.sub(r"\*\*|__|^#+\s*", "", text, flags=re.M)).strip()      # markdown out
         if not text:
             return "the web search found nothing: say so"
         sites = sorted({u.split("/")[0] for u in seen if u})[:8]
