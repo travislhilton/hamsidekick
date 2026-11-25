@@ -320,8 +320,9 @@ you chose is remembered. Each column shows:
   amateurs link to that call and ask it anything; it sends CHIRP files, the band plan, weather / HF conditions as an
   ICS-213, an ICS-205, an ICS-309, and takes notes for you (**✉ Notes**). With you away it answers only where Part 97
   allows automatic control (6 m and up; the HF automatic segments; elsewhere HF 500 Hz answering only) and never
-  opens a link; with no internet it stops answering. AI stations heard show **🤖** under their operator's call; choose
-  one for ready questions (HELP, weather, a CHIRP file…). Files received open with **View** (forms as forms, a CSV as
+  opens a link; with no internet it stays on the air for its command words (PACK, CHIRP, BANDPLAN, NETS…: answered by
+  the station without the AI) and questions in words come back with the internet. AI stations heard show **🤖** under
+  their operator's call; choose one for its quick requests (What can you do?, its band plan, its nets, weather…). Files received open with **View** (forms as forms, a CSV as
   a table, no script). **My stations** (top) lets you be the control operator of your other stations from this one
   (Settings → Einstein & AI → My other stations; tick **Control from here**; ⏹ Stop).
   **The channel** (owner 2026-11-16; Help → VARA chat and files, side 2): **Join the channel** announces your call (a
@@ -357,15 +358,23 @@ you chose is remembered. Each column shows:
   set: in VARA FM, **Settings → VARA Setup → Digipeater**, a callsign with its own SSID (for example W9XYZ-4,
   different from the call that station chats with); VARA FM needs its licence key for this. Nothing is set in HAM
   Einstein on the digipeater itself: VARA FM relays by itself while it is running on the frequency.
-  To use one: choose the station, and under the chat fill **🛰 Path to …** with the digipeater's call (two calls for
+  To use one: choose the station, open **Link tools** under the message box and fill **🛰 Path to …** with the digipeater's call (two calls for
   two hops, the one nearest to you first; VARA FM allows at most two) and **Save path**. Every message, file and
   link test to that station then goes `CONNECT … via …`, and the station waits longer for the answer (each hop
-  adds time). Empty = direct. **Announce via** (on the channel bar) sends your announcements through a digipeater
+  adds time). Empty = direct. **Announce via** (the channel bar's **Settings**) sends your announcements through a digipeater
   too, so stations beyond it see you. When another station's announcement arrives through digipeaters, its path is
   filled in for you, backwards ("the way its announcement came"), and cleared again if it is later heard direct; a
   path you saved yourself is never changed. A link through a digipeater is about half as fast per hop: run **Test
   link speed** after changing the path (the old result is dropped).
-  **Test link speed** (owner 2026-11-18), under the chat with a station: sends random test data to that station for
+  **The chat as a workspace** (owner 2026-11-25). The conversation has a fixed height: the messages scroll inside it
+  and the message box and quick requests stay in view. **⤢ Focus** (top of the panel) gives the chat the whole
+  window; **Esc** or **✕ Close focus** goes back, and the choice is remembered. The Einstein bar and the channel bar
+  are one line each, with their settings behind **Setup · about** and **Settings**; the path, the link speed test,
+  📦 Share and Forget are in **Link tools**. Messages are laid out in lines and lists; an AI station's
+  identification line is small above its answer; **📋** copies a message and any text in one can be selected. On the
+  station running Einstein, what it is doing for a station shows in that station's conversation, where its question
+  came in.
+  **Test link speed** (owner 2026-11-18), in **Link tools** under the message box: sends random test data to that station for
   30, 60 or 120 s (it is thrown away there) and measures the real speed. VARA starts slow and steps its speed up as
   data flows, so the result gives the average, the speed reached, VARA's speed level and S/N, and a table of **how
   long a file of 1 KB to 1 MB would take** (calling the station included). The last result is kept per station:

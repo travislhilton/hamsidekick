@@ -331,7 +331,10 @@ class Tools:
         t = self.e.plans().consolidated()
         cls = self.sess.get("asker_class")
         srcs = [s["name"] for s in t.get("sources", []) if s.get("authority") not in ("adhoc",)][:12]
-        lines = [f"Band plan for {label} in this station's area (from: {', '.join(srcs[:6]) or 'ARRL/FCC'})"]
+        short = [re.sub(r"\s*\(.*$", "", x) for x in srcs]             # the title, without the organisation after it
+        lines = [f"Band plan for {label} in this station's area.",
+                 "From: " + ("; ".join(short[:3]) + (f" (+{len(short) - 3} more, named in the file)" if len(short) > 3 else "")
+                             if short else "ARRL / FCC")]
         page = []
         for b in t.get("bands") or []:
             for r in b["rows"]:
@@ -343,7 +346,7 @@ class Tools:
                     extra += f" offset {r['offset_mhz']:+.3f}"
                 if r.get("tone_hz"):
                     extra += f" tone {r['tone_hz']}"
-                if len(lines) <= 60:
+                if len(lines) <= 61:
                     lines.append(f"{f} MHz {r['type']}: {r.get('use') or ''}{extra}" + (f" [{r['by']}]" if r.get("by") else ""))
                 if as_file:
                     mid = r["from"] if r["type"] == "channel" else (r["from"] + r["to"]) / 2
@@ -1236,7 +1239,7 @@ class Einstein:
                     return True
                 out = tools.t_band_plan(band, as_file=True)
                 lines = out.split("\n")
-                out = "\n".join([lines[0]] + [x for x in lines[1:] if "license" in x or "made file" in x])
+                out = "\n".join(lines[:2] + [x for x in lines[2:] if "license" in x or "made file" in x])
             elif word == "ICS205":
                 out = tools.t_make_ics205(incident=rest or "Ad hoc channels", source="adhoc")
             elif word == "ICS309":
@@ -1284,7 +1287,10 @@ class Einstein:
         if not s["disclosed"]:
             s["disclosed"] = True
             s["last_id"] = self.clock()
-            return disclosure(self.name(), ecall, self.of(rid), self.op_call(rid)) + "\n" + text
+            d = disclosure(self.name(), ecall, self.of(rid), self.op_call(rid))
+            if text.startswith(DIRECT_HELP[:24]):          # the HELP list itself follows: no "Type HELP" above it
+                d = d.replace("Type HELP for what I can do.\n", "")
+            return d + "\n" + text
         if self.clock() - s["last_id"] >= ID_EVERY_S:
             s["last_id"] = self.clock()
             return text + f"\nde {ecall}"

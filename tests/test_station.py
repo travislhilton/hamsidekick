@@ -761,5 +761,5 @@ def test_vara_message_text_can_be_selected_and_copied():
     from station.server import STATIC
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert "if(vSelecting(box)){VA.drawLater=true;continue}" in idx and 'addEventListener("selectionchange"' in idx
-    assert '<span class="vtx">${esc(it.text||"")}</span>' in idx and "data-vcopy" in idx
+    assert '<span class="vtx">${vFmt(it.text,' in idx and "data-vcopy" in idx
     assert ".vb .meta,.vb button,.vb .vxfer{user-select:none" in idx and 'document.execCommand("copy")' in idx

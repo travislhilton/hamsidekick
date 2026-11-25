@@ -467,9 +467,12 @@ def test_einstein_activity_is_drawn_on_the_panel():
     from station.server import STATIC
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     bar = idx.split("function vEinBar(m,ch)")[1].split("\nfunction ")[0]
-    assert "${vEinAct(e,rid)}" in bar
-    act = idx.split("function vEinAct(e,rid)")[1].split("\nsetInterval")[0]
-    assert "is working" not in act and "asked" in act and "linked to Einstein" in act and 'data-vkeep="einrec-' in act
+    assert "${vEinAct(e,rid)}" in bar and '${vEinAct(e,rid,"recent")}' in bar   # what it answered: in its fold
+    act = idx.split("function vEinAct(e,rid,part)")[1].split("\nsetInterval")[0]
+    assert "working for" in act and "linked to Einstein" in act and 'data-vkeep="einrec-' in act
+    # owner 2026-11-25: what Einstein is doing shows in the conversation, where the question came in
+    work = idx.split("function vEinWorking(ch,peer)")[1].split("\nfunction ")[0]
+    assert "Einstein is ${esc(j.step)}" in work and "data-vsince" in work and "${vEinWorking(ch,one)}</div>" in idx
     assert '"peer_working","einstein"]' in idx                                   # an einstein event redraws the panel
     assert "is working on your question…" in idx                                 # and the asker sees it in the chat
 
@@ -824,4 +827,20 @@ def test_replies_are_laid_out_for_people(tmp_path):
     v = m.vara
     _link_e(m, v, "K7ABC")
     h = _ask(m, v, "K7ABC", "What can you do?")
-    assert "- PACK PLAN:" in h and "\nType HELP for what I can do.\n" in h
+    assert "- PACK PLAN:" in h and "Type HELP" not in h              # the HELP list itself: no "Type HELP" above it
+    r = _ask(m, v, "K7ABC", "NETS")
+    assert "Type HELP" not in r
+
+
+def test_the_chat_is_a_workspace_with_a_focus_view_and_formatted_messages():
+    """Owner 2026-11-25 (UX audit): the conversation has a fixed height with the message box always in view (the panel
+    grew to 1300 px); ⤢ Focus gives it the whole window; the bars are one line with their settings folded; the path,
+    speed test, share and forget are in Link tools; a message is laid out in lines and lists with an AI station's
+    identification small above its answer."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "height:clamp(340px,calc(100dvh - 385px),920px)" in idx and ".vpanel .vthread{max-height:none;flex:1 1 0" in idx
+    assert "data-vfocus=" in idx and ".vpanel.vfocus{position:fixed;inset:0" in idx and 'localStorage.setItem("vfocus"' in idx
+    assert 'data-vkeep="chan-' in idx and 'data-vkeep="tools-' in idx and "<summary>Link tools" in idx
+    assert "function vFmt(t,ai)" in idx and 'class="vli"' in idx and 'class="vid"' in idx
+    assert "With no internet it stops answering" not in idx and "stays on the air for its command words" in idx
