@@ -934,6 +934,7 @@ def test_alerts_gives_every_hazard_for_my_area_and_says_what_is_clear(tmp_path):
                     "geometry": {"x": -89.5, "y": 40.0}}]
     st, rid, m, clk, e = _setup(tmp_path, model=lambda *a: (_ for _ in ()).throw(AssertionError("no model")))
     e.fetch = fetch
+    e._key = lambda: None                                       # the feeds alone here (the news follow-up has its own test)
     e.settings({"radio": rid, "on": True})
     st.agent.sender.here = False
     m.check()
@@ -972,3 +973,50 @@ def test_alerts_gives_every_hazard_for_my_area_and_says_what_is_clear(tmp_path):
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
     assert '"⚠ What are the emergency alerts for my area?","ALERTS {grid}","net"' in idx
     assert "- ALERTS [place]: emergency alerts" in E.DIRECT_HELP and "(ALERT|EARTHQUAKE|WILDFIRE|VOLCANO|AIR QUALITY):" in idx
+
+
+def test_alerts_is_followed_by_an_ai_search_of_the_local_news(tmp_path):
+    """Owner 2026-11-25: "Perhaps the AI should search the local news for the area as well?". The official feeds go
+    out first, by code; then a second message: what local news and local officials reported in the last 24 hours that
+    no feed carries (a spill, an evacuation, a boil-water notice), sources named, marked as not official. With no AI
+    the first message says the news was not searched, and nothing follows."""
+    def fetch(url):
+        if "/points/" in url:
+            return {"properties": {"relativeLocation": {"properties": {"city": "Springfield", "state": "IL"}}}}
+        if "air-quality-api" in url:
+            return {"current": {"us_aqi": 30}}
+        if "getElevatedVolcanoes" in url:
+            return []
+        return {"features": []}
+    asked = []
+
+    def web(key, body, timeout):
+        asked.append(body["input"][0]["content"])
+        return {"output": [{"type": "web_search_call", "action": {"url": "https://www.example-courier.com/a"}},
+                           {"type": "message", "content": [{"type": "output_text", "text":
+                            "1 urgent item:\n- **Boil-water notice** for the east side of Springfield since 6 AM after a "
+                            "main break ([Courier](https://www.example-courier.com/a))", "annotations": []}]}]}
+    st, rid, m, clk, e = _setup(tmp_path, model=lambda *a: (_ for _ in ()).throw(AssertionError("no chat model")))
+    e.fetch, e.web_post = fetch, web
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    chats = lambda: [c[1] for c in v.calls if c[0] == "chat"]
+    n = len(chats())
+    m._event("chat", {"peer": "K7ABC", "text": "ALERTS EN50"})
+    assert _wait(lambda: len(chats()) >= n + 2 and not e.busy.get((rid, "K7ABC")))
+    first, second = chats()[n], chats()[n + 1]
+    assert "No emergency alerts for Springfield, IL" in first and first.rstrip().endswith("Local news check follows (AI search).")
+    assert second.startswith("Local news check for Springfield, IL (AI search of news reports and local officials' pages; not official alerts):")
+    assert "- Boil-water notice for the east side of Springfield since 6 AM after a main break (Courier)" in second
+    assert "http" not in second.split("(searched")[0] and "**" not in second and "example-courier.com" in second
+    assert "LAST 24 HOURS ONLY" in asked[0] and "Springfield, IL" in asked[0] and "Do not repeat those" in asked[0]
+    assert {"answered: local news check", "answered ALERTS (no AI)"} <= {r["outcome"] for r in e.state(rid)["recent"]}
+    e._key = lambda: None                                       # no AI: said so, nothing follows
+    n = len(chats())
+    r = _ask(m, v, "K7ABC", "ALERTS EN50")
+    time.sleep(0.3)
+    assert "Local news not searched: the AI search is not available here now." in r and len(chats()) == n + 1
+    assert len(asked) == 1

@@ -196,6 +196,19 @@ CALLING_MHZ = {146.52, 446.0, 223.5}              # the national FM simplex call
 CLAIMS_FILE = re.compile(r"\battach(?:ed|ment)\b|\bfile name:|\bfile (?:follows|is on its way|is coming|sent)\b|"
                          r"\bin the (?:attached |enclosed )?(?:file|csv|form|page)\b|\bsee the (?:file|csv|form)\b", re.I)
 WEB_MODEL = "grok-4.20-0309-non-reasoning"
+LOCAL_NEWS = """It is {today} at the place asked about. A radio amateur at {place} (latitude {lat}, longitude {lon}) \
+asked for emergency alerts. The official feeds were already checked and sent: National Weather Service warnings, USGS \
+earthquakes and volcanoes, wildfire incidents, air quality. Do not repeat those.
+Search local news and local officials (county and city emergency management, sheriff, police, fire, the health \
+department, utilities, the state transportation department) for that town and its county, LAST 24 HOURS ONLY, for \
+anything urgent the feeds do not carry: a hazardous-material or chemical spill, gas leak, evacuation or shelter in \
+place, boil-water or water contamination notice, disease outbreak or health advisory, a large power, phone or 911 \
+outage, a major road closure, a dam or levee problem, an active police emergency, a missing-person search.
+Answer in plain text for a radio link, under 700 characters, no markdown, no links:
+- first line: "Nothing urgent found in the last 24 hours." or "N urgent item(s):"
+- then each item on its own line starting "- ": what, where, when, and the name of the source that reported it.
+Only what a source reported in the last 24 hours for that area. No older stories, no general news, no weather, no \
+opinion, no advice of your own. If you are not sure an item is current or is in that area, leave it out."""
 WEB_TIMEOUT_S = 60
 
 
@@ -233,7 +246,7 @@ OFFLINE_SAY = ("No internet here right now, so I can't answer questions in words
                "CALL, MSG.\nHELP says what each sends.")
 SHARE_DEFAULT = {"plans": True, "kept": True, "adhoc": True, "nets": True, "own_files": False}
 
-TOOL_STEP = {"band_plan": "reading the band plan", "weather": "looking up the weather", "hf_conditions":
+TOOL_STEP = {"local_news": "searching the local news", "band_plan": "reading the band plan", "weather": "looking up the weather", "hf_conditions":
              "looking up HF conditions", "make_chirp": "making a CHIRP file", "make_ics213": "writing an ICS-213",
              "make_ics205": "making an ICS-205 radio plan", "make_ics309": "making an ICS-309 log",
              "nets": "looking at the nets", "make_net_schedule": "making the net schedule files", "lookup_call": "looking up a call", "leave_message": "taking a note for you",
@@ -396,6 +409,7 @@ class Tools:
         h = wx.hazards(p, fetch=self.e.fetch)
         if len(h["failed"]) >= 5:
             raise OSError("no alert source could be reached")
+        self.alert_place = {"name": h["place"], "lat": p["lat"], "lon": p["lon"]}      # for the local news check
         mi = lambda km: f"{km * 0.621371:.0f} mi" if km is not None else "distance unknown"   # noqa: E731
 
         def until(t):
@@ -427,7 +441,7 @@ class Tools:
         clear = [w for k, w in (
             ("official", "official warnings: weather, flood, and civil ones (hazardous materials, radiological, "
                          "evacuation, shelter in place)"),
-            ("quakes", f"earthquakes M{wx.QUAKE_MAG:g}+ within {wx.QUAKE_KM * 0.621371:.0f} mi in {wx.QUAKE_H} h"),
+            ("quakes", f"earthquakes M{wx.QUAKE_MAG:g}+ within {round(wx.QUAKE_KM * 0.621371 / 5) * 5} mi in {wx.QUAKE_H} h"),
             ("fires", f"wildfires within {wx.FIRE_KM * 0.621371:.0f} mi"), ("volcanoes", "volcanoes at raised alert"),
             ("air", f"air quality (US AQI {aqi:.0f})" if aqi is not None else "air quality"))
                  if k not in h["failed"] and k not in h["skipped"] and not (
@@ -629,8 +643,7 @@ class Tools:
         except Exception as e:  # noqa: BLE001
             return f"the web search failed ({getattr(e, 'code', None) or type(e).__name__}): say it could not be done"
         text, seen = netfind._text_and_sources(d)
-        text = re.sub(r"\[\[\d+\]\]\([^)]*\)|\[([^\]]+)\]\(https?://[^)]+\)", r"\1", text or "")   # links out
-        text = re.sub(r"https?://\S+", "", re.sub(r"\*\*|__|^#+\s*", "", text, flags=re.M)).strip()      # markdown out
+        text = _plain_web(text)
         if not text:
             return "the web search found nothing: say so"
         sites = sorted({u.split("/")[0] for u in seen if u})[:8]
@@ -681,6 +694,12 @@ _BANDS = {"160": (1.8, 2.0), "80": (3.5, 4.0), "60": (5.33, 5.41), "40": (7.0, 7
           "20": (14.0, 14.35), "17": (18.068, 18.168), "15": (21.0, 21.45), "12": (24.89, 24.99), "10": (28.0, 29.7),
           "6": (50.0, 54.0), "2": (144.0, 148.0), "1.25": (222.0, 225.0), "220": (222.0, 225.0), "70": (420.0, 450.0),
           "440": (420.0, 450.0), "33": (902.0, 928.0), "23": (1240.0, 1300.0)}
+
+
+def _plain_web(text) -> str:
+    """A web answer as plain text for the air: links and markdown out."""
+    text = re.sub(r"\[\[\d+\]\]\([^)]*\)|\[([^\]]+)\]\(https?://[^)]+\)", r"\1", text or "")
+    return re.sub(r"https?://\S+", "", re.sub(r"\*\*|__|^#+\s*", "", text, flags=re.M)).strip()
 
 
 _ABBR_END = re.compile(r"\b(?:Mt|St|Dr|Mr|Mrs|Ms|No|vs|approx|e\.g|i\.e|U\.S|a\.m|p\.m|Jr|Sr|Co|Inc|Ave|Rd|Ft)\.$", re.I)
@@ -1364,13 +1383,67 @@ class Einstein:
         if len(reply) > REPLY_CHARS:
             reply = reply[:REPLY_CHARS - 40].rsplit(" ", 1)[0] + " … (the file has it all)" if files else \
                 reply[:REPLY_CHARS - 4].rsplit(" ", 1)[0] + " …"
+        # ALERTS: the official feeds go out now; then the AI searches the local news for what no feed carries (owner
+        # 2026-11-25: "Perhaps the AI should search the local news for the area as well?"), as a second message.
+        news = word == "ALERTS" and not bad and getattr(tools, "alert_place", None)
+        if news:
+            now = self.clock()
+            can = online and self._key() and not self.busy.get((rid, peer)) and len(self.day) < PER_DAY and (
+                s["owner"] or len([t for t in s["asked"] if now - t < 3600]) < int(self.cfg.get("per_hour") or PER_STATION_HOUR))
+            reply += ("\nLocal news check follows (AI search)." if can else
+                      "\nLocal news not searched: the AI search is not available here now.")
+            news = news if can else None
         s["history"] += [{"role": "asker", "text": text}, {"role": "einstein", "text": reply}]
         say(reply)
         self._log(rid, {"kind": "direct", "peer": peer, "word": word, "files": [f["name"] for f in files]})
         self._send_files(s, files, send)
         self._done(rid, peer, text, f"answered {word} (no AI)", tools=tools.calls or [word.lower()],
                    files=[f["name"] for f in files], started=t0)
+        if news:
+            s["asked"].append(self.clock())
+            self.day.append(self.clock())
+            send(note="WORKING 30")
+            self.busy[(rid, peer)] = True
+            with self.lock:
+                self.now[(rid, peer)] = {"text": f"local news for {news['name']}"[:200], "at": self.clock(),
+                                         "step": "searching the local news"}
+            self._show(rid)
+            threading.Thread(target=self._local_news, args=(rid, peer, s, news, send), daemon=True,
+                             name=f"einstein-news-{peer}").start()
         return True
+
+    def _local_news(self, rid, peer, s, place, send):
+        """The second half of ALERTS: a live search of local news and local officials' pages for anything urgent in
+        the last 24 hours that the feeds do not carry. News reports, named by source, marked as not official."""
+        what = f"local news for {place['name']}"
+        try:
+            from . import netfind
+            body = {"model": WEB_MODEL, "max_tool_calls": 10, "tools": [{"type": "web_search"}, {"type": "x_search"}],
+                    "input": [{"role": "user", "content": LOCAL_NEWS.format(
+                        today=f"{datetime.now():%A %Y-%m-%d %H:%M}", place=place["name"],
+                        lat=f"{place['lat']:.2f}", lon=f"{place['lon']:.2f}")}]}
+            d = (self.web_post or _web_post)(self._key(), body, WEB_TIMEOUT_S)
+            text, seen = netfind._text_and_sources(d)
+            text = _plain_web(text)[:900]
+            bad = text_problems(text) if text else ["nothing came back"]
+            if bad:
+                text = "The search could not be used (" + "; ".join(bad) + ")."
+            sites = sorted({u.split("/")[0] for u in seen if u})[:6]
+            reply = (f"Local news check for {place['name']} (AI search of news reports and local officials' pages; "
+                     f"not official alerts):\n" + readable(text) + (f"\n(searched: {', '.join(sites)})" if sites and not bad else ""))
+            ok, outcome = not bad, "answered: local news check" if not bad else "local news check blocked"
+        except Exception as e:  # noqa: BLE001
+            self._log(rid, {"kind": "error", "peer": peer, "error": f"local news: {type(e).__name__}: {str(e)[:200]}"})
+            reply, ok, outcome = "Local news check: the search could not be done just now.", False, "local news check failed"
+        try:
+            reply = self._wrap(rid, peer, s, reply)
+            s["log"].append({"role": "einstein", "text": reply, "at": self.clock()})
+            s["history"] += [{"role": "einstein", "text": reply}]
+            self._log(rid, {"kind": "out", "peer": peer, "text": reply, "tools": ["local_news"]})
+            send(text=reply)
+        finally:
+            self.busy[(rid, peer)] = False
+            self._done(rid, peer, what, outcome, ok=ok, tools=["local_news"])
 
     def _wrap(self, rid, peer, s, text) -> str:
         """Disclosure first, then the call every 10 minutes (97.119(a), 97.113(a)(4)), as code, never the model."""
