@@ -230,7 +230,8 @@ class Tools:
               "channel, and this station's reserved ad hoc channels; band empty = both bands; use it for 'local' or "
               "'EMCOMM' channels), 'radio_list' (this station's radio channels), 'band_plan' (every channel in the "
               "area plan, optionally one band), 'adhoc' (reserved ad hoc channels) or 'custom' (the channels given). "
-              "radio: 'ht' (2 m / 70 cm handheld: Baofeng, Quansheng) or 'any'.",
+              "radio: 'ht' (2 m / 70 cm handheld: Baofeng, Quansheng) or 'any'. One call makes one file with every band "
+              "asked for: call it once per request (several CHIRP files attached to one reply are merged into one).",
               {"source": {"type": "string", "enum": ["local", "radio_list", "band_plan", "adhoc", "custom"]},
                "band": {"type": "string"}, "radio": {"type": "string", "enum": ["ht", "any"]},
                "title": {"type": "string"},
@@ -282,6 +283,9 @@ class Tools:
             return f"not made: {len(data) // 1024} KB is more than this station sends ({FILE_MAX // 1024} KB); ask for less"
         fid = f"f{len(self.files) + 1}"
         self.files[fid] = {"name": name, "data": data, "what": what}
+        chirp, self._chirp_next = getattr(self, "_chirp_next", None), None
+        if chirp:
+            self.files[fid]["chirp"] = chirp
         est = self.e.airtime_s(self.rid, self.peer, len(data))
         return (f"made file {fid}: {name} ({len(data) / 1024:.1f} KB"
                 + (f", about {est:.0f} s on this link" if est else "") + f"). Put \"{fid}\" in attach to send it.")
@@ -432,8 +436,10 @@ class Tools:
         if not items:
             return "no channels found for that: say which band, or list the channels"
         p = R.plan(items, radio if radio in R.PROFILES else R.DEFAULT_PROFILE)
-        csv = R.chirp_csv(items, radio if radio in R.PROFILES else R.DEFAULT_PROFILE, 1)
+        prof = radio if radio in R.PROFILES else R.DEFAULT_PROFILE
+        csv = R.chirp_csv(items, prof, 1)
         name = f"CHIRP-{forms.slug(title or (source + '-' + band))}.csv"
+        self._chirp_next = {"items": items, "profile": prof}
         notes = []
         if p["left_out"]:
             notes.append(f"left out (not for this radio): {'; '.join(p['left_out'][:6])}")
@@ -1125,7 +1131,7 @@ class Einstein:
                          f"or {self.op_call(rid)} can follow up.")
                 files = []
             else:
-                files = [tools.files[f] for f in out.get("attach") or [] if f in tools.files]
+                files = one_file_each([tools.files[f] for f in dict.fromkeys(out.get("attach") or []) if f in tools.files])
             if len(reply) > REPLY_CHARS:
                 reply = reply[:REPLY_CHARS - 40].rsplit(" ", 1)[0] + " … (ask for it as a file for the rest)"
             note = str(out.get("note_for_operator") or "").strip()
@@ -1186,6 +1192,39 @@ class Einstein:
         with self.lock:
             xs = [x for x in self.held.pop((rid, peer), []) if self.clock() - x["at"] < HOLD_S]
         return xs
+
+
+def one_file_each(files: list[dict]) -> list[dict]:
+    """What goes on the air for one reply (owner 2026-11-24: one request for a CHIRP file sent three files of one name):
+    every CHIRP file attached becomes ONE file (their channels in order, each channel once, numbered from 1, named as
+    the first); a file attached twice goes once; two different files of one name get -2, -3."""
+    from . import radiochan as R
+    chirps = [f for f in files if f.get("chirp")]
+    if len(chirps) > 1:
+        items, seen = [], set()
+        for f in chirps:
+            for it in f["chirp"]["items"]:
+                k = (round(float(it["freq_mhz"]), 4), it.get("offset_mhz") or None, it.get("tone_hz") or None)
+                if k not in seen:
+                    seen.add(k)
+                    items.append(it)
+        prof = "ht" if all(f["chirp"]["profile"] == "ht" for f in chirps) else "any"
+        merged = dict(chirps[0], data=R.chirp_csv(items[:R.MAX], prof, 1).encode(),
+                      chirp={"items": items[:R.MAX], "profile": prof}, merged=len(chirps))
+        files = [merged if f is chirps[0] else f for f in files if f is chirps[0] or not f.get("chirp")]
+    out, names, bodies = [], {}, set()
+    for f in files:
+        h = hashlib.sha256(f["data"]).hexdigest()
+        if h in bodies:
+            continue
+        bodies.add(h)
+        n = names.get(f["name"].lower(), 0) + 1
+        names[f["name"].lower()] = n
+        if n > 1:
+            stem, dot, ext = f["name"].rpartition(".")
+            f = dict(f, name=f"{stem}-{n}.{ext}" if dot else f"{f['name']}-{n}")
+        out.append(f)
+    return out
 
 
 def owner_token(key: str, nonce: str, call: str) -> str:

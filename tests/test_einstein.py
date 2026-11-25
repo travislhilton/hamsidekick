@@ -585,3 +585,34 @@ def test_news_is_searched_on_the_web_never_answered_with_the_weather(tmp_path):
     assert "weather is not news" in E.SYSTEM and "answering a question is not a note" in E.SYSTEM
     assert E.TOOL_STEP["search_web"] == "searching the web" and "search the internet" in E.HELP
     assert "whole internet" in E.SYSTEM and "Never say you cannot browse" in E.SYSTEM
+
+
+def test_one_request_for_a_chirp_file_sends_one_file(tmp_path):
+    """Owner 2026-11-24: "Local EMCOMM CHIRP file" sent three files of one name (the model called make_chirp four times
+    and attached three). Every CHIRP file attached to one reply becomes one file; a file twice goes once."""
+    c2 = [{"freq_mhz": 146.94, "offset_mhz": -0.6, "tone_hz": 100.0, "mode": "FM", "alias": "RPT", "name": "rpt"},
+          {"freq_mhz": 146.52, "offset_mhz": 0, "tone_hz": 0, "mode": "FM", "alias": "CALL", "name": "calling"}]
+    c70 = [{"freq_mhz": 446.0, "offset_mhz": 0, "tone_hz": 0, "mode": "FM", "alias": "CALL70", "name": "70 calling"},
+           {"freq_mhz": 146.52, "offset_mhz": 0, "tone_hz": 0, "mode": "FM", "alias": "CALL", "name": "calling"}]
+
+    def model(system, user, tools):
+        for ch in (c2, c70, c2):
+            tools.run("make_chirp", {"source": "custom", "band": "", "radio": "ht", "title": "Local EMCOMM", "channels": ch})
+        tools.run("make_ics213", {"to": "K7ABC", "subject": "x", "message": "y", "incident": ""})
+        return {"reply": "Here is your file.", "attach": ["f1", "f2", "f3", "f4", "f4"], "note_for_operator": ""}, {"tools": []}
+    st, rid, m, clk, e = _setup(tmp_path, model=model)
+    e.settings({"radio": rid, "on": True})
+    st.agent.sender.here = False
+    m.check()
+    v = m.vara
+    _link_e(m, v, "K7ABC")
+    m._event("chat", {"peer": "K7ABC", "text": "Local EMCOMM CHIRP file (2m/70cm/ad hoc)"})
+    assert _wait(lambda: len([c for c in v.calls if c[0] == "file"]) >= 2)
+    time.sleep(0.2)
+    sent = [c for c in v.calls if c[0] == "file"]
+    assert [c[1] for c in sent] == ["CHIRP-Local-EMCOMM.csv", next(c[1] for c in sent if c[1].startswith("ICS213"))]
+    csv = sent[0][2].decode()
+    rows = [r for r in csv.splitlines()[1:] if r]
+    assert len(rows) == 3 and csv.count("146.520000") == 1 and "446.000000" in csv and rows[2].startswith("3,")
+    same = E.one_file_each([{"name": "a.csv", "data": b"1"}, {"name": "a.csv", "data": b"2"}, {"name": "a.csv", "data": b"1"}])
+    assert [f["name"] for f in same] == ["a.csv", "a-2.csv"]
