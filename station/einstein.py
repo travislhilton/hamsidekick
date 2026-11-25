@@ -205,8 +205,10 @@ anything urgent the feeds do not carry: a hazardous-material or chemical spill, 
 place, boil-water or water contamination notice, disease outbreak or health advisory, a large power, phone or 911 \
 outage, a major road closure, a dam or levee problem, an active police emergency, a missing-person search.
 Answer in plain text for a radio link, under 700 characters, no markdown, no links:
-- first line: "Nothing urgent found in the last 24 hours." or "N urgent item(s):"
-- then each item on its own line starting "- ": what, where, when, and the name of the source that reported it.
+- nothing urgent: exactly two lines and nothing else: "Nothing urgent found in the last 24 hours." then \
+"Checked: " and up to five source names. Do not list what you ruled out.
+- otherwise: first line "N urgent item(s):", then each item on its own line starting "- ": what, where, when, and \
+the name of the source that reported it.
 Only what a source reported in the last 24 hours for that area. No older stories, no general news, no weather, no \
 opinion, no advice of your own. If you are not sure an item is current or is in that area, leave it out."""
 WEB_TIMEOUT_S = 60
@@ -1425,6 +1427,9 @@ class Einstein:
             d = (self.web_post or _web_post)(self._key(), body, WEB_TIMEOUT_S)
             text, seen = netfind._text_and_sources(d)
             text = _plain_web(text)[:900]
+            if text.lower().startswith("nothing urgent"):       # said in one line (it once took 800 characters to say it)
+                ls = [x.strip() for x in text.split("\n") if x.strip()]
+                text = "\n".join([ls[0]] + [x[:160] for x in ls[1:] if x.lower().startswith("checked")][:1])
             bad = text_problems(text) if text else ["nothing came back"]
             if bad:
                 text = "The search could not be used (" + "; ".join(bad) + ")."

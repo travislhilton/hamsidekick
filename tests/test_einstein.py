@@ -1014,9 +1014,17 @@ def test_alerts_is_followed_by_an_ai_search_of_the_local_news(tmp_path):
     assert "http" not in second.split("(searched")[0] and "**" not in second and "example-courier.com" in second
     assert "LAST 24 HOURS ONLY" in asked[0] and "Springfield, IL" in asked[0] and "Do not repeat those" in asked[0]
     assert {"answered: local news check", "answered ALERTS (no AI)"} <= {r["outcome"] for r in e.state(rid)["recent"]}
+    e.web_post = lambda *a: {"output": [{"type": "message", "content": [{"type": "output_text", "annotations": [], "text":
+        "Nothing urgent found in the last 24 hours.\n\nAll official local sources were checked for the area.\nThe only "
+        "new items were a resolved planned outage and a routine repair.\nChecked: County EM, City Water, the Courier"}]}]}
+    n = len(chats())
+    m._event("chat", {"peer": "K7ABC", "text": "ALERTS EN50"})
+    assert _wait(lambda: len(chats()) >= n + 2 and not e.busy.get((rid, "K7ABC")))
+    quiet = chats()[n + 1]
+    assert quiet.endswith("Nothing urgent found in the last 24 hours.\nChecked: County EM, City Water, the Courier")
+    assert "resolved planned outage" not in quiet                # nothing urgent is said in one line
     e._key = lambda: None                                       # no AI: said so, nothing follows
     n = len(chats())
     r = _ask(m, v, "K7ABC", "ALERTS EN50")
     time.sleep(0.3)
     assert "Local news not searched: the AI search is not available here now." in r and len(chats()) == n + 1
-    assert len(asked) == 1
