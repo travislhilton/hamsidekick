@@ -148,7 +148,7 @@ reply on this link: name it in your reply. Use the tools' results as facts; neve
 license data. You can reach the whole internet through search_web (the web and X, live, and any page by its address): \
 use it for any question whose answer is current, local, specific or something you are not sure of (news, events, \
 sports, schedules, products and specs, places, people in the public eye, how-to, a page they name), and name the \
-sources. Never say you cannot browse. Only say a file is attached when a tool made it and its id is in attach. \
+sources. Never say you cannot browse. Only say a file is attached when a tool made it and its id is in attach; never write a file id (f1) in the reply. \
 Never answer one thing with another (weather is not news): if nothing can do \
 what was asked, say so.
 
@@ -1636,6 +1636,7 @@ class Einstein:
             out, usage = (self.ask_model or self._ask)(system, user, tools)
             self._step(rid, peer, "writing the answer")
             reply = re.sub(r"[ \t]*\(?\bf\d+\b(?:\s+is)?\s+attached[^.\n]*\.?\)?", "", str(out.get("reply") or ""))   # no file ids
+            reply = re.sub(r"(?<![\w.])f\d{1,2}(?!\w)", "the file", re.sub(r"\bfile f\d{1,2}\b", "file", reply))
             reply = readable(reply.strip()[:REPLY_CHARS * 2])
             bad = text_problems(reply)
             if bad:
