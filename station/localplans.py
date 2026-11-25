@@ -53,7 +53,8 @@ GATEWAYS_KEY, GATEWAYS_TITLE = "search:winlink", "Winlink gateways near you (VHF
 EXPRESS_KEYS = {"express:vhf": "vhf", "express:hf": "hf"}
 HF_KM = 600                                         # VARA HF gateways when no HF antenna is set: about NVIS reach
 HF_PHYS_KM = 6000                                   # with the antenna set: every gateway this near is asked of the model
-HF_PHYS_MAX = 60                                    # the surest this many frequencies are kept
+HF_PHYS_MAX = 72                                    # the surest this many frequencies are kept,
+HF_PHYS_PER_BAND = 14                               # at most this many on one band
 LIST_STALE_DAYS = 10            # older than this, the operator is asked to update Express's channel list (owner 11-16)
 LIST_SNOOZE_S = 7 * 86400
 OFFLINE_KINDS = ("band_plan", "ares_plan", "races_plan", "ics205", "comm_plan")
@@ -297,7 +298,7 @@ class Plans:
                 continue
             by_phys = kind == "hf" and phys
             sig = [str(p), mt, km[kind], [round(where[0], 3), round(where[1], 3)]] + (
-                [day, round(sfi / 5) * 5, hf["antenna"], hf["height_m"], hf["power_w"], hf["ground"],
+                ["v2", day, round(sfi / 5) * 5, hf["antenna"], hf["height_m"], hf["power_w"], hf["ground"],
                  list(hf["good_km"] or [])] if by_phys else [])
             if prev and prev.get("sig") == sig:
                 continue
@@ -327,10 +328,14 @@ class Plans:
                                                    "hops": e["hops"], "hours": e["hours"]}))
                 # the surest first; one gateway's best few frequencies; a list a person can read
                 kept.sort(key=lambda r: (-len(r["reach"]["hours"]), -r["reach"]["pct"], r["km"]))
-                per, rows = {}, []
+                # every band it reaches has its share (40 m is open all day and filled the list; 20 m, the distance
+                # band, is open by day only), and one gateway its best three frequencies
+                per, band_n, rows = {}, {}, []
                 for r in kept:
-                    if per.get(r["call"], 0) < 3 and len(rows) < HF_PHYS_MAX:
+                    b = hfprop.band_of(r["freq_mhz"])
+                    if per.get(r["call"], 0) < 3 and band_n.get(b, 0) < HF_PHYS_PER_BAND and len(rows) < HF_PHYS_MAX:
                         per[r["call"]] = per.get(r["call"], 0) + 1
+                        band_n[b] = band_n.get(b, 0) + 1
                         rows.append(r)
             freqs = []
             for f in wc.as_frequencies(rows, title):
