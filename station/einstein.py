@@ -224,7 +224,7 @@ DIRECT_HELP = ("What I can send (type the word; all but ALERTS, WX and HF work w
                "- ICS205: ad hoc channel plan; ICS309: log of this session\n"
                "- CALL K7ABC: callbook lookup\n"
                "- MSG your note: a message for the operator\n"
-               "- ALERTS [place]: urgent weather warnings\n"
+               "- ALERTS [place]: emergency alerts (weather, civil, quake, fire)\n"
                "- WX or WX213 [place]: weather (as an ICS-213)\n"
                "- HF: HF band conditions")
 OFFLINE_WHY = "no internet: answers its command words (PACK, CHIRP, BANDPLAN, NETS …) and your owner-key commands only"
@@ -386,32 +386,65 @@ class Tools:
         return text
 
     def t_alerts(self, place: str = "") -> str:
-        """The urgent weather warnings for a place, most severe first; says plainly when there are none."""
+        """Every urgent alert for a place (wx.hazards): official warnings (weather, flood, and the civil ones: hazardous
+        materials, radiological, evacuation, shelter in place...), earthquakes, wildfires, volcanoes, bad air. Says
+        what was checked and found clear, what could not be reached, and what no feed covers."""
         from . import wx
         p = self.e.here() if str(place).strip().lower() in ("", "here", "your area", "there") else wx.place(place, fetch=self.e.fetch)
         if not p:
             return "unknown place: send ALERTS and a town with its state, a ZIP, or a grid square"
-        a = wx.alerts(p, fetch=self.e.fetch)
-        at = f"{datetime.now():%Y-%m-%d %H:%M} local at {self.e.of(self.rid)}"
-        if not a["us"]:
-            return f"Weather alerts here come from the US National Weather Service, which does not cover {a['place']}."
-        if not a["alerts"]:
-            return f"No active weather alerts for {a['place']} (US National Weather Service, {at})."
+        h = wx.hazards(p, fetch=self.e.fetch)
+        if len(h["failed"]) >= 5:
+            raise OSError("no alert source could be reached")
+        mi = lambda km: f"{km * 0.621371:.0f} mi" if km is not None else "distance unknown"   # noqa: E731
 
         def until(t):
             try:
                 return " until " + datetime.fromisoformat(t).strftime("%a %b %d %H:%M")
             except (TypeError, ValueError):
                 return ""
-        out = [f"{len(a['alerts'])} active weather alert{'s' if len(a['alerts']) != 1 else ''} for {a['place']} "
-               f"(US National Weather Service, {at}):"]
-        for x in a["alerts"]:
+        out = []
+        for x in h["official"]:
             out.append(f"ALERT: {x['event']} ({', '.join(v for v in (x['severity'], x['urgency']) if v)}){until(x['until'])}")
             if x["headline"]:
-                out.append("- " + x["headline"][:220])
+                out.append("- " + x["headline"][:200])
             if x["do"]:
-                out.append("- What to do: " + (x["do"][:260].rsplit(" ", 1)[0] + " …" if len(x["do"]) > 260 else x["do"]))
-        return "\n".join(out)
+                out.append("- What to do: " + (x["do"][:240].rsplit(" ", 1)[0] + " …" if len(x["do"]) > 240 else x["do"]))
+        for q in h["quakes"]:
+            out.append(f"EARTHQUAKE: M{q['mag']:.1f}, {q['where']}, {mi(q['km'])} from you, "
+                       f"{datetime.utcfromtimestamp(q['at']):%H:%M} UTC" + (" (tsunami message issued)" if q["tsunami"] else ""))
+        for f in h["fires"]:
+            out.append(f"WILDFIRE: {f['name']}" + (f", {f['acres']:,.0f} acres" if f["acres"] else ", size not reported")
+                       + (f", {f['contained']:.0f}% contained" if f["contained"] is not None else "")
+                       + f", {mi(f['km'])} from you" + (f" ({f['county']} County)" if f["county"] else ""))
+        for v in h["volcanoes"]:
+            out.append(f"VOLCANO: {v['name']}, {v['level']} ({v['color']}), {mi(v['km'])} from you")
+        aqi = h["air"].get("aqi")
+        if aqi is not None and aqi >= wx.AQI_BAD:
+            out.append(f"AIR QUALITY: unhealthy{' for sensitive groups' if aqi < 151 else ''}, US AQI {aqi:.0f}")
+        names = {"official": "official warnings (National Weather Service)", "quakes": "earthquakes (USGS)",
+                 "fires": "wildfires (NIFC)", "volcanoes": "volcanoes (USGS)", "air": "air quality"}
+        clear = [w for k, w in (
+            ("official", "official warnings: weather, flood, and civil ones (hazardous materials, radiological, "
+                         "evacuation, shelter in place)"),
+            ("quakes", f"earthquakes M{wx.QUAKE_MAG:g}+ within {wx.QUAKE_KM * 0.621371:.0f} mi in {wx.QUAKE_H} h"),
+            ("fires", f"wildfires within {wx.FIRE_KM * 0.621371:.0f} mi"), ("volcanoes", "volcanoes at raised alert"),
+            ("air", f"air quality (US AQI {aqi:.0f})" if aqi is not None else "air quality"))
+                 if k not in h["failed"] and k not in h["skipped"] and not (
+                     h[k] if k != "air" else (aqi is not None and aqi >= wx.AQI_BAD))]
+        at = f"{datetime.now():%Y-%m-%d %H:%M} local at {self.e.of(self.rid)}"
+        n = sum(1 for x in out if re.match(r"[A-Z ]+:", x))
+        head = (f"{n} emergency alert{'s' if n != 1 else ''} for {h['place']} ({at}):" if n
+                else f"No emergency alerts for {h['place']} ({at}).")
+        tail = []
+        if clear:
+            tail.append(("Also checked, clear: " if n else "Checked, clear: ") + "; ".join(clear) + ".")
+        if h["failed"]:
+            tail.append("Could not be reached now: " + ", ".join(names[k] for k in h["failed"]) + ".")
+        if h["skipped"]:
+            tail.append("Not covered outside the US: official warnings, wildfires, volcanoes.")
+        tail.append("No feed reports a chemical or biological release unless an authority has issued an alert for it.")
+        return "\n".join([head] + out + tail)
 
     def t_hf_conditions(self, as_form: bool = False) -> str:
         from . import wx

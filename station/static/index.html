@@ -2245,7 +2245,7 @@ function vFmt(t,ai){t=String(t||"");let id="";
   if(ai){const m=t.match(/^(\S+ [^\n]{0,40}? here: an automated AI assistant[^\n]*?control operator is [A-Z0-9\/-]+\.)\s*(?:Type HELP for what I can do\.)?\s*/);if(m){id=m[1];t=t.slice(m[0].length)}
     else{const k=t.match(/^([A-Z0-9\/-]{3,12} [^\n:]{1,30}):\n/);if(k){id=k[1];t=t.slice(k[0].length)}}}
   if(ai&&!/\n/.test(t)&&t.length>160)t=t.replace(/(?<!\b(?:Mt|St|Dr|Mr|Mrs|Ms|No|vs|Jr|Sr|Co|Ft))([a-z0-9)\]%"'])([.!?])\s+(?=[A-Z0-9("'])/g,"$1$2\n");
-  const body=t.split("\n").map(l=>/^\s*[-•]\s+/.test(l)?`<span class="vli">${esc(l.replace(/^\s*[-•]\s+/,""))}</span>`:/^ALERT:/.test(l)?`<span class="vln valert">⚠ ${esc(l)}</span>`:l.trim()?`<span class="vln">${esc(l)}</span>`:'<span class="vgap"></span>').join("");
+  const body=t.split("\n").map(l=>/^\s*[-•]\s+/.test(l)?`<span class="vli">${esc(l.replace(/^\s*[-•]\s+/,""))}</span>`:/^(ALERT|EARTHQUAKE|WILDFIRE|VOLCANO|AIR QUALITY):/.test(l)?`<span class="vln valert">⚠ ${esc(l)}</span>`:l.trim()?`<span class="vln">${esc(l)}</span>`:'<span class="vgap"></span>').join("");
   return (id?`<span class="vid" title="Its station identification, sent on the air as Part 97 requires">${esc(id)}</span>`:"")+(body||(id?'<span class="vln muted">(identification only)</span>':""))}
 function vBubble(it,call,isAI){const t=new Date(it.at*1000).toTimeString().slice(0,5);
   // a message typed while the link is busy must say it is waiting, and for what (owner 2026-11-18: "we need some kind
@@ -2369,7 +2369,7 @@ const V_ASK=[["What can you do?","HELP","now","what it can send and do, and its 
   ["📅 Send your station's nets","PACK NETS","now","its net schedule as one file; you then see which nets are new to you and add the ones you choose"],
   ["Send your weather as ICS-213","WX213","net","the forecast and alerts where that station is, as an ICS-213 message"],
   ["What are the HF band conditions now?","HF","net","solar flux, K index and what they mean for HF"],
-  ["⚠ What are the urgent weather warnings for my area?","ALERTS {grid}","net","sends your grid square (Settings → Station) so their station looks up the active National Weather Service warnings where you are, most severe first; it says so when there are none"],
+  ["⚠ What are the emergency alerts for my area?","ALERTS {grid}","net","sends your grid square (Settings → Station) so their station looks up everything urgent where you are: official warnings (weather, flood, and civil ones such as hazardous materials, evacuation, shelter in place), earthquakes, wildfires, volcanoes and bad air; it says what it checked and found clear"],
   ["What is the weather forecast for my station?","WX {grid}","net","sends your grid square (Settings → Station) so their station looks up the forecast and alerts where you are"]];
 // Einstein on the air (station/einstein.py): this radio's AI assistant at a call of its own
 function vEinBar(m,ch){const e=ch.einstein;if(!e)return"";const rid=m.radio,st=e.state,can=e.can_on||[false,""];

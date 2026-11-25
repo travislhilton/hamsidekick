@@ -57,14 +57,14 @@ internet, no xAI key) for all but WX and HF, which need the internet (not the AI
 | `CALENDAR` | the nets as a calendar file (.ics) and a HAM Sidekick net file |
 | `CALL K7ABC` | the station's callbook (FCC database, country list) |
 | `MSG your note` | a note for the control operator |
-| `ALERTS` [place or grid] | the active US National Weather Service warnings there, most severe first, each with its severity, until when and what to do; says so when there are none — needs the internet |
+| `ALERTS` [place or grid] | every urgent alert there, from five public feeds asked at once: **official warnings** most severe first (US National Weather Service: weather, flood, tsunami, and the civil ones authorities issue through it — Hazardous Materials, Radiological Hazard, Nuclear Power Plant, Civil Danger / Emergency, Evacuation, Shelter In Place), **earthquakes** M3+ within 100 mi in 24 h (USGS), **wildfires** within 50 mi (NIFC; no prescribed burns), **volcanoes** at raised alert within 300 mi (USGS), **air quality** when unhealthy. It says what it checked and found clear, names a feed it could not reach, and says that no feed reports a chemical or biological release unless an authority issued an alert — needs the internet |
 | `WX`, `WX213` [place] | forecast and alerts (as an ICS-213) — needs the internet |
 | `HF`, `HF213` | space weather and what it means for HF (as an ICS-213) — needs the internet |
 | `HELP` | all of these |
 
 The quick buttons on the asking station (owner 2026-11-25): **What can you do?** (`HELP`), **📦 Send your station's band plan** (`PACK PLAN`),
 **📅 Send your station's nets** (`PACK NETS`), **🌐 Send your weather as ICS-213** (`WX213`), **🌐 What are the HF band
-conditions now?** (`HF`), **🌐 ⚠ What are the urgent weather warnings for my area?** (`ALERTS` + your grid square) and **🌐 What is the weather forecast for my station?** (`WX` + your grid square from
+conditions now?** (`HF`), **🌐 ⚠ What are the emergency alerts for my area?** (`ALERTS` + your grid square) and **🌐 What is the weather forecast for my station?** (`WX` + your grid square from
 Settings → Station, so their station looks up the forecast where you are). On the asking station the buttons show this: no mark = works off grid, 🌐 = needs the internet there, 🤖 = a question
 for the AI (put in the box to edit).
 

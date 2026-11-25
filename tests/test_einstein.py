@@ -575,7 +575,7 @@ def test_the_panel_sends_nets_and_offers_add_and_the_quick_requests():
     assert [(l, c) for l, c, _ in labels] == [("What can you do?", "HELP"),
         ("📦 Send your station's band plan", "PACK PLAN"), ("📅 Send your station's nets", "PACK NETS"),
         ("Send your weather as ICS-213", "WX213"), ("What are the HF band conditions now?", "HF"),
-        ("⚠ What are the urgent weather warnings for my area?", "ALERTS {grid}"),
+        ("⚠ What are the emergency alerts for my area?", "ALERTS {grid}"),
         ("What is the weather forecast for my station?", "WX {grid}")]
     assert 'c.replace("{grid}",ch.me.grid||"")' in idx and "Set your grid square in Settings → Station" in idx
 
@@ -890,24 +890,48 @@ def test_a_new_link_keeps_the_limits_and_identifies_briefly_and_a_pack_is_announ
     assert r.split("\n")[0].endswith("includes:") and r.count("\n- ") == 4 and r.endswith("Sources: A, B.")
 
 
-def test_alerts_gives_the_urgent_weather_warnings_most_severe_first(tmp_path):
-    """Owner 2026-11-25: "What are the urgent weather warnings for my area?". ALERTS [place or grid] is answered by
-    code from the National Weather Service: each warning with its severity, until when and what to do; none = said
-    plainly; no internet = said plainly. The quick button sends the asker's grid."""
+def test_alerts_gives_every_hazard_for_my_area_and_says_what_is_clear(tmp_path):
+    """Owner 2026-11-25: "What are the urgent weather warnings for my area?", then "all emergency alerts like bad
+    weather, earthquakes, flooding, fire, chemical spill ... biological hazards and any other hazards". ALERTS [place or
+    grid] is answered by code from five public feeds asked at the same time: official warnings most severe first (the
+    civil ones too), earthquakes, wildfires (no prescribed burns, no small old ones), volcanoes, bad air; what was
+    checked and clear; a feed that is down is named and the rest still answer; all down = "needs the internet"."""
     import urllib.error
+    now = time.time()
     feats = [{"properties": {"event": "Wind Advisory", "severity": "Moderate", "urgency": "Expected",
                              "headline": "Wind Advisory until 6 PM", "ends": "2026-11-26T18:00:00-06:00", "instruction": ""}},
-             {"properties": {"event": "Blizzard Warning", "severity": "Extreme", "urgency": "Immediate",
-                             "headline": "Blizzard Warning issued November 25 by NWS", "ends": "2026-11-26T06:00:00-06:00",
-                             "instruction": "Travel should be restricted to emergencies only.\nCarry a winter kit."}}]
+             {"properties": {"event": "Hazardous Materials Warning", "severity": "Extreme", "urgency": "Immediate",
+                             "headline": "Hazardous Materials Warning issued by County Emergency Management",
+                             "ends": "2026-11-26T06:00:00-06:00",
+                             "instruction": "Shelter in place.\nClose windows and turn off ventilation."}}]
 
     def fetch(url):
         if "/points/" in url:
             return {"properties": {"relativeLocation": {"properties": {"city": "Springfield", "state": "IL"}}}}
         if "/alerts/active" in url:
             return {"features": fetch.feats}
+        if "earthquake.usgs.gov" in url:
+            assert "minmagnitude=3" in url and "maxradiuskm=160" in url
+            return {"features": fetch.quakes}
+        if "WFIGS_Incident_Locations_Current" in url:
+            assert "IncidentTypeCategory%3D%27WF%27" in url                # prescribed burns are not asked for
+            return {"features": fetch.fires}
+        if "getElevatedVolcanoes" in url:
+            return fetch.volc
+        if "getVolcano/" in url:
+            return {"latitude": 40.6, "longitude": -89.6}
+        if "air-quality-api" in url:
+            return {"current": {"us_aqi": fetch.aqi, "pm2_5": 9.0}}
         raise AssertionError(url)
-    fetch.feats = feats
+    fetch.feats, fetch.volc, fetch.aqi = feats, [], 34
+    fetch.quakes = [{"properties": {"mag": 4.2, "place": "12 km NW of Riverton", "time": (now - 3600) * 1000, "tsunami": 0},
+                     "geometry": {"coordinates": [-89.9, 40.3, 5]}}]
+    fetch.fires = [{"attributes": {"IncidentName": "OAK RIDGE", "IncidentSize": 1250.0, "PercentContained": 30.0,
+                                   "FireDiscoveryDateTime": (now - 5 * 86400) * 1000, "POOCounty": "Sangamon"},
+                    "geometry": {"x": -89.4, "y": 40.0}},
+                   {"attributes": {"IncidentName": "TINY OLD", "IncidentSize": 0.5, "PercentContained": 100.0,
+                                   "FireDiscoveryDateTime": (now - 20 * 86400) * 1000, "POOCounty": "Sangamon"},
+                    "geometry": {"x": -89.5, "y": 40.0}}]
     st, rid, m, clk, e = _setup(tmp_path, model=lambda *a: (_ for _ in ()).throw(AssertionError("no model")))
     e.fetch = fetch
     e.settings({"radio": rid, "on": True})
@@ -916,11 +940,29 @@ def test_alerts_gives_the_urgent_weather_warnings_most_severe_first(tmp_path):
     v = m.vara
     _link_e(m, v, "K7ABC")
     r = _ask(m, v, "K7ABC", "ALERTS EN50")
-    assert "2 active weather alerts for Springfield, IL" in r
-    assert r.index("ALERT: Blizzard Warning (Extreme, Immediate) until Thu Nov 26 06:00") < r.index("ALERT: Wind Advisory")
-    assert "- What to do: Travel should be restricted to emergencies only. Carry a winter kit." in r
-    fetch.feats = []
-    assert "No active weather alerts for Springfield, IL" in _ask(m, v, "K7ABC", "warnings EN50")
+    assert "4 emergency alerts for Springfield, IL" in r
+    assert r.index("ALERT: Hazardous Materials Warning (Extreme, Immediate) until Thu Nov 26 06:00") < r.index("ALERT: Wind Advisory")
+    assert "- What to do: Shelter in place. Close windows and turn off ventilation." in r
+    assert "EARTHQUAKE: M4.2, 12 km NW of Riverton," in r and "mi from you" in r
+    assert "WILDFIRE: Oak Ridge, 1,250 acres, 30% contained," in r and "(Sangamon County)" in r and "Tiny Old" not in r
+    assert "Also checked, clear: volcanoes at raised alert; air quality (US AQI 34)." in r
+    assert "No feed reports a chemical or biological release unless an authority has issued an alert" in r
+    fetch.feats, fetch.quakes, fetch.fires, fetch.aqi = [], [], [], 162
+    fetch.volc = [{"vnum": "1", "volcano_name": "Mount Example", "alert_level": "WATCH", "color_code": "ORANGE"}]
+    r = _ask(m, v, "K7ABC", "warnings EN50")
+    assert "2 emergency alerts for Springfield, IL" in r and "VOLCANO: Mount Example, Watch (orange)," in r
+    assert "AIR QUALITY: unhealthy, US AQI 162" in r and "Also checked, clear: official warnings" in r
+    fetch.volc, fetch.aqi = [], 20
+    ok = fetch
+
+    def partly(url):
+        if "earthquake.usgs.gov" in url:
+            raise urllib.error.URLError("down")
+        return ok(url)
+    e.fetch = partly
+    r = _ask(m, v, "K7ABC", "ALERTS EN50")
+    assert r.startswith("W9XYZ-14 Einstein:\nNo emergency alerts for Springfield, IL") or "No emergency alerts for Springfield, IL" in r
+    assert "Could not be reached now: earthquakes (USGS)." in r and "wildfires within 50 mi" in r
 
     def down(url):
         raise urllib.error.URLError("no route")
@@ -928,4 +970,5 @@ def test_alerts_gives_the_urgent_weather_warnings_most_severe_first(tmp_path):
     assert "ALERTS needs the internet here" in _ask(m, v, "K7ABC", "ALERTS EN50")
     from station.server import STATIC
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert '"ALERTS {grid}","net"' in idx and "- ALERTS [place]: urgent weather warnings" in E.DIRECT_HELP
+    assert '"⚠ What are the emergency alerts for my area?","ALERTS {grid}","net"' in idx
+    assert "- ALERTS [place]: emergency alerts" in E.DIRECT_HELP and "(ALERT|EARTHQUAKE|WILDFIRE|VOLCANO|AIR QUALITY):" in idx

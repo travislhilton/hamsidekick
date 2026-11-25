@@ -147,6 +147,120 @@ def alerts(p: dict, fetch=None) -> dict:
     return {"source": "US National Weather Service (api.weather.gov)", "place": where, "us": True, "alerts": out[:6]}
 
 
+# ---- all hazards for a place (owner 2026-11-25: "all emergency alerts like bad weather, earthquakes, flooding, fire,
+# chemical spill ... biological hazards and any other hazards"). Feeds checked live 2026-11-25:
+#   NWS alerts          weather, flood, tsunami, AND the civil messages authorities issue through it: Hazardous
+#                       Materials, Radiological Hazard, Nuclear Power Plant, Civil Danger / Emergency, Local Area
+#                       Emergency, Evacuation Immediate, Shelter In Place, Fire Warning, Earthquake Warning, 911 outage
+#   USGS earthquakes    fdsnws event query by distance (worldwide)
+#   NIFC wildfires      WFIGS current incident locations (US; prescribed burns left out)
+#   USGS volcanoes      HANS elevated volcanoes (US)
+#   Open-Meteo          US air-quality index (worldwide)
+# Not used: FEMA's public IPAWS archive runs about a day behind; CDC's Health Alert Network feed is empty. There is no
+# public live feed of chemical or biological releases: they show only when an authority issues an alert.
+QUAKE_KM, QUAKE_MAG, QUAKE_H = 160, 3.0, 24
+FIRE_KM, VOLCANO_KM, AQI_BAD = 80, 500, 101
+CIVIL = re.compile(r"hazardous materials|radiological|nuclear|civil|local area emergency|evacuat|shelter in place|"
+                   r"911|law enforcement|child abduction|blue alert|earthquake warning|volcano|fire warning", re.I)
+_VOLC: dict[str, tuple[float, float]] = {}
+
+
+def km_between(a: float, b: float, c: float, d: float) -> float:
+    import math
+    p, q = math.radians(a), math.radians(c)
+    h = math.sin((q - p) / 2) ** 2 + math.cos(p) * math.cos(q) * math.sin(math.radians(d - b) / 2) ** 2
+    return 6371.0 * 2 * math.asin(min(1.0, math.sqrt(h)))
+
+
+def _quakes(lat, lon, fetch, now=None) -> list[dict]:
+    from datetime import datetime, timedelta, timezone
+    now = now or datetime.now(timezone.utc)
+    q = urllib.parse.urlencode({"format": "geojson", "latitude": lat, "longitude": lon, "maxradiuskm": QUAKE_KM,
+                                "minmagnitude": QUAKE_MAG, "orderby": "time", "limit": 8,
+                                "starttime": (now - timedelta(hours=QUAKE_H)).strftime("%Y-%m-%dT%H:%M:%S")})
+    out = []
+    for f in fetch("https://earthquake.usgs.gov/fdsnws/event/1/query?" + q).get("features") or []:
+        pr, g = f.get("properties") or {}, (f.get("geometry") or {}).get("coordinates") or [None, None]
+        out.append({"mag": pr.get("mag"), "where": pr.get("place") or "", "at": (pr.get("time") or 0) / 1000,
+                    "tsunami": bool(pr.get("tsunami")),
+                    "km": km_between(lat, lon, g[1], g[0]) if g[0] is not None else None})
+    return out
+
+
+def _fires(lat, lon, fetch, now=None) -> list[dict]:
+    import time as _t
+    now = now or _t.time()
+    q = urllib.parse.urlencode({"where": "IncidentTypeCategory='WF'", "geometry": f"{lon},{lat}",
+                                "geometryType": "esriGeometryPoint", "inSR": 4326, "outSR": 4326,
+                                "spatialRel": "esriSpatialRelIntersects", "distance": FIRE_KM, "units": "esriSRUnit_Kilometer",
+                                "outFields": "IncidentName,IncidentSize,PercentContained,FireDiscoveryDateTime,POOCounty",
+                                "returnGeometry": "true", "f": "json", "resultRecordCount": 60})
+    d = fetch("https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/"
+              "FeatureServer/0/query?" + q)
+    if d.get("error"):
+        raise ValueError(str(d["error"])[:120])
+    out = []
+    for f in d.get("features") or []:
+        a, g = f.get("attributes") or {}, f.get("geometry") or {}
+        size, born = a.get("IncidentSize"), (a.get("FireDiscoveryDateTime") or 0) / 1000
+        if not ((size or 0) >= 10 or now - born < 48 * 3600):      # a small old one is out: not news
+            continue
+        out.append({"name": " ".join(str(a.get("IncidentName") or "").split()).title(), "acres": size,
+                    "contained": a.get("PercentContained"), "county": a.get("POOCounty") or "",
+                    "km": km_between(lat, lon, g["y"], g["x"]) if "y" in g else None})
+    out.sort(key=lambda x: (x["km"] is None, x["km"] or 0))
+    return out[:5]
+
+
+def _volcanoes(lat, lon, fetch) -> list[dict]:
+    out = []
+    for v in (fetch("https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes") or [])[:12]:
+        n = str(v.get("vnum") or "")
+        if n not in _VOLC:
+            w = fetch("https://volcanoes.usgs.gov/hans-public/api/volcano/getVolcano/" + urllib.parse.quote(n))
+            _VOLC[n] = (float(w["latitude"]), float(w["longitude"]))
+        km = km_between(lat, lon, *_VOLC[n])
+        if km <= VOLCANO_KM:
+            out.append({"name": v.get("volcano_name") or "", "level": str(v.get("alert_level") or "").title(),
+                        "color": str(v.get("color_code") or "").lower(), "km": km})
+    return out
+
+
+def _air(lat, lon, fetch) -> dict:
+    q = urllib.parse.urlencode({"latitude": lat, "longitude": lon, "current": "us_aqi,pm2_5"})
+    c = fetch("https://air-quality-api.open-meteo.com/v1/air-quality?" + q).get("current") or {}
+    return {"aqi": c.get("us_aqi"), "pm25": c.get("pm2_5")}
+
+
+def hazards(p: dict, fetch=None) -> dict:
+    """Everything urgent for a place from place(): {"place", "us", "official": [alerts(), each + "civil": bool],
+    "quakes", "fires", "volcanoes", "air", "failed": [what could not be reached], "skipped": [what does not cover it]}.
+    Each feed is asked on its own, at the same time: one that is down is named, the others still answer."""
+    from concurrent.futures import ThreadPoolExecutor
+    fetch = fetch or _fetch
+    lat, lon = round(p["lat"], 3), round(p["lon"], 3)
+    jobs = {"official": lambda: alerts(p, fetch), "quakes": lambda: _quakes(lat, lon, fetch),
+            "fires": lambda: _fires(lat, lon, fetch), "volcanoes": lambda: _volcanoes(lat, lon, fetch),
+            "air": lambda: _air(lat, lon, fetch)}
+    got, failed = {}, []
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        fut = {k: ex.submit(f) for k, f in jobs.items()}
+        for k, f in fut.items():
+            try:
+                got[k] = f.result(timeout=TIMEOUT_S + 10)
+            except Exception:  # noqa: BLE001 - that feed is down or does not cover the place
+                failed.append(k)
+    off = got.get("official") or {"place": p.get("label") or f"{lat}, {lon}", "us": None, "alerts": []}
+    us = off.get("us")
+    skipped = [k for k in ("official", "fires", "volcanoes") if us is False]
+    for a in off["alerts"]:
+        a["civil"] = bool(CIVIL.search(a["event"]))
+    off["alerts"].sort(key=lambda x: (_SEV.get(x["severity"], 9), not x["civil"]))
+    return {"place": off["place"], "us": us, "official": off["alerts"], "quakes": got.get("quakes") or [],
+            "fires": [] if us is False else got.get("fires") or [], "volcanoes": got.get("volcanoes") or [],
+            "air": got.get("air") or {}, "failed": [k for k in failed if k not in skipped], "skipped": skipped}
+
+
 def space(fetch=None, cache: dict | None = None) -> dict:
     """{"sfi", "kp", "scales": "R0 S0 G0", "source"}: what HF propagation is doing now."""
     from . import hfprop
