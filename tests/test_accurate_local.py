@@ -493,3 +493,33 @@ def test_no_home_server_configured_says_none(tmp_path, monkeypatch):
         assert st.accurate.reach is None
     finally:
         st.stop.set()
+
+
+def test_with_the_home_server_the_final_pass_also_rolls_during_a_long_net(tmp_path, monkeypatch):
+    """A 75-minute net, 2026-11-24: with the home server the final text came a median 25 minutes after each
+    transmission (up to 60), because the final pass ran only once the net went quiet. It now also runs on the
+    finished part every `rolling_server_min` while the net goes on; 0 = only after the net, as before."""
+    from tests.test_accurate_stages import ContextRemote
+    monkeypatch.delenv("EMCOMM_STT_KEY", raising=False)
+    mac = ContextRemote()
+    st = _station(tmp_path, ["K7ABC checking in.", "K7ABC, you're in the log."], remote=mac,
+                  final_after_min=30, rolling_server_min=10)
+    try:
+        for _ in range(2):
+            st.inject("ftm", np.zeros(SR * 2, np.float32))
+            assert wait_for(lambda: st.tx[-1]["status"] == "final")
+        assert wait_for(lambda: all(stage_of(t) == "provisional" for t in st.tx[-2:]))     # seconds after each one
+        t0 = datetime.now()
+        st.accurate.tick(t0 + timedelta(minutes=6))                      # not ten minutes' worth yet
+        time.sleep(0.3)
+        assert [r["stage"] for r in mac.requests].count("final") == 0
+        st.accurate.tick(t0 + timedelta(minutes=11))                     # the net is still going (final after 30 min)
+        assert wait_for(lambda: all(stage_of(t) == "final" for t in st.tx[-2:]))
+        assert [r["stage"] for r in mac.requests].count("final") == 1
+    finally:
+        st.stop.set()
+    st2 = _station(tmp_path / "off", ["K7ABC checking in."], remote=ContextRemote(), final_after_min=30, rolling_server_min=0)
+    try:
+        assert not st2.accurate._rolls()
+    finally:
+        st2.stop.set()

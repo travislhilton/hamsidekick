@@ -26,7 +26,13 @@ FUZZY = {"helo": "K", "hilo": "K", "keelo": "K", "kiloh": "K", "sheila": "K", "k
          # 2026-11-09 (a 2-m net and an HF net): "Gila" and "Cilo" for Kilo, "Indy" for India
          "gila": "K", "cilo": "K", "indy": "I",
          # 2026-11-09 HF net, accurate pass: "Austin" for Oscar, "Vicky" for Victor
-         "austin": "O", "vicky": "V"}
+         "austin": "O", "vicky": "V",
+         # 2026-11-24 (two 2-m nets and a 70-cm net, 34 live texts still spelled out): "Julia" / "Julie" for Juliet,
+         # "Mic" for Mike, "Keele" / "Kewa" / "Keto" / "Kila" / "Kiyo" / "QO" for Kilo, "uniforms" for Uniform,
+         # "Gulf" for Golf, "Foxhawk" for Foxtrot; and the digit said as an ordinal ("November 7th, Charlie Oscar…")
+         "julia": "J", "julie": "J", "mic": "M", "keele": "K", "kewa": "K", "keto": "K", "kila": "K", "kiyo": "K",
+         "qo": "K", "uniforms": "U", "gulf": "G", "foxhawk": "F",
+         "1st": "1", "2nd": "2", "3rd": "3", "4th": "4", "5th": "5", "6th": "6", "7th": "7", "8th": "8", "9th": "9"}
 FUZZY = {k: v for k, v in FUZZY.items() if k not in PHON}
 # A run of 4-7 tokens, each a phonetic word or a bare digit (Whisper often writes "Kilo 7"),
 # separated by spaces, hyphens or commas ("Kilo 7, Alpha Bravo Charlie").

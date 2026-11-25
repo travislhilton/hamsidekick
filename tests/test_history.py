@@ -331,3 +331,55 @@ def test_a_live_stated_speaker_needs_the_newer_text_to_say_it():
     assert best({**tx, "accurate": {"text": "This is W9XYZ, over.", "callsigns": ["W9XYZ"]}})[0] == "W9XYZ"
     assert best({**tx, "speaker_set": "K7ABC", "accurate": {"text": "Roger."}}) == ("K7ABC", "operator")
 
+
+
+def test_the_own_call_echo_check_also_sees_a_glued_suffix_and_spoken_words():
+    """Nets on 2026-11-24: four prompt echoes got past the check: the call's suffix glued onto another word, and the
+    call's own phonetic words. Each costs one more decode, which then keeps or drops the call."""
+    from station.core import own_call_in
+    me = "W9XYZ"
+    assert own_call_in("K1UXYZ.", me) and own_call_in("Always welcome to WLXYZ, thanks.", me)      # the suffix, glued
+    assert own_call_in("Whiskey Niner X-ray.", me) and own_call_in("box truck Niner X-ray ten", me)   # two in a row
+    assert own_call_in("W9XYZ6 Romeo Papa Johnson.", me) and own_call_in("this is w9xyz-7", me)     # as before
+    for clean in ("K7ABC, roger.", "W9XY roger", "Whiskey Seven Alpha Bravo Charlie", "XYZ is the end of the alphabet",
+                  "Niner niner two is the frequency", ""):
+        assert not own_call_in(clean, me), clean
+
+
+def test_a_live_text_far_too_short_for_its_audio_is_read_again_in_two_halves():
+    """Nets on 2026-11-24: 12 FM and 42 HF transmissions had half the words of the accurate text or fewer ("Yeah." for
+    23 seconds of speech; a looped text cut to one copy). Each half read on its own; taken only when it gives clearly
+    more words and neither half loops; a steady carrier or a normal-length text is left alone."""
+    import numpy as np
+    from types import SimpleNamespace as NS
+    from station.core import SR, Station
+    rng = np.random.default_rng(1)
+    t = np.arange(SR * 12) / SR
+    speech = (0.3 * np.sin(2 * np.pi * 300 * t) * (np.sin(2 * np.pi * 2.5 * t) > 0)).astype(np.float32)   # syllables
+    speech[int(5.6 * SR):int(6.3 * SR)] = 0.0                                # a pause near the middle
+    carrier = (0.05 * rng.standard_normal(SR * 12)).astype(np.float32)       # steady hiss
+    me = NS(SHORT_S=Station.SHORT_S, SHORT_WPS=Station.SHORT_WPS, SHORT_MOD_DB=Station.SHORT_MOD_DB, _words=Station._words)
+    calls = []
+
+    def eng_for(*texts, looped=False):
+        it = iter(texts)
+
+        def transcribe(audio, prompt=""):
+            calls.append(len(audio) / SR)
+            return {"text": next(it), "looped": looped, "model": "fake"}
+        return NS(transcribe=transcribe)
+    read = lambda eng, audio, res: Station._read_again_in_halves(me, eng, audio, res, "p")   # noqa: E731
+    out = read(eng_for("K7ABC checking in from Springfield with", "no traffic tonight thanks for the net"), speech,
+               {"text": "Yeah.", "looped": False})
+    assert out["text"] == "K7ABC checking in from Springfield with no traffic tonight thanks for the net"
+    assert out["reread"] == {"words_before": 1, "words": 13} and 5.0 < calls[0] < 7.0 and abs(sum(calls) - 12) < 0.1
+    calls.clear()
+    assert read(eng_for("a", "b"), carrier, {"text": ".", "looped": False})["text"] == "." and not calls      # no speech in it
+    ok = {"text": "K7ABC checking in from Springfield, no traffic tonight.", "looped": False}
+    assert read(eng_for("a", "b"), speech, ok) is ok and not calls                                         # long enough
+    assert read(eng_for("Yeah.", "Okay."), speech, {"text": "Yeah.", "looped": False})["text"] == "Yeah."     # no better
+    looped = read(eng_for("K7ABC checking in from Springfield", "no traffic tonight thanks"), speech,
+                  {"text": "K7ABC roger.", "looped": True})
+    assert "no traffic tonight" in looped["text"] and looped["looped"] is False
+    assert read(eng_for("one two three four five", "six seven eight nine ten", looped=True), speech,
+                {"text": "Yeah.", "looped": False})["text"] == "Yeah."                                       # a half looped

@@ -88,3 +88,19 @@ def test_austin_for_oscar_and_vicky_for_victor_when_known():
     heard = "Okay, November X-ray 7, Austin, Vicky, Quebec. Thanks."
     assert normalize(heard, validate={"NX7OVQ"}.__contains__)[1] == ["NX7OVQ"]
     assert normalize(heard, validate=lambda c: False)[1] == []
+
+
+def test_more_mishearings_of_the_phonetic_words_and_a_digit_said_as_an_ordinal():
+    """Nets on 2026-11-24: 34 live texts still held a spelled-out call, with "Julia" / "Julie" for Juliet, "Mic" for
+    Mike, "Keele" / "Kewa" for Kilo, "uniforms" for Uniform, "Gulf" for Golf, "Foxhawk" for Foxtrot, and the digit said
+    as an ordinal ("7th"). Taken only when the callbook knows the call, so a name (Julia, Julie) or a word (gulf, mic)
+    never makes one up. The calls here are KX7 examples, unassigned in the FCC data."""
+    known = {"KX7JQZ", "KX7MQU", "KX7FQZ", "KX7QKZ", "KX7QOZ", "KX7GQZ"}
+    ok = lambda c: c in known                                                   # noqa: E731
+    for heard, call in (("Helo, X-ray 7, Julia, Quebec, Zulu.", "KX7JQZ"), ("Helo X-ray 7 Mic Quebec uniforms.", "KX7MQU"),
+                        ("Kilo X-ray 7, Foxhawk Quebec Zulu.", "KX7FQZ"), ("Keele X-ray 7 Quebec Keele Zulu", "KX7QKZ"),
+                        ("This is Kilo X-ray 7th, Quebec Oscar Zulu", "KX7QOZ"), ("Kewa X-ray 7 Gulf Quebec Zulu", "KX7GQZ")):
+        text, found = normalize(heard, validate=ok)
+        assert found == [call] and call in text, (heard, text, found)
+    for heard in ("Julia and Julie went to the gulf with a mic on the 7th.", "Helo, X-ray 7, Julia, Quebec, Zulu."):
+        assert normalize(heard, validate=lambda c: False)[1] == []              # not known to the callbook: no call

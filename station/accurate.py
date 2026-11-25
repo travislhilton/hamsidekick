@@ -27,6 +27,8 @@ Config (station.yaml):
                                 # 2026-11-06: the operator waited 8 min after a QSO; a resumed conversation only
                                 # re-does the blocks with new transmissions)
       auto_after_min: 15        # catch-up for anything still without the final pass (e.g. the Mac was off); 0 = off
+      rolling_server_min: 10    # with the home server: the final pass on the finished part of a net still going,
+                                # this often (0 = only after the net)
       rolling_min: 5            # only this PC, final stage only (no provisional text): during a long net, the final
                                 # pass runs on the finished part every few minutes instead of only after the net
                                 # (2026-11-09, owner: "run the accurate pass more often"); 0 = only after the net
@@ -147,6 +149,9 @@ class AccuratePass:
         self.auto_after = timedelta(minutes=float(cfg.get("auto_after_min", 15)))
         self.final_after = timedelta(minutes=float(cfg.get("final_after_min", 2)))
         self.rolling = timedelta(minutes=float(cfg.get("rolling_min", 5)))
+        # with the home server (2026-11-25: on a 75-minute net the final text came a median 25 min after each
+        # transmission, up to 60: the final pass ran only once the net went quiet). 0 = only after the net.
+        self.rolling_server = timedelta(minutes=float(cfg.get("rolling_server_min", 10)))
         self.live = bool(cfg.get("live", True))
         self.cfg_prompt = cfg.get("prompt", "")
         self.remote = remote or Remote(cfg.get("urls", DEFAULT_URLS), read_key(station.root))
@@ -331,10 +336,17 @@ class AccuratePass:
                     self.submit(rid, s["start"], s["end"], auto=True)
 
     def _rolls(self) -> bool:
-        """Rolling final passes: only when this PC does the work and gives no provisional text (final_only). With
-        the home server answering, every transmission already gets its text within seconds."""
-        return (self.context and self.rolling > timedelta(0) and self.local is not None
-                and not self.local.provisional and self._kind() == "local")
+        """Rolling final passes during a net that is still going: when this PC does the work and gives no
+        provisional text (final_only), every `rolling_min`; with the home server, every `rolling_server_min` (its
+        provisional text is there in seconds, but the final text, the better one, waited for the end of the net)."""
+        if not self.context:
+            return False
+        if self._kind() == "remote":
+            return self.rolling_server > timedelta(0)
+        return self.rolling > timedelta(0) and self.local is not None and not self.local.provisional
+
+    def _roll_every(self) -> timedelta:
+        return self.rolling_server if self._kind() == "remote" else self.rolling
 
     def _roll(self, rid, s, now):
         if not self._rolls():
@@ -354,7 +366,7 @@ class AccuratePass:
         if not ready:
             return
         oldest = min(ended(t) for t in ready)
-        if now - oldest < self.rolling and sum(float(t.get("duration_s") or 0) for t in ready) < FINAL_BLOCK_S:
+        if now - oldest < self._roll_every() and sum(float(t.get("duration_s") or 0) for t in ready) < FINAL_BLOCK_S:
             return                                     # wait for a few minutes' worth, then do it in one go
         until = max(t["start"] for t in ready)
         self.submit(rid, s["start"], s["end"], auto=True, until=until)

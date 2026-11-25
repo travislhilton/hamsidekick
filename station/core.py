@@ -31,8 +31,26 @@ SR = 16000
 
 
 def own_call_in(text: str, me: str) -> bool:
-    """The operator's call, or the call with something stuck on it ("W9XYZ6", "W9XYZLHLH": a prompt echo)."""
-    return bool(me) and any(w.startswith(me) for w in re.sub(r"[^A-Z0-9 ]", " ", (text or "").upper()).split())
+    """Signs of the live prompt's call in a text: the operator's call, or the call with something stuck on it
+    ("W9XYZ6", "W9XYZLHLH"); its suffix glued onto another word ("K1UXYZ", "WLXYZ": 2026-11-24, four echoes got past
+    the first rule); or two of its phonetic words in a row ("Whiskey Niner", "Niner X-ray")."""
+    if not me:
+        return False
+    t = (text or "").upper()
+    words = re.sub(r"[^A-Z0-9 ]", " ", t).split()
+    if any(w.startswith(me) for w in words):
+        return True
+    m = re.match(r"^[A-Z0-9]*\d([A-Z]{3,})$", me)
+    if m and any(w != me and len(w) > len(m.group(1)) + 1 and w.endswith(m.group(1)) for w in words):
+        return True
+    from hamkit.callsigns import PHON
+    spoken = [[k.upper() for k, v in PHON.items() if v == ch] for ch in me]
+    said = re.sub(r"[^A-Z0-9 -]", " ", t).split()
+    for i in range(len(said) - 1):
+        for j in range(len(spoken) - 1):
+            if said[i] in spoken[j] and said[i + 1] in spoken[j + 1]:
+                return True
+    return False
 
 
 def own_call_shown(text: str, me: str) -> bool:
@@ -2011,6 +2029,40 @@ class Station:
         self.bus.publish("engines", self.engines)
         return new
 
+    SHORT_S, SHORT_WPS, SHORT_MOD_DB = 8.0, 0.4, 6.0
+
+    def _read_again_in_halves(self, eng, audio, res: dict, prompt: str) -> dict:
+        """A live text far too short for its audio, or one that looped (the loop guard keeps one copy and the rest of
+        the clip is gone): 2026-11-24, 12 FM and 42 HF transmissions had half the words of the accurate text or fewer
+        ("KK7ABC Jeremy." for three sentences, "Yeah." for 70 words). Whisper lost its place; each half read on its
+        own often finds it. Only when the audio varies like speech (a dead carrier or steady hiss is left alone), cut
+        at the quietest half second of the middle, and taken only when it gives clearly more words and does not loop."""
+        secs = len(audio) / SR
+        n = self._words(res.get("text"))
+        if secs < self.SHORT_S or not (res.get("looped") or n < self.SHORT_WPS * secs):
+            return res
+        try:
+            x = np.asarray(audio, np.float32)
+            hop = SR // 20                                               # 50 ms frames
+            k = len(x) // hop
+            db = 10 * np.log10(np.mean(x[:k * hop].reshape(k, hop) ** 2, axis=1) + 1e-10)
+            if float(np.percentile(db, 90) - np.percentile(db, 10)) < self.SHORT_MOD_DB:
+                return res                                               # not speech-like: nothing to find
+            lo, hi = int(k * 0.3), int(k * 0.7)
+            run = np.convolve(db, np.ones(10) / 10, "valid")             # the mean of each half second
+            cut = (lo + int(np.argmin(run[lo:hi])) + 5) * hop
+            a = eng.transcribe(x[:cut], prompt=prompt)
+            b = eng.transcribe(x[cut:], prompt=prompt)
+        except Exception:  # noqa: BLE001 — keep what we have
+            return res
+        text = " ".join(t for t in ((a.get("text") or "").strip(), (b.get("text") or "").strip()) if t)
+        m = self._words(text)
+        if a.get("looped") or b.get("looped") or m < max(n + 3, 1.5 * n):
+            return res
+        print(f"{datetime.now():%H:%M:%S} live: {secs:.0f} s read as {n} words, read again in two halves: {m} words",
+              flush=True)
+        return {**res, "text": text, "looped": False, "reread": {"words_before": n, "words": m}}
+
     def _maybe_recover(self, eng, audio, res: dict, prompt: str):
         """-> (engine, result). Every transmission (owner 2026-11-12, after a 4-hour stuck engine with no dashboard
         open on 11-11): a suspect final -> check the engine on the reference; broken -> reload and read the
@@ -2091,6 +2143,7 @@ class Station:
                 clean = self.clean(tx and tx["radio"], audio)
                 prompt = self.prompt_for(tx and tx["radio"])
                 res = eng.transcribe(clean, prompt=prompt)
+                res = self._read_again_in_halves(eng, clean, res, prompt)
                 eng, res = self._maybe_recover(eng, clean, res, prompt)
                 res = self._check_own_call(eng, tx, clean, res)
                 self.finish(tid, res, round(time.time() - t, 2))

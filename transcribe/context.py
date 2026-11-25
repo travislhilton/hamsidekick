@@ -334,10 +334,32 @@ def _score(ws):
     return float(np.mean([0.0 if w.get("rep") else _p(w) * (0.5 if w["edge"] < EDGE_S else 1.0) for w in ws]))
 
 
+OVERLAP_MIN_S = 0.15     # two one-sided stretches sharing this much time (and half the shorter one) are rivals
+TWIN_S = 0.35            # the same word from the two decodes ending this close together is one word
+
+
+def _span(ws) -> tuple[float, float]:
+    return min(w["t0"] for w in ws), max(w["t1"] for w in ws)
+
+
+def _rivals(x, y) -> bool:
+    """Two stretches of words, each from one decode only, that cover the same audio."""
+    (a0, a1), (b0, b1) = _span(x), _span(y)
+    over = min(a1, b1) - max(a0, b0)
+    return over >= OVERLAP_MIN_S and over >= 0.5 * min(a1 - a0, b1 - b0)
+
+
 def merge(hyps: list[list[dict]]) -> list[dict]:
     """ROVER-style merge of two (or more) word sequences for the same stretch of audio: align them word by word;
     where they agree take the better-timed copy, where they differ take the side with the higher (edge-discounted)
-    probability over the differing stretch."""
+    probability over the differing stretch.
+
+    The alignment is by words, and words alone can align wrongly: when the two decodes share one word but hear the
+    rest differently, or place a shared word at different ends, the aligner calls one decode's words a deletion and
+    the other's an insertion and BOTH were kept, though they are the same seconds of audio; ordered by time they then
+    interleaved ("You're You're doing doing a a lot lot better better now now", "A tiny you want long to time have no
+    speak": a real net, 2026-11-24, 26 of ~850 final texts). So one-sided stretches from different decodes that
+    overlap in time are rivals: the better one stays."""
     hyps = [mark_loops(h) for h in hyps if h is not None]
     if not hyps:
         return []
@@ -345,15 +367,43 @@ def merge(hyps: list[list[dict]]) -> list[dict]:
     for other in hyps[1:]:
         a, b = [_norm(w["w"]) for w in base], [_norm(w["w"]) for w in other]
         sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
-        out = []
+        blocks = []                                   # [source ("=", "a", "b"), words]
         for op, i1, i2, j1, j2 in sm.get_opcodes():
             if op == "equal":
-                for x, y in zip(base[i1:i2], other[j1:j2]):
-                    out.append(x if x["edge"] >= y["edge"] else y)
-            else:
-                out += base[i1:i2] if _score(base[i1:i2]) >= _score(other[j1:j2]) else other[j1:j2]
-        base = out
+                blocks.append(["=", [x if x["edge"] >= y["edge"] else y for x, y in zip(base[i1:i2], other[j1:j2])]])
+            elif op == "replace":
+                keep_a = _score(base[i1:i2]) >= _score(other[j1:j2])
+                blocks.append(["a" if keep_a else "b", base[i1:i2] if keep_a else other[j1:j2]])
+            elif op == "delete":
+                if _score(base[i1:i2]) >= 0.0:             # a stretch of nothing but repeats loses even to nothing
+                    blocks.append(["a", base[i1:i2]])
+            elif _score(other[j1:j2]) > 0.0:
+                blocks.append(["b", other[j1:j2]])
+        drop = set()
+        for i, (si, wi) in enumerate(blocks):
+            for j in range(i + 1, len(blocks)):
+                sj, wj = blocks[j]
+                if i in drop or j in drop or "=" in (si, sj) or si == sj or not wi or not wj or not _rivals(wi, wj):
+                    continue
+                drop.add(j if _score(wi) >= _score(wj) else i)
+        base = [w for k, (_, ws) in enumerate(blocks) if k not in drop for w in ws]
     return base
+
+
+def drop_twins(words: list[dict]) -> list[dict]:
+    """After the merged words are put in time order: the same word twice in a row, from different decodes, ending
+    within TWIN_S of each other, is one word heard by both (the better-placed copy stays). A word really said twice
+    ("that that", "very very") comes from one decode and is left alone."""
+    out: list[dict] = []
+    for w in words:
+        p = out[-1] if out else None
+        if (p is not None and _norm(w["w"]) and _norm(w["w"]) == _norm(p["w"]) and w.get("hyp") != p.get("hyp")
+                and abs(w["t1"] - p["t1"]) <= TWIN_S):
+            if w["edge"] > p["edge"]:
+                out[-1] = w
+            continue
+        out.append(w)
+    return out
 
 
 def assemble(lay: Layout, decoded: list[list[dict]], targets=None) -> dict:
@@ -367,13 +417,13 @@ def assemble(lay: Layout, decoded: list[list[dict]], targets=None) -> dict:
         a, b = lay.spans[cid]
         oa, ob = bounds[cid]
         hyps, flags = [], set()
-        for tiling in decoded:
-            ws = [w for win in tiling for w in _clip_words(win["words"], oa, ob)]
+        for hi, tiling in enumerate(decoded):
+            ws = [dict(w, hyp=hi) for win in tiling for w in _clip_words(win["words"], oa, ob)]
             flags |= {w["why"] for w in ws if not w["ok"]}
             hyps.append([w for w in ws if w["ok"]])
         hyps.sort(key=_score, reverse=True)
         words = merge(hyps) if len(hyps) > 1 else (hyps[0] if hyps else [])
-        words = sorted(words, key=_order_key)
+        words = drop_twins(sorted(words, key=_order_key))
         text = "".join(w["w"] for w in words).strip()
         text = re.sub(r"\s+", " ", text)
         # conf None = the recogniser gives no word probabilities (OpenVINO): a lone noise phrase is then always set

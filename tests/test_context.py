@@ -192,3 +192,35 @@ def test_a_window_first_word_timed_early_does_not_jump_ahead_in_the_merge():
     two = [{"words": [W(" Weather's", 0.05, 1.05), W(" been", 1.05, 1.19), W(" real", 1.19, 1.43), W(" nice.", 1.43, 1.83)]}]
     text = cx.assemble(lay, [one, two])["x"]["text"]
     assert text.lower().startswith("the weather's been") and "Weather's The" not in text
+
+
+def test_two_decodes_of_the_same_seconds_are_never_both_kept():
+    """A real net, 2026-11-24: 26 of about 850 final texts came out doubled or interleaved ("You're You're doing
+    doing a a lot lot better better now now", "A tiny you want long to time have no speak"). The word aligner called
+    one decode's words a deletion and the other's an insertion around a shared word, and both were kept though they
+    cover the same audio. Stretches from different decodes that overlap in time are rivals; and the same word from
+    both decodes ending together is one word. A word really said twice is kept."""
+    lay = cx.stitch([cx.Clip("x", 0.0, tone(4.0))])
+    say = [" You're", " doing", " a", " lot", " better", " now."]
+    # the long decode ends the clip with "Roger."; the windowed decode starts with it: the only shared word
+    one = [{"words": [W(w, 0.3 * i, 0.3 * i + 0.28) for i, w in enumerate(say)] + [W(" Roger.", 2.0, 2.4)]}]
+    two = [{"words": [W(" Roger.", 0.0, 0.1, p=0.4)] + [W(w, 0.3 * i + 0.03, 0.3 * i + 0.3) for i, w in enumerate(say)]}]
+    text = cx.assemble(lay, [one, two])["x"]["text"]
+    assert all(text.count(w.strip()) == 1 for w in say) and "You're doing a lot better now." in text
+    # two different hearings of the same seconds around a shared word: one of them, whole
+    a = [W(" A", 0.0, 0.2), W(" long", 0.2, 0.5), W(" time", 0.5, 0.8), W(" no", 0.8, 1.0), W(" speak.", 1.0, 1.4),
+         W(" Over.", 1.6, 1.9)]
+    b = [W(" Over.", 0.0, 0.1, p=0.3), W(" tiny", 0.1, 0.4, p=0.5), W(" you", 0.4, 0.6, p=0.5), W(" want", 0.6, 0.9, p=0.5),
+         W(" to", 0.9, 1.0, p=0.5), W(" have", 1.0, 1.3, p=0.5)]
+    out = "".join(w["w"] for w in sorted(cx.merge([a, b]), key=lambda w: w["t1"]))
+    assert "A long time no speak." in out and "tiny" not in out and "want" not in out
+    # the usual cases are untouched: the confident side of a difference, and a word said twice
+    a = [W(" Kilo", 0, .3), W(" Seven", .3, .6, p=.3), W(" Bravo", .6, .9)]
+    b = [W(" Kilo", 0, .3), W(" Eleven", .3, .6, p=.8), W(" Bravo", .6, .9)]
+    assert [w["w"] for w in cx.merge([a, b])] == [" Kilo", " Eleven", " Bravo"]
+    twice = [{"words": [W(" very", 0.0, 0.3), W(" very", 0.35, 0.6), W(" good.", 0.6, 1.0)]}]
+    assert cx.assemble(lay, [twice, twice])["x"]["text"] == "very very good."
+    # a stretch only one decode has, with nothing of the other's over those seconds, is still kept
+    a = [W(" Good", 0, .3), W(" evening.", .3, .8)]
+    b = [W(" Good", 0, .3), W(" evening.", .3, .8), W(" No", 1.2, 1.4), W(" traffic.", 1.4, 1.9)]
+    assert "".join(w["w"] for w in cx.merge([a, b])).strip() == "Good evening. No traffic."
