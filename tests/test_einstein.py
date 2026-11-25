@@ -839,7 +839,13 @@ def test_the_chat_is_a_workspace_with_a_focus_view_and_formatted_messages():
     identification small above its answer."""
     from station.server import STATIC
     idx = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert "height:clamp(340px,calc(100dvh - 385px),920px)" in idx and ".vpanel .vthread{max-height:none;flex:1 1 0" in idx
+    # owner 2026-11-25: "nested in 3 scroll bars ... the screen keeps jumping ... collapse everything but the chat log
+    # and quick request controls": the panel is as tall as its column, the message log is the only scroller, and the
+    # station / Einstein / channel / files are one fold
+    assert "function vFit(box)" in idx and "vFit(box);" in idx and ".vpanel .vconv{min-height:0;overflow:hidden" in idx
+    assert ".vpanel .vthread{max-height:none;flex:1 1 0" in idx and ".vpanel{overflow:hidden" in idx
+    assert '<details class="vstation" data-vkeep="${esc(fk)}"${vKeep(fk)||(m.channel&&!P.on?" open":"")}>' in idx
+    assert "data-vaddtoggle" in idx and 'const keepS=[".vros",".vstin",".vtools"]' in idx
     assert "data-vfocus=" in idx and ".vpanel.vfocus{position:fixed;inset:0" in idx and 'localStorage.setItem("vfocus"' in idx
     assert 'data-vkeep="chan-' in idx and 'data-vkeep="tools-' in idx and "<summary>Link tools" in idx
     assert "function vFmt(t,ai)" in idx and 'class="vli"' in idx and 'class="vid"' in idx
