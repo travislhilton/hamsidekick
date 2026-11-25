@@ -207,8 +207,12 @@ outage, a major road closure, a dam or levee problem, an active police emergency
 Answer in plain text for a radio link, under 700 characters, no markdown, no links:
 - nothing urgent: exactly two lines and nothing else: "Nothing urgent found in the last 24 hours." then \
 "Checked: " and up to five source names. Do not list what you ruled out.
-- otherwise: first line "N urgent item(s):", then each item on its own line starting "- ": what, where, when, and \
-the name of the source that reported it.
+- otherwise: first line "N urgent item(s):", then each item on its own line in exactly this shape:
+"- [YYYY-MM-DD HH:MM] what and where. Authority: who issued or confirmed it. Source: who reported it."
+The time in brackets is when the authority issued it or the source published it, local time there (the date alone \
+if no time is given). Authority is the official body (e.g. County Emergency Management, the Sheriff's Office, the \
+Health Department, the water utility); write "Authority: none named" when the report names none. Leave out an item \
+whose date you cannot find.
 Only what a source reported in the last 24 hours for that area. No older stories, no general news, no weather, no \
 opinion, no advice of your own. If you are not sure an item is current or is in that area, leave it out."""
 WEB_TIMEOUT_S = 60
@@ -696,6 +700,19 @@ _BANDS = {"160": (1.8, 2.0), "80": (3.5, 4.0), "60": (5.33, 5.41), "40": (7.0, 7
           "20": (14.0, 14.35), "17": (18.068, 18.168), "15": (21.0, 21.45), "12": (24.89, 24.99), "10": (28.0, 29.7),
           "6": (50.0, 54.0), "2": (144.0, 148.0), "1.25": (222.0, 225.0), "220": (222.0, 225.0), "70": (420.0, 450.0),
           "440": (420.0, 450.0), "33": (902.0, 928.0), "23": (1240.0, 1300.0)}
+
+
+def _stamped(line: str) -> str:
+    """One item of the local news check carries when it was issued and by whom; one that came without is marked, so
+    nobody takes an undated report for a current one."""
+    t = line.strip()
+    if not t.startswith(("- ", "• ")):
+        return line
+    if not re.search(r"\b20\d\d-\d\d-\d\d\b|\b\d{1,2}:\d\d\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.? \d{1,2}\b", t):
+        t = "- [time not stated] " + t[2:]
+    if not re.search(r"\bAuthority:", t, re.I):
+        t = t.rstrip() + (" " if t.endswith(".") else ". ") + "Authority: none named."
+    return t
 
 
 def _plain_web(text) -> str:
@@ -1430,12 +1447,15 @@ class Einstein:
             if text.lower().startswith("nothing urgent"):       # said in one line (it once took 800 characters to say it)
                 ls = [x.strip() for x in text.split("\n") if x.strip()]
                 text = "\n".join([ls[0]] + [x[:160] for x in ls[1:] if x.lower().startswith("checked")][:1])
+            else:                                               # owner 2026-11-25: time/date stamped, the authority named
+                text = "\n".join(_stamped(x) for x in text.split("\n"))
             bad = text_problems(text) if text else ["nothing came back"]
             if bad:
                 text = "The search could not be used (" + "; ".join(bad) + ")."
             sites = sorted({u.split("/")[0] for u in seen if u})[:6]
-            reply = (f"Local news check for {place['name']} (AI search of news reports and local officials' pages; "
-                     f"not official alerts):\n" + readable(text) + (f"\n(searched: {', '.join(sites)})" if sites and not bad else ""))
+            reply = (f"Local news check for {place['name']}, searched {datetime.now():%Y-%m-%d %H:%M} local at "
+                     f"{self.of(rid)} (AI search of news reports and local officials' pages; not official alerts):\n"
+                     + (text if not text.lower().startswith("nothing urgent") else readable(text)) + (f"\n(searched: {', '.join(sites)})" if sites and not bad else ""))
             ok, outcome = not bad, "answered: local news check" if not bad else "local news check blocked"
         except Exception as e:  # noqa: BLE001
             self._log(rid, {"kind": "error", "peer": peer, "error": f"local news: {type(e).__name__}: {str(e)[:200]}"})

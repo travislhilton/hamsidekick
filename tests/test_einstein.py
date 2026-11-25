@@ -994,8 +994,10 @@ def test_alerts_is_followed_by_an_ai_search_of_the_local_news(tmp_path):
         asked.append(body["input"][0]["content"])
         return {"output": [{"type": "web_search_call", "action": {"url": "https://www.example-courier.com/a"}},
                            {"type": "message", "content": [{"type": "output_text", "text":
-                            "1 urgent item:\n- **Boil-water notice** for the east side of Springfield since 6 AM after a "
-                            "main break ([Courier](https://www.example-courier.com/a))", "annotations": []}]}]}
+                            "2 urgent items:\n- [2026-11-25 06:10] **Boil-water notice** for the east side of Springfield "
+                            "after a main break. Authority: City Water Department. Source: "
+                            "[Courier](https://www.example-courier.com/a)\n- Gas leak closes Main Street (Courier)",
+                            "annotations": []}]}]}
     st, rid, m, clk, e = _setup(tmp_path, model=lambda *a: (_ for _ in ()).throw(AssertionError("no chat model")))
     e.fetch, e.web_post = fetch, web
     e.settings({"radio": rid, "on": True})
@@ -1009,8 +1011,13 @@ def test_alerts_is_followed_by_an_ai_search_of_the_local_news(tmp_path):
     assert _wait(lambda: len(chats()) >= n + 2 and not e.busy.get((rid, "K7ABC")))
     first, second = chats()[n], chats()[n + 1]
     assert "No emergency alerts for Springfield, IL" in first and first.rstrip().endswith("Local news check follows (AI search).")
-    assert second.startswith("Local news check for Springfield, IL (AI search of news reports and local officials' pages; not official alerts):")
-    assert "- Boil-water notice for the east side of Springfield since 6 AM after a main break (Courier)" in second
+    # owner 2026-11-25: "The AI provided alert should be time/date stamped and reference the authority"
+    assert re.match(r"Local news check for Springfield, IL, searched \d{4}-\d\d-\d\d \d\d:\d\d local at W9XYZ-7 \(AI search", second)
+    assert "not official alerts):" in second
+    assert ("- [2026-11-25 06:10] Boil-water notice for the east side of Springfield after a main break. "
+            "Authority: City Water Department. Source: Courier") in second
+    assert "- [time not stated] Gas leak closes Main Street (Courier). Authority: none named." in second   # marked, never passed off
+    assert "[YYYY-MM-DD HH:MM]" in asked[0] and "Authority:" in asked[0] and "Leave out an item" in asked[0]
     assert "http" not in second.split("(searched")[0] and "**" not in second and "example-courier.com" in second
     assert "LAST 24 HOURS ONLY" in asked[0] and "Springfield, IL" in asked[0] and "Do not repeat those" in asked[0]
     assert {"answered: local news check", "answered ALERTS (no AI)"} <= {r["outcome"] for r in e.state(rid)["recent"]}
