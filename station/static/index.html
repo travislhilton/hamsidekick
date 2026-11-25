@@ -3094,7 +3094,7 @@ let NA={d:null,sig:"",sel:{},msg:null};
 const NF={d:null,sel:new Set(),radio:{},msg:null,busy:false,geoTried:false,addr:false,hideFar:true};
 function nfVals(){const v=id=>$(id)?$(id).value:undefined,o={};
   if($("nfKm"))o.km=v("nfKm");if($("nfHfKm"))o.hf_km=v("nfHfKm");
-  if($("nfAnt"))o.hf={antenna:v("nfAnt"),height_m:$("nfHt")?v("nfHt"):"",power_w:v("nfPw"),good_from_km:v("nfGood1"),good_to_km:v("nfGood2"),ground:v("nfGnd")};
+  if($("nfAnt"))o.hf={antenna:v("nfAnt"),height_m:$("nfHt")?v("nfHt"):"",ends_m:$("nfEnds")?v("nfEnds"):"",unit:$("nfUnit")?v("nfUnit"):"si",power_w:v("nfPw"),good_from_km:v("nfGood1"),good_to_km:v("nfGood2"),ground:v("nfGnd")};
   const ints=[...document.querySelectorAll("[data-nfint]")];if(ints.length)o.interests=ints.filter(x=>x.checked).map(x=>x.dataset.nfint);
   if($("nfDx"))o.dx=$("nfDx").checked;
   return o}
@@ -3113,6 +3113,15 @@ function nfRule(n){const r=n.repeat||{},d=(r.weekdays||[]).join(", ");const th=x
 async function nfGeo(){if(NF.geoTried||!navigator.geolocation)return false;NF.geoTried=true;
   return new Promise(res=>navigator.geolocation.getCurrentPosition(async p=>{try{NF.d=await post("/api/netfind/settings",{gps:{lat:p.coords.latitude,lon:p.coords.longitude,acc_m:p.coords.accuracy}});res(true)}catch(e){res(false)}},
     ()=>res(false),{timeout:15000,maximumAge:3600000}))}
+// feet and miles, or metres and km (owner 2026-11-25: a ring typed as 400-600 meaning miles was read as km)
+function nfUnits(d){const us=(d.hf.unit||((navigator.language||"")==="en-US"&&!d.hf.set?"us":"si"))==="us";
+  return {us,HU:us?"ft":"m",DU:us?"mi":"km",hOut:x=>x==null||x===""?"":us?Math.round(x/0.3048):x,dOut:x=>x==null||x===""?"":us?Math.round(x/1.609344):x}}
+function nfFoot(d){const U=nfUnits(d),DU=U.DU,dOut=U.dOut;
+  const span=r=>r.map(([a,b])=>a===b?`${dOut(a)}`:`${dOut(a)}–${dOut(b)}`).join(", ");
+  return d.footprint?`<details class="small" id="nfFootBox" open><summary><b>Where your signal lands today</b> <span class="muted">by band, in ${DU}: each stretch is one more hop off the ionosphere; closer than the first stretch is your skip zone</span></summary>
+     <table class="nlist" style="margin:6px 0"><thead><tr><th>Band</th><th>By day <span class="muted" style="font-weight:400">(early afternoon)</span></th><th>By night <span class="muted" style="font-weight:400">(after midnight)</span></th></tr></thead><tbody>${d.footprint.map(r=>`<tr><td><b>${esc(r.band)}</b></td><td>${r.day.length?span(r.day)+" "+DU:'<span class="muted">closed or absorbed</span>'}</td><td>${r.night.length?span(r.night)+" "+DU:'<span class="muted">closed</span>'}</td></tr>`).join("")}</tbody></table>
+     <p class="muted" style="margin:2px 0">Worked out for your antenna, power and today's solar flux (${d.sfi.value}): the antenna's gain at each hop's takeoff angle, the highest frequency the layer returns at that distance (above it the signal goes through: the skip zone), daytime absorption on the low bands, and up to several hops. Sunrise and sunset (the gray line) and the path over the pole are worked out per net and per gateway, with the real sun over each hop. ${d.hf_km_physics?`Your regional reach by this is about <b>${dOut(d.hf_km_physics)} ${DU}</b>. <button type="button" class="small linkish" data-nfusephys="${d.hf_km_physics}">Use it for the HF search distance</button>`:""}</p>
+     <p class="muted" style="margin:2px 0">If this does not match what you hear, check the heights and the ring below: they decide it.</p></details>`:""}
 async function renderFind(){
   const box=$("nfBox");if(!box)return;
   if(!NF.d){box.innerHTML='<p class="muted">Loading…</p>';try{NF.d=await api("/api/netfind")}catch(e){box.innerHTML=`<p class="bad">${esc(e.message)}</p>`;return}}
@@ -3129,13 +3138,17 @@ async function renderFind(){
   const radios=R.radios.length?`Your radios (${esc(R.radios.join(", "))}) record <b>${[R.VU?"VHF/UHF":"",R.HF?"HF":""].filter(Boolean).join(" and ")||"neither HF nor VHF/UHF"}</b>, so ${both?"both are":"only that is"} searched.`:'<span class="bad">No radio on this PC yet: add one in Radios first.</span>';
   const pickBands=both?`<label>Search <select id="nfBands"><option value=""${bands===""?" selected":""}>VHF/UHF and HF</option><option value="VU"${bands==="VU"?" selected":""}>VHF/UHF only</option><option value="HF"${bands==="HF"?" selected":""}>HF only</option></select></label>`:"";
   const vu=R.VU&&bands!=="HF",hf=R.HF&&bands!=="VU";
-  const dist=`${vu?`<label>VHF/UHF within <input id="nfKm" type="number" min="1" max="500" value="${d.km}" style="width:5em"> km</label>`:""}${hf?` <label>HF within <input id="nfHfKm" type="number" min="50" max="${d.max_hf_km||20000}" value="${d.hf_km}" style="width:6em"> km</label>`:""}`;
+  const dist=`${vu?`<label>VHF/UHF within <input id="nfKm" type="number" min="1" max="500" value="${d.km}" style="width:5em"> km</label>`:""}${hf?` <label title="How far the regional HF search looks (state, section and regional nets). The table below shows where your antenna really lands; the worldwide search is the tick box below.">HF within <input id="nfHfKm" type="number" min="50" max="${d.max_hf_km||20000}" value="${d.hf_km}" style="width:6em"> km</label>`:""}`;
   const akind=(d.antennas.find(a=>a.id===d.hf.antenna)||{}).kind;
+  const U=nfUnits(d),us=U.us,HU=U.HU,DU=U.DU,hOut=U.hOut,dOut=U.dOut,foot=nfFoot(d);
   const hfset=hf?`<div class="row nfrow"><b>Your HF setup</b> <label>Antenna <select id="nfAnt">${d.antennas.map(a=>`<option value="${a.id}"${d.hf.antenna===a.id?" selected":""}>${esc(a.label)}</option>`).join("")}</select></label>
-      <label${akind==="h"?"":" hidden"} title="Height above ground (an inverted V: its apex). A low wire fires straight up (nearby nets, NVIS), a high one fires low (distant nets)">Height${d.hf.antenna==="invv"?" (apex)":""} <input id="nfHt" type="number" min="0" max="100" step="0.5" value="${d.hf.height_m}" style="width:5em"> m</label>
+      <label title="Feet and miles, or metres and kilometres, for the heights and distances here">Units <select id="nfUnit"><option value="us"${us?" selected":""}>feet and miles</option><option value="si"${us?"":" selected"}>metres and km</option></select></label>
+      <label${akind==="h"?"":" hidden"} title="Height above ground (an inverted V: its apex, the centre). A low wire fires straight up (nearby nets, NVIS), a high one fires low (distant nets)">Height${d.hf.antenna==="invv"?" (apex)":""} <input id="nfHt" type="number" min="0" max="330" step="0.5" value="${hOut(d.hf.apex_m!=null?d.hf.apex_m:d.hf.height_m)}" style="width:5em"> ${HU}</label>
+      <label${d.hf.antenna==="invv"?"":" hidden"} title="How high the two ends of the inverted V are. The wire works from about a third of the way down from the apex to the ends, so low ends make it fire more steeply. Leave empty if you do not know.">Ends <input id="nfEnds" type="number" min="0" max="330" step="0.5" value="${hOut(d.hf.ends_m)}" placeholder="optional" style="width:5em"> ${HU}</label>
       <label${akind==="h"?" hidden":""} title="Ground under a vertical decides how low it fires: salt water best, dry rocky ground worst">Ground <select id="nfGnd">${d.grounds.map(g=>`<option value="${g.id}"${d.hf.ground===g.id?" selected":""}>${esc(g.label)}</option>`).join("")}</select></label>
       <label>Power <input id="nfPw" type="number" min="1" max="1500" value="${d.hf.power_w}" style="width:5em"> W</label>${d.hf.set?"":' <span class="small warnc">check these: they decide which HF nets you can hear and reach</span>'}</div>
-    <div class="row nfrow"><label title="From your own listening: the distances where HF stations come in well. It replaces the antenna model's pattern: closer than this is your skip zone, farther needs more hops.">You hear HF stations well from <input id="nfGood1" type="number" min="20" max="4000" value="${(d.hf.good_km||[])[0]||""}" placeholder="e.g. 400" style="width:6em"> to <input id="nfGood2" type="number" min="20" max="4000" value="${(d.hf.good_km||[])[1]||""}" placeholder="600" style="width:6em"> km</label> <span class="small muted">optional: leave empty to use the antenna model</span></div>
+    <div class="row nfrow"><label title="From your own listening on 80 and 40 m: the distances where stations come in well (your first hop). On those bands it replaces the antenna model's pattern: closer is your skip zone, farther needs more hops. It is not used on 20 m and higher, where the same wire fires much lower.">On 80 and 40 m you hear stations well from <input id="nfGood1" type="number" min="12" max="4000" value="${dOut((d.hf.good_km||[])[0])}" placeholder="e.g. 400" style="width:6em"> to <input id="nfGood2" type="number" min="12" max="4000" value="${dOut((d.hf.good_km||[])[1])}" placeholder="600" style="width:6em"> ${DU}</label> <span class="small muted">optional: leave empty to use the antenna model</span></div>
+    ${foot}
     <div class="row nfrow"><b>HF nets wanted</b> ${d.interests.map(i=>`<label class="chk"><input type="checkbox" data-nfint="${i.id}"${i.on?" checked":""}> ${esc(i.label)}</label>`).join("")}</div>
     <div class="row nfrow"><label class="chk" title="A second HF search: DX, international, maritime and expedition nets in the parts of the world this setup hears, on those bands, at those hours. Only nets you probably hear when they meet are kept. Adds one search (about $0.10–0.30)."><input type="checkbox" id="nfDx"${d.dx?" checked":""}> <b>Also search worldwide</b>: nets around the world this antenna can probably hear (${d.dx_keep_pct}% or better when they meet)</label></div>
     <details class="small" id="nfReachBox"${NF.reachOpen||d.dx?" open":""}><summary><b>What you can hear around the world today</b> <span class="muted">with this antenna and power: each hop's sun, the highest usable frequency, daytime and auroral absorption, the long path too</span></summary>${nfReachHtml()}</details>
@@ -3171,7 +3184,7 @@ async function renderFind(){
   const sch=(d.scheduled||[]).length?`<details class="small"><summary>${d.scheduled.length} found already on your schedule (not shown)</summary><ul>${d.scheduled.map(x=>`<li>${esc(x.name)}${x.as!==x.name?` (as ${esc(x.as)})`:""}</li>`).join("")}</ul></details>`:"";
   const out=(d.left_out||[]).length?`<details class="small"><summary>${d.left_out.length} more found but left out</summary><ul>${d.left_out.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></details>`:"";
   box.innerHTML=back+`<h4>Find nets near you</h4><p>${where}</p>${addr}<p>${radios}</p><div class="row nfrow">${pickBands} ${dist}</div>${hfset}${go}${msg}${farNote}${table}${unh}${sch}${out}`;
-  const save=async(b,redraw)=>{try{const d2=await post("/api/netfind/settings",b);if(redraw){NF.d=d2;renderFind()}else{NF.d.nets=d2.nets;NF.d.hf=d2.hf;NF.d.km=d2.km;NF.d.hf_km=d2.hf_km;NF.d.interests=d2.interests}}
+  const save=async(b,redraw)=>{try{const d2=await post("/api/netfind/settings",b);if(redraw){NF.d=d2;renderFind()}else{NF.d.nets=d2.nets;NF.d.hf=d2.hf;NF.d.km=d2.km;NF.d.hf_km=d2.hf_km;NF.d.interests=d2.interests;NF.d.footprint=d2.footprint;NF.d.hf_km_physics=d2.hf_km_physics;NF.d.sfi=d2.sfi}}
     catch(e){NF.msg={bad:true,text:e.message};renderFind()}};          // a field change saves quietly: no redraw swallows the next click
   const km=$("nfKm");if(km)km.onchange=()=>save({km:km.value});
   const hk=$("nfHfKm");if(hk)hk.onchange=()=>save({hf_km:hk.value});
@@ -3179,7 +3192,13 @@ async function renderFind(){
   const rb=$("nfReachBox");if(rb){rb.ontoggle=()=>{NF.reachOpen=rb.open;if(rb.open&&NF.reach===undefined)nfLoadReach()};if(rb.open&&NF.reach===undefined)setTimeout(nfLoadReach,0)}
   const ant=$("nfAnt"),pw=$("nfPw"),ht=$("nfHt");if(ant){const f=()=>save({hf:nfVals().hf},false).then(()=>{if(NF.reach!==undefined&&!NF.reachLoading){NF.reach=undefined;if(NF.reachOpen)nfLoadReach()}});   // never redraw while typing
     const gd=$("nfGnd");ant.onchange=()=>{const k=(NF.d.antennas.find(a=>a.id===ant.value)||{}).kind;if(ht)ht.closest("label").hidden=k!=="h";if(gd)gd.closest("label").hidden=k==="h";f()};pw.onchange=f;if(ht)ht.onchange=f;if(gd)gd.onchange=f;
-    const g1=$("nfGood1"),g2=$("nfGood2");const fg=()=>{if((g1.value&&g2.value)||(!g1.value&&!g2.value))f()};g1.onchange=fg;g2.onchange=fg}
+    const g1=$("nfGood1"),g2=$("nfGood2");const fg=()=>{if((g1.value&&g2.value)||(!g1.value&&!g2.value))f()};g1.onchange=fg;g2.onchange=fg;
+    // the table follows each change (drawn alone: the form is never redrawn while typing); the units redraw it all
+    const f0=f,en=$("nfEnds"),un=$("nfUnit"),redo=()=>f0().then(()=>{const b=$("nfFootBox");if(b&&NF.d)b.outerHTML=nfFoot(NF.d)});
+    ant.onchange=()=>{const k=(NF.d.antennas.find(a=>a.id===ant.value)||{}).kind;if(ht)ht.closest("label").hidden=k!=="h";if(gd)gd.closest("label").hidden=k==="h";if(en)en.closest("label").hidden=ant.value!=="invv";redo()};
+    pw.onchange=redo;if(ht)ht.onchange=redo;if(gd)gd.onchange=redo;if(en)en.onchange=redo;g1.onchange=()=>{if((g1.value&&g2.value)||(!g1.value&&!g2.value))redo()};g2.onchange=g1.onchange;
+    if(un)un.onchange=()=>{const toUs=un.value==="us",h=x=>{if(x&&x.value)x.value=toUs?Math.round(x.value/0.3048):Math.round(x.value*0.3048*10)/10},dd=x=>{if(x&&x.value)x.value=toUs?Math.round(x.value/1.609344):Math.round(x.value*1.609344)};
+      h(ht);h(en);dd(g1);dd(g2);save({hf:nfVals().hf},true)}}
   document.querySelectorAll("[data-nfint]").forEach(x=>x.onchange=()=>{const v=nfVals().interests;if(v.length)save({interests:v})});
   const bs=$("nfBands");if(bs)bs.onchange=()=>{NF.bands=bs.value||"";renderFind()};
 }
@@ -3187,6 +3206,7 @@ document.addEventListener("click",async e=>{
   const t=e.target;if(!t.closest||!t.closest("#nfBox"))return;
   if(t.closest("[data-nfback]")){NV.finding=false;NF.d=null;NF.reach=undefined;NF.sel.clear();renderSchedule(true);return}
   if(t.closest("[data-nfaddr]")){NF.addr=true;renderFind();return}
+  const up=t.closest("[data-nfusephys]");if(up){try{NF.d=await post("/api/netfind/settings",{hf_km:+up.dataset.nfusephys});NF.msg=null}catch(err){NF.msg={bad:true,text:err.message}}renderFind();return}
   if(t.closest("[data-nfaddrsave]")){try{NF.d=await post("/api/netfind/settings",{address:$("nfAddr").value,gps:null});NF.addr=false;NF.msg=null}catch(err){NF.msg={bad:true,text:err.message}}renderFind();return}
   if(t.closest("[data-nfgeo]")){NF.geoTried=false;const ok=await nfGeo();NF.msg=ok?null:{bad:true,text:"This PC did not give a location (Windows Settings → Privacy → Location, or the browser blocked it). Use an address instead."};if(!ok)NF.addr=true;renderFind();return}
   const pk=t.closest("[data-nfpick]");if(pk){pk.checked?NF.sel.add(pk.dataset.nfpick):NF.sel.delete(pk.dataset.nfpick);renderFind();return}

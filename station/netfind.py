@@ -90,6 +90,30 @@ def reach(st) -> dict:
     return {"HF": hf, "VU": vu, "modes": sorted(modes), "radios": names}
 
 
+def hf_setup(st, d: dict | None = None) -> dict:
+    """This station's HF antenna as the propagation model takes it (also used by the Plans search): height_m is the
+    EFFECTIVE height (an inverted V with its ends given sits lower than its apex); apex_m, ends_m and unit are what
+    the operator entered."""
+    h = dict((d if d is not None else _load(st)).get("hf") or {})
+    if h.get("antenna") in hfprop.OLD_IDS:
+        h["antenna"], h["height_m"] = hfprop.OLD_IDS[h["antenna"]]
+    ant = h.get("antenna") if h.get("antenna") in hfprop.ANTENNAS else hfprop.DEFAULT["antenna"]
+    apex = h.get("height_m") or hfprop.DEFAULT["height_m"]
+    ends = h.get("ends_m") if ant == "invv" else None
+    return {"antenna": ant, "height_m": hfprop.invv_height(apex, ends) if ends is not None else apex,
+            "apex_m": apex, "ends_m": ends, "unit": h.get("unit") or "si",
+            "power_w": h.get("power_w") or _power_default(st), "good_km": h.get("good_km"),
+            "ground": h.get("ground") if h.get("ground") in hfprop.GROUNDS else hfprop.DEFAULT["ground"], "set": bool(h)}
+
+
+def last_sfi(st) -> float:
+    """The solar flux last read from NOAA (Find nets reads it), or a typical value."""
+    try:
+        return float((_load(st).get("sfi") or {}).get("sfi") or hfprop.TYPICAL_SFI)
+    except (TypeError, ValueError):
+        return hfprop.TYPICAL_SFI
+
+
 # ---------------------------------------------------------------- where the station is ---------------------------
 def _path(st):
     return st.data / "netfind.json"
@@ -563,9 +587,17 @@ class Finder:
                                  n["distance_km"] if n["distance_km"] is not None else 9999, n["name"].casefold()))
         hf_on = reach(self.st)["HF"]
         key = self._table_key(d, sfi) if hf_on else None
+        foot = None
+        if hf_on:                                               # where this setup lands, band by band (cached)
+            fk = (hf["antenna"], hf["height_m"], hf["power_w"], hf["ground"], tuple(hf["good_km"] or ()), round(sfi / 5) * 5)
+            if getattr(self, "_foot", (None, None))[0] != fk:
+                self._foot = (fk, hfprop.footprint(hf["antenna"], hf["height_m"], hf["power_w"], sfi,
+                                                    tuple(hf["good_km"]) if hf.get("good_km") else None, hf["ground"]))
+            foot = self._foot[1]
         table = self._table[1] if key is not None and self._table[0] == key else None   # GET /api/netfind/reach
         return {"key": bool(self.key()), "location": location(self.st), "km": d.get("km", DEFAULT_KM),
                 "hf_km": d.get("hf_km", DEFAULT_HF_KM), "max_hf_km": MAX_HF_KM, "reach": reach(self.st), "hf": hf,
+                "footprint": foot, "hf_km_physics": hfprop.regional_km(foot) if foot else None,
                 "dx": bool(d.get("dx")), "dx_table": table, "dx_min_pct": hfprop.DX_MIN_PCT, "dx_keep_pct": DX_KEEP_PCT,
                 "antennas": [{"id": k, "label": v[0], "kind": v[1]} for k, v in hfprop.ANTENNAS.items()],
                 "grounds": [{"id": k, "label": v[0]} for k, v in hfprop.GROUNDS.items()],
@@ -581,13 +613,7 @@ class Finder:
         return v or list(DEFAULT_INTERESTS)
 
     def _hf(self, d: dict) -> dict:
-        h = dict(d.get("hf") or {})
-        if h.get("antenna") in hfprop.OLD_IDS:
-            h["antenna"], h["height_m"] = hfprop.OLD_IDS[h["antenna"]]
-        return {"antenna": h.get("antenna") if h.get("antenna") in hfprop.ANTENNAS else hfprop.DEFAULT["antenna"],
-                "height_m": h.get("height_m") or hfprop.DEFAULT["height_m"],
-                "power_w": h.get("power_w") or _power_default(self.st), "good_km": h.get("good_km"),
-                "ground": h.get("ground") if h.get("ground") in hfprop.GROUNDS else hfprop.DEFAULT["ground"], "set": bool(h)}
+        return hf_setup(self.st, d)
 
     def settings(self, body: dict) -> dict:
         with self.lock:
@@ -609,18 +635,27 @@ class Finder:
                 p = _num(h.get("power_w"))
                 if not p or not 1 <= p <= 1500:
                     raise ValueError("HF power must be 1 to 1500 W")
-                ht = _num(h.get("height_m")) if h.get("height_m") not in (None, "") else hfprop.DEFAULT["height_m"]
-                if ht is None or not 0 <= ht <= 100:
-                    raise ValueError("antenna height must be 0 to 100 m")
+                # owner 2026-11-25: "Have the user add any needed parameters for the antenna setup". Feet and miles or
+                # metres and kilometres (a ring typed as 400-600 meaning MILES was read as km); an inverted V's ends.
+                us = h.get("unit") == "us"
+                ft, mi = (0.3048, 1.609344) if us else (1.0, 1.0)
+                hu, du = ("ft", "mi") if us else ("m", "km")
+                ht = _num(h.get("height_m")) if h.get("height_m") not in (None, "") else hfprop.DEFAULT["height_m"] / ft
+                if ht is None or not 0 <= ht * ft <= 100:
+                    raise ValueError(f"antenna height must be 0 to {round(100 / ft)} {hu}")
+                ends = _num(h.get("ends_m")) if h.get("antenna") == "invv" and h.get("ends_m") not in (None, "") else None
+                if ends is not None and not 0 <= ends <= ht:
+                    raise ValueError(f"the inverted V's ends are between the ground and its apex ({ht:g} {hu})")
                 good = None
                 lo, hi = _num(h.get("good_from_km")), _num(h.get("good_to_km"))
                 if lo or hi:
-                    if not (lo and hi and 20 <= lo < hi <= 4000):
-                        raise ValueError("where you hear HF stations well: give both distances, like 400 to 600 km")
-                    good = [int(lo), int(hi)]
+                    if not (lo and hi and 20 <= lo * mi < hi * mi <= 4000):
+                        raise ValueError(f"where you hear HF stations well: give both distances, like 400 to 600 {du}")
+                    good = [int(round(lo * mi)), int(round(hi * mi))]
                 gr = h.get("ground") if h.get("ground") in hfprop.GROUNDS else hfprop.DEFAULT["ground"]
-                d["hf"] = {"antenna": h["antenna"], "height_m": round(ht, 1), "power_w": int(p), "good_km": good,
-                           "ground": gr}
+                d["hf"] = {"antenna": h["antenna"], "height_m": round(ht * ft, 1), "power_w": int(p), "good_km": good,
+                           "ground": gr, "unit": "us" if us else "si",
+                           "ends_m": None if ends is None else round(ends * ft, 1)}
             if "dx" in body:
                 d["dx"] = bool(body.get("dx"))
             if "interests" in body:

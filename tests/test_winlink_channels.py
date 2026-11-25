@@ -153,3 +153,45 @@ def test_each_list_reminder_is_optional(tmp_path, monkeypatch):
     from station.server import STATIC
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     assert 'id="wlListSet"' in html and "data-wlremind" in html and "data-wloff" in html
+
+
+def test_hf_gateways_are_chosen_by_what_the_antenna_reaches_not_by_a_circle(tmp_path, monkeypatch):
+    """Owner 2026-11-25: the Plans search "only looked within 373 mi ... inside the first bounce off of the ionosphere
+    and are hard to reach ... work up the HF net search based on the physics for the antenna". With the HF antenna
+    set (Find nets), each VARA HF gateway out to 6,000 km is asked of the propagation model for today: one in the
+    skip zone is left out, one a hop away is kept with the hours it is reached; with no antenna set, the old circle
+    and a title that says how to do better."""
+    from station import netfind
+    far = ("N0CALL|EM59gt|14105000|53|00-23|PUBLIC\r\n"           # 20 m, a few km away: inside the skip zone
+           "K7ABC|DM33xl|14105000|53|00-23|PUBLIC\r\n"            # 20 m, Arizona, ~2,100 km: one hop
+           "K7ABC|DM33xl|7102500|53|00-23|PUBLIC\r\n")
+    inst = tmp_path / "RMS Express"
+    d = inst / "W9XYZ" / "Data"
+    d.mkdir(parents=True)
+    (d / wc.VHF_FILE).write_text(VHF, encoding="utf-8")
+    (d / wc.HF_FILE).write_text(far, encoding="utf-8")
+    (inst / "RMS Express.exe").write_bytes(b"")
+    st, p, _, _ = _plans(tmp_path)
+    st.where = lambda: HERE
+    monkeypatch.setattr(p, "_installs", lambda: [str(inst)])
+    hf = {g["key"]: g for g in p.state()["gateways"]}["express:hf"]
+    assert "within 373 mi" in hf["title"] and "set your HF antenna in Find nets" in hf["title"]   # no antenna set yet
+    assert [g["gateway"]["call"] for g in hf["list"]] == ["N0CALL"]
+    netfind.Finder(st).settings({"hf": {"antenna": "invv", "height_m": 40, "ends_m": 10, "unit": "us", "power_w": 100,
+                                        "good_from_km": 400, "good_to_km": 600}})
+    h = netfind.hf_setup(st)
+    assert h["unit"] == "us" and h["apex_m"] == 12.2 and h["ends_m"] == 3.0 and h["height_m"] == 9.13   # feet in
+    assert h["good_km"] == [644, 966]                                                                 # miles in
+    hf = {g["key"]: g for g in p.state()["gateways"]}["express:hf"]
+    assert "your antenna reaches today" in hf["title"] and "373 mi" not in hf["title"]
+    calls = [(g["gateway"]["call"], g["freq_mhz"]) for g in hf["list"]]
+    assert ("K7ABC", 14.105) in calls and ("N0CALL", 14.105) not in calls        # one hop away: in; the skip zone: out
+    k = next(g for g in hf["list"] if g["gateway"]["call"] == "K7ABC" and g["freq_mhz"] == 14.105)
+    assert k["gateway"]["reach"]["hours"] and "reach " in k["use"] and "UTC" in k["use"] and "hop" in k["use"]
+    import pytest
+    with pytest.raises(ValueError, match="between the ground and its apex"):
+        netfind.Finder(st).settings({"hf": {"antenna": "invv", "height_m": 30, "ends_m": 40, "unit": "us", "power_w": 100}})
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'id="nfUnit"' in idx and 'id="nfEnds"' in idx and "Where your signal lands today" in idx
+    assert "On 80 and 40 m you hear stations well from" in idx and "data-nfusephys" in idx

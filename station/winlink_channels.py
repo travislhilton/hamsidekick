@@ -104,6 +104,9 @@ def as_frequencies(rows: list[dict], title: str) -> list[dict]:
                     "source_opened": False, "net": None, "source_doc": title,
                     "use": f"Winlink gateway {r['call']} ({' / '.join(r['modes'])}), {mi:.0f} mi {r['dir']}, "
                            f"grid {r['grid']}" + (f", {r['hours']} UTC" if r.get("hours") and r["hours"] != "00-23"
-                                                  else "") + (" · EMCOMM" if r["service"] == "EMCOMM" else ""),
-                    "gateway": {k: r[k] for k in ("call", "grid", "km", "dir", "modes", "service", "hours")}})
+                                                  else "") + (" · EMCOMM" if r["service"] == "EMCOMM" else "")
+                           + (f" · reach {r['reach']['pct']}% {r['reach']['when']}, {r['reach']['hops']} hop"
+                              f"{'s' if r['reach']['hops'] != 1 else ''}" if r.get("reach") else ""),
+                    "gateway": dict({k: r[k] for k in ("call", "grid", "km", "dir", "modes", "service", "hours")},
+                                    **({"reach": r["reach"]} if r.get("reach") else {}))})
     return out

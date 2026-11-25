@@ -328,6 +328,10 @@ def estimate(f: float, km: float | None, start: str, antenna: str, height_m: flo
     if antenna not in ANTENNAS:
         antenna = DEFAULT["antenna"]
     good = tuple(sorted(float(x) for x in good_km)) if good_km and all(good_km) else None
+    if good and f >= RING_MAX_MHZ:
+        good = None       # the ring is what the operator hears on 80 / 40 m; above that the antenna is many
+        #                   wavelengths higher and fires low (owner 2026-11-25: Japan on 20-10 m with this antenna;
+        #                   the ring had forced -21 dBi at 5 degrees on every band)
     hour = int(start[:2]) + int(start[3:5]) / 60 if start and start[:2].isdigit() else 19.0
     d = 400.0 if km is None else max(20.0, float(km))
     n_min, _ = hops(d)
@@ -391,6 +395,98 @@ def estimate(f: float, km: float | None, start: str, antenna: str, height_m: flo
 
 
 # ---------------------------------------------------------------- today's solar flux ------------------------------
+# ---- what the antenna reaches, without a fixed circle (owner 2026-11-25: a Plans search "only looked within 373 mi
+# ... inside the first bounce off of the ionosphere ... Rework how the physics are calculated and work up the HF net
+# search based on the physics for the antenna") ----
+def invv_height(apex_m: float, ends_m: float | None) -> float:
+    """An inverted V radiates from where its current is: mostly near the apex. Its effective height is about a third
+    of the way down from the apex to the ends (the usual rule of thumb; a flat dipole is its own height)."""
+    if ends_m is None or ends_m >= apex_m:
+        return float(apex_m)
+    return round(apex_m - (apex_m - max(0.0, ends_m)) / 3.0, 2)
+
+
+FOOT_BANDS = (("160 m", 1.9), ("80 m", 3.8), ("40 m", 7.18), ("20 m", 14.25), ("17 m", 18.13), ("15 m", 21.3),
+              ("10 m", 28.4))
+FOOT_KM = tuple(range(50, 800, 50)) + tuple(range(800, 3200, 100)) + tuple(range(3200, 12001, 400))
+RING_MAX_MHZ = 10.0                     # a "heard well from..to" ring shapes 160-40 m only
+REACH_PCT, REACH_SEND_PCT = 60, 50      # "reaches": heard this often, and likely to be heard checking in
+
+
+def footprint(antenna: str, height_m: float, power_w: float, sfi: float = TYPICAL_SFI, good_km: tuple | None = None,
+              ground: str = "average") -> list[dict]:
+    """Where this setup's signal lands, band by band, by day (local 13:00) and night (01:00):
+    [{"band", "mhz", "day": [[from_km, to_km], ...], "night": [...]}]. The gap before the first stretch is the skip
+    zone (the frequency goes through the layer at steep angles, or the antenna fires too low / too high for it);
+    later stretches are more hops. An empty list: the band is closed, or absorbed, at that time."""
+    out = []
+    for band, f in FOOT_BANDS:
+        row = {"band": band, "mhz": f}
+        for name, hr in (("day", "13:00"), ("night", "01:00")):
+            runs: list[list[int]] = []
+            prev = None
+            for d in FOOT_KM:
+                e = estimate(f, d, hr, antenna, height_m, power_w, sfi, good_km, ground=ground)
+                ok = e["pct_hear"] >= REACH_PCT and e["pct_send"] >= REACH_SEND_PCT
+                if ok and prev is not None and runs and runs[-1][1] == prev:
+                    runs[-1][1] = d
+                elif ok:
+                    runs.append([d, d])
+                prev = d
+            row[name] = [r for r in runs if r[1] > r[0] or r[0] >= 800]
+        out.append(row)
+    return out
+
+
+def regional_km(foot: list[dict]) -> int | None:
+    """How far "regional" is for this setup: the far edge of the first stretch on its best low band (80 / 40 m by
+    night, 40 / 20 m by day), where state and regional nets meet."""
+    far = [r[name][0][1] for r in foot for name in ("day", "night")
+           if r["band"] in ("80 m", "40 m", "20 m") and r[name]]
+    return int(max(far)) if far else None
+
+
+def reach_day(f: float, home: tuple, there: tuple, antenna: str, height_m: float, power_w: float,
+              sfi: float = TYPICAL_SFI, good_km: tuple | None = None, ground: str = "average", day=None) -> dict:
+    """The best this setup does to one place on one frequency over a day, every 2 hours UTC, with the real sun over
+    each hop (so sunrise and sunset, the gray line, count): {"pct" (the worse of hearing and being heard, at the
+    best hour), "hours": [UTC hours it reaches], "km", "hops", "why"}."""
+    from datetime import datetime, timezone
+    day = day or datetime.now(timezone.utc)
+    km = great_circle_km(home, there)
+    mid = control_points(home, there, 1)[0] if km > 50 else home
+    best, hours = None, []
+    for h in range(0, 24, 2):
+        when = day.replace(hour=h, minute=0, second=0, microsecond=0)
+        local = (h + mid[1] / 15.0) % 24
+        e = estimate(f, km, f"{int(local):02d}:{int(local % 1 * 60):02d}", antenna, height_m, power_w, sfi, good_km,
+                     when, mid, ground, (home, there))
+        pct = min(e["pct_hear"], e["pct_send"])
+        if e["pct_hear"] >= REACH_PCT and e["pct_send"] >= REACH_SEND_PCT:
+            hours.append(h)
+        if best is None or pct > best[0]:
+            best = (pct, e)
+    return {"pct": best[0], "hours": hours, "km": round(km), "hops": best[1]["hops"], "why": best[1]["why"],
+            "band": best[1]["band"]}
+
+
+def hours_words(hours: list[int]) -> str:
+    """[0, 2, 4, 14] -> "00-06, 14-16 UTC" (2-hour steps)."""
+    if not hours:
+        return ""
+    if len(hours) == 12:
+        return "all day"
+    runs = []
+    for h in sorted(hours):
+        if runs and h == runs[-1][1]:
+            runs[-1][1] = h + 2
+        else:
+            runs.append([h, h + 2])
+    if len(runs) > 1 and runs[0][0] == 0 and runs[-1][1] == 24:      # wraps midnight
+        runs[0][0] = runs.pop()[0]
+    return ", ".join(f"{a:02d}-{b % 24:02d}" for a, b in runs) + " UTC"
+
+
 SFI_URL = "https://services.swpc.noaa.gov/json/f107_cm_flux.json"
 
 

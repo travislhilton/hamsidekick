@@ -51,7 +51,9 @@ GATEWAYS_KEY, GATEWAYS_TITLE = "search:winlink", "Winlink gateways near you (VHF
 # Winlink Express's own RMS channel list on this PC (station/winlink_channels.py, owner 2026-11-16): VARA only,
 # service codes PUBLIC / EMCOMM, distance from each gateway's grid square
 EXPRESS_KEYS = {"express:vhf": "vhf", "express:hf": "hf"}
-HF_KM = 600                                         # VARA HF gateways: about NVIS reach
+HF_KM = 600                                         # VARA HF gateways when no HF antenna is set: about NVIS reach
+HF_PHYS_KM = 6000                                   # with the antenna set: every gateway this near is asked of the model
+HF_PHYS_MAX = 60                                    # the surest this many frequencies are kept
 LIST_STALE_DAYS = 10            # older than this, the operator is asked to update Express's channel list (owner 11-16)
 LIST_SNOOZE_S = 7 * 86400
 OFFLINE_KINDS = ("band_plan", "ares_plan", "races_plan", "ics205", "comm_plan")
@@ -275,6 +277,13 @@ class Plans:
         self._xlist = {"installed": bool(installs), "files": found}
         d = _load(self.st)
         km = {"vhf": float(d.get("km", DEFAULT_KM)), "hf": float(d.get("hf_km", HF_KM))}
+        # HF: which gateways this station's antenna reaches today, by the propagation model, not a circle (owner
+        # 2026-11-25: 373 mi "lands inside the first bounce off of the ionosphere and are hard to reach")
+        from . import hfprop
+        hf = netfind.hf_setup(self.st)
+        sfi = netfind.last_sfi(self.st)
+        phys = bool(hf["set"])
+        day = time.strftime("%Y-%m-%d", time.gmtime())
         ing = d.get("ingested") or {}
         changed = False
         for key, kind in EXPRESS_KEYS.items():
@@ -286,17 +295,43 @@ class Plans:
                 mt = p.stat().st_mtime
             except OSError:
                 continue
-            sig = [str(p), mt, km[kind], [round(where[0], 3), round(where[1], 3)]]
+            by_phys = kind == "hf" and phys
+            sig = [str(p), mt, km[kind], [round(where[0], 3), round(where[1], 3)]] + (
+                [day, round(sfi / 5) * 5, hf["antenna"], hf["height_m"], hf["power_w"], hf["ground"],
+                 list(hf["good_km"] or [])] if by_phys else [])
             if prev and prev.get("sig") == sig:
                 continue
             mi = round(km[kind] / 1.609)
             title = (f"Winlink VARA FM gateways within {mi} mi (VHF/UHF)" if kind == "vhf"
-                     else f"Winlink VARA HF gateways within {mi} mi") + " · Winlink Express's channel list"
+                     else f"Winlink VARA HF gateways your antenna reaches today (propagation for {day} UTC, solar flux "
+                          f"{round(sfi)})" if by_phys
+                     else f"Winlink VARA HF gateways within {mi} mi (set your HF antenna in Find nets for the ones it "
+                          "really reaches)") + " · Winlink Express's channel list"
             try:
-                rows = wc.near(p, kind == "hf", where, km[kind])
+                rows = wc.near(p, kind == "hf", where, HF_PHYS_KM if by_phys else km[kind])
             except OSError as e:
                 print(f"localplans: Winlink Express channel list {p}: {e}", flush=True)
                 continue
+            if by_phys:
+                from hamkit.zipgeo import grid_to_latlon
+                kept = []
+                for r in rows:
+                    there = grid_to_latlon(r["grid"][:6] if len(r["grid"]) >= 6 else r["grid"][:4])
+                    if not there:
+                        continue
+                    e = hfprop.reach_day(r["freq_mhz"], (where[0], where[1]), there, hf["antenna"], hf["height_m"],
+                                         hf["power_w"], sfi, tuple(hf["good_km"]) if hf.get("good_km") else None,
+                                         hf["ground"])
+                    if e["hours"]:
+                        kept.append(dict(r, reach={"pct": e["pct"], "when": hfprop.hours_words(e["hours"]),
+                                                   "hops": e["hops"], "hours": e["hours"]}))
+                # the surest first; one gateway's best few frequencies; a list a person can read
+                kept.sort(key=lambda r: (-len(r["reach"]["hours"]), -r["reach"]["pct"], r["km"]))
+                per, rows = {}, []
+                for r in kept:
+                    if per.get(r["call"], 0) < 3 and len(rows) < HF_PHYS_MAX:
+                        per[r["call"]] = per.get(r["call"], 0) + 1
+                        rows.append(r)
             freqs = []
             for f in wc.as_frequencies(rows, title):
                 c, _ = _clean_freq(f, set(), require_source=False)
@@ -307,7 +342,8 @@ class Plans:
                         "list_at": mt, "list_file": p.name,
                         "excluded": prev.get("excluded", kind == "hf") if prev else kind == "hf"}
             changed = True
-            print(f"localplans: {len(rows)} {kind.upper()} VARA gateways within {mi} mi from {p.name}", flush=True)
+            print(f"localplans: {len(rows)} {kind.upper()} VARA gateways "
+                  + ("by propagation" if by_phys else f"within {mi} mi") + f" from {p.name}", flush=True)
         if changed:
             with self.lock:
                 d2 = _load(self.st)
