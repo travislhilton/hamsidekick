@@ -752,3 +752,14 @@ def test_a_fold_in_a_vara_panel_stays_open_across_redraws():
             assert "vKeep(" in d, d
     assert 'data-vkeep="ein-' in vara and "What Einstein does on the air" in vara
     assert 'document.addEventListener("toggle",e=>{const d=e.target;if(d.dataset&&d.dataset.vkeep' in idx
+
+
+def test_vara_message_text_can_be_selected_and_copied():
+    """Owner 2026-11-24: "I start the selection in the message and then it jumps outside to other text outside the
+    message." The panel's redraw waits while a selection is made in it; the time / status line and buttons are not
+    selectable; each message has 📋 Copy (with a fallback for the dashboard over plain http on the LAN)."""
+    from station.server import STATIC
+    idx = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "if(vSelecting(box)){VA.drawLater=true;continue}" in idx and 'addEventListener("selectionchange"' in idx
+    assert '<span class="vtx">${esc(it.text||"")}</span>' in idx and "data-vcopy" in idx
+    assert ".vb .meta,.vb button,.vb .vxfer{user-select:none" in idx and 'document.execCommand("copy")' in idx
