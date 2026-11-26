@@ -597,7 +597,8 @@ header button.hq{background:transparent;border-color:rgba(255,255,255,.18);font-
 .vphead{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.vphead h3{margin:0;font-size:15px}
 .vpstat{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
 /* The chat column (owner 2026-11-25): the panel is as tall as its column (vFit); the message log is the only scroller. */
-.vpanel{overflow:hidden;scroll-snap-align:start}.rcol.data{scroll-snap-type:y proximity}.rcol>.vpanel{flex:none!important;min-height:0!important}
+.vpanel{overflow:hidden;scroll-snap-align:start}.rcol.data{scroll-snap-type:y proximity}.rcol.data>.toptabs{scroll-snap-align:start}   /* without a stop at the top the column sprang back to the chat: the radio could not be scrolled into view */
+.rcol>.vpanel{flex:none!important;min-height:0!important}
 .vpanel .vchan{flex:1 1 0;height:auto;min-height:0;grid-template-columns:minmax(140px,190px) 1fr;grid-template-rows:minmax(0,1fr);margin:4px 0 0}
 .vpanel .vros{max-height:none;min-height:0}.vpanel .vconv{min-height:0;overflow:hidden;padding:6px 8px;gap:5px}.vpanel .vconv>*:not(.vthread){flex:none}.vpanel .vthread{max-height:none;flex:1 1 0;min-height:60px}
 .vpanel>.vphead{flex:none;flex-wrap:nowrap}.vpanel>.vphead h3{white-space:nowrap;flex:none}.vpst{display:inline-flex;flex-wrap:nowrap;align-items:center;gap:3px 6px;min-width:0;overflow:hidden;white-space:nowrap}.vpst>b{overflow:hidden;text-overflow:ellipsis}.vphead [data-vfocus]{flex:none}.vone{flex:none;margin:2px 0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
