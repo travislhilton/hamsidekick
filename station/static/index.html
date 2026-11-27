@@ -61,6 +61,14 @@ header #nightBtn[aria-pressed=true]{background:#fff;color:var(--hdr)}
   .feed{flex:1;min-height:0;max-height:none}
 }
 #rtabs{display:none}
+/* A window too narrow for every radio side by side (owner 2026-11-27): the columns no longer wrap into rows. The tabs
+   appear, as many columns as fit are shown, and a tab brings its radio into view (fitCols). */
+body.rtabbed #rtabs{display:flex;gap:6px;padding:6px 18px 0;overflow-x:auto;flex:none}
+body.rtabbed #rtabs button{flex:1 0 auto;padding:5px 10px;border-radius:8px 8px 0 0;border-bottom:0;font-weight:600;display:flex;gap:6px;align-items:center;justify-content:center}
+body.rtabbed #rtabs button.vis{border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+body.rtabbed #rtabs button.on{background:var(--accent);color:var(--on);border-color:var(--accent)}
+body.rtabbed #rtabs .dot{width:9px;height:9px;border-radius:50%;background:var(--line)}body.rtabbed #rtabs .dot.rx{background:var(--ok)}body.rtabbed #rtabs .dot.em{background:var(--bad)}
+body.rtabbed .rcol:not(.show){display:none}
 /* phones / narrow windows: one radio at a time, picked with the tabs under the header */
 @media (max-width:900px) and (min-height:560px){
   body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
@@ -1536,7 +1544,16 @@ document.addEventListener("dblclick",e=>{const sp=e.target.closest(".split");if(
 let SEL=null;try{SEL=localStorage.getItem("hamsidekick.radio")}catch(e){}
 function selectRadio(id){SEL=id;try{localStorage.setItem("hamsidekick.radio",id)}catch(e){}
   document.querySelectorAll(".rcol").forEach(c=>c.classList.toggle("sel",c.id==="col-"+id));
-  document.querySelectorAll("#rtabs button").forEach(b=>{b.classList.toggle("on",b.dataset.r===id);b.setAttribute("aria-selected",b.dataset.r===id)})}
+  document.querySelectorAll("#rtabs button").forEach(b=>{b.classList.toggle("on",b.dataset.r===id);b.setAttribute("aria-selected",b.dataset.r===id)});fitCols()}
+/* Wider than a phone but not wide enough for every radio: show the columns that fit, the chosen one always among them. */
+let COL0=0;
+function fitCols(){const box=$("radios"),ids=(S.radios||[]).map(r=>r.id),n=ids.length;if(!box)return;
+  const k=Math.max(1,Math.floor(((box.clientWidth||innerWidth)+12)/352)),tab=innerWidth>900&&n>k,was=document.body.classList.contains("rtabbed");
+  document.body.classList.toggle("rtabbed",tab);box.style.gridTemplateColumns=tab?`repeat(${k},minmax(0,1fr))`:"";
+  const i=Math.max(0,ids.indexOf(SEL));if(i<COL0)COL0=i;if(i>=COL0+k)COL0=i-k+1;COL0=Math.max(0,Math.min(COL0,n-k));
+  const key=tab?COL0+":"+k:"";ids.forEach((id,j)=>{const on=tab&&j>=COL0&&j<COL0+k,c=$("col-"+id),b=document.querySelector(`#rtabs button[data-r="${CSS.escape(id)}"]`);if(c)c.classList.toggle("show",on);if(b)b.classList.toggle("vis",on)});
+  if((was!==tab||fitCols.key!==key)&&typeof vFit==="function")document.querySelectorAll(".vpanel").forEach(b=>{if(b.firstChild)vFit(b)});fitCols.key=key}
+addEventListener("resize",fitCols);
 function renderRtabs(){
   const nav=$("rtabs");if(!S.radios.length){nav.innerHTML="";return}
   if(!S.radios.some(r=>r.id===SEL))SEL=S.radios[0].id;
@@ -2390,7 +2407,7 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
       ${VA.msg&&VA.rid===rid&&!$("varaDlg").open?`<p class="vtoast ${VA.msg.bad?"bad":"ok"}" role="status">${esc(VA.msg.text)}<button class="linkish small" data-vmsgx aria-label="Dismiss" title="Dismiss">✕</button></p>`:""}
       <div class="vpre" aria-label="${isAI?"Quick requests":"Quick messages"}"><button type="button" class="small vqbtn" data-vqtoggle="${esc(rid)}" aria-haspopup="menu" aria-expanded="${VA.qopen===rid}">⚡ ${isAI?"Quick requests":"Quick messages"} <span class="muted">(${isAI?ASKS.length:(ch.presets||[]).length})</span><span class="vqcar">${VA.qopen===rid?"▴":"▾"}</span></button><span class="vqchips">${presets}${isAI?"":' <button class="small linkish" data-vpedit>Edit</button>'}</span></div>
       ${VA.pedit?`<div><textarea id="vPresets-${esc(rid)}" rows="6" style="width:100%" aria-label="Quick messages, one per line">${esc((ch.presets||[]).join("\n"))}</textarea><div class="small muted">One per line, up to 12. Fill-ins: {me} {them} {sn} {name} {grid}.</div><button class="small primary" data-vpsave>Save quick messages</button> <button class="small quiet" data-vpedit>Cancel</button><div class="small muted">A quick message is sent as soon as you tap it.</div></div>`:""}
-      <form class="vcomp" id="vCompose-${esc(rid)}"><textarea id="vMsg-${esc(rid)}" maxlength="4000" rows="2" placeholder="Message to ${esc(who)}" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer;white-space:nowrap" title="Choose a file to send (up to 5 MB). It goes out by itself over a link, checked at the other end; the other station needs this program. You are told how long it should take before it goes.">📎<span class="vfl"> Send a file…</span><input type="file" id="vCFile-${esc(rid)}" style="display:none"></label><span class="vhint">Enter sends · Shift+Enter new line</span></form>
+      <form class="vcomp" id="vCompose-${esc(rid)}"><textarea id="vMsg-${esc(rid)}" maxlength="4000" rows="2" placeholder="Message to ${esc(who)}" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer;white-space:nowrap" title="Choose a file to send (up to 5 MB). It goes out by itself over a link, checked at the other end; the other station needs this program. You are told how long it should take before it goes.">📎<span class="vfl"> Send a file…</span><input type="file" id="vCFile-${esc(rid)}" style="display:none"></label><span class="vhint" title="Enter sends the message. Shift+Enter starts a new line.">Enter sends · Shift+Enter new line</span></form>
       ${one?`<details class="vtools small" data-vkeep="tools-${esc(rid)}"${vKeep("tools-"+rid)||(VA.share&&VA.share.to===one?" open":"")}><summary>Link tools <span class="muted">· ${r&&(r.via||[]).length?"via "+r.via.map(esc).join(" › "):"direct"} · ${r&&r.speed?vBps(r.speed.bps):"speed not tested"} · share your band plan and nets · forget</span></summary>`:""}
       ${one&&m.cfg.kind!=="hf"?`<form class="small vpath" data-vviaform="${esc(one)}"><span title="A VARA FM digipeater relays the link when the two stations cannot hear each other directly. The digipeater is another station's VARA FM with its Digipeater call set (VARA FM → Settings → VARA Setup; it needs a licensed VARA FM).">🛰 <b>Path to ${esc(one)}:</b></span> ${(r&&(r.via||[]).length)?`via <b class="mono">${r.via.map(esc).join(" › ")}</b>${r.via_by==="heard"?' <span class="muted">(the way its announcement came)</span>':""}`:"direct"}
         <input data-vvia value="${esc(((r&&r.via)||[]).join(" "))}" placeholder="direct, or digipeater call(s)" aria-label="Digipeaters on the way to ${esc(one)}, at most two" style="width:15em;text-transform:uppercase;min-height:0" autocomplete="off"><button class="small">Save path</button>
