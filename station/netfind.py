@@ -85,7 +85,10 @@ def reach(st) -> dict:
         bands = m["bands"]
         hf = hf or any(a < 30 and b > 1.8 for a, b in bands)
         vu = vu or any(b > 144 and a < 450 for a, b in bands)
-        modes |= set(m["modes"])
+        # digital voice only from a radio set up as that kind, with decoded audio ("Other" is not checked, and a
+        # data jack carries the signal undecoded)
+        modes |= {x for x in m["modes"] if x not in fit.DV_MODES
+                  or (r.get("model") in fit.MODELS and r.get("model") != "any" and r.get("gate") != "carrier")}
         names.append(r.get("name") or r["id"])
     return {"HF": hf, "VU": vu, "modes": sorted(modes), "radios": names}
 
@@ -202,13 +205,13 @@ def _where_words(loc: dict) -> str:
 
 # ---------------------------------------------------------------- the search -------------------------------------
 NET_KEYS = ("name", "freq_mhz", "mode", "offset_mhz", "tone_hz", "repeat", "weekdays", "nth", "start", "time_zone",
-            "duration_min", "ncs", "area", "distance_km", "emergency", "source_url", "note")
+            "duration_min", "ncs", "area", "distance_km", "emergency", "source_url", "note", "access")
 
 
 _FIELDS = (
     "Answer ONLY with a JSON object, no prose: {\"nets\": [ ... up to %d ... ]} where each net is\n"
-    "{\"name\": str, \"freq_mhz\": number (the listening frequency), \"mode\": one of FM USB LSB AM CW DIG (skip DMR,"
-    " D-STAR, Fusion and other digital voice nets), \"offset_mhz\": number or null (repeater offset, e.g. 0.6 or -5),"
+    "{\"name\": str, \"freq_mhz\": number (the listening frequency), \"mode\": one of %s,"
+    " \"offset_mhz\": number or null (repeater offset, e.g. 0.6 or -5),"
     " \"tone_hz\": number or null (CTCSS), \"repeat\": \"weekly\" | \"monthly\" | \"daily\", \"weekdays\": [\"Mon\"..\"Sun\"],"
     " \"nth\": [1-5 or -1] (monthly only, e.g. 2nd Tuesday = [2]), \"start\": \"HH:MM\" 24-hour,"
     " \"time_zone\": \"local\" | \"UTC\" (as the page gives it), \"utc_offset_hours\": number (the net's local UTC"
@@ -218,7 +221,30 @@ _FIELDS = (
     " station to the net's home area or net control), \"serves_station_area\": bool (the net's region includes the"
     " station: a state, multi-state or national net), \"kind\": one of emergency traffic social technical special,"
     " \"emergency\": bool, \"source_url\": str, \"org\": str or null (the club or group that runs it),"
-    " \"note\": str (short: e.g. 'linked system', 'last listed 2024')}")
+    " \"note\": str (short: e.g. 'linked system', 'last listed 2024'), \"access\": str or null (a digital voice"
+    " net only: what to set on the radio besides the frequency, as the page gives it: D-STAR reflector and module"
+    " or repeater module; Fusion room or reflector and DG-ID; DMR network, talkgroup, time slot and color code)}")
+
+
+def _fields(n: int, modes: list[str]) -> str:
+    """The answer format. Digital voice nets are asked for only in the modes a radio here decodes."""
+    dv = [m for m in fit.DV_MODES if m in modes]
+    other = [fit.DV_NAME[m].split(" ")[0] for m in fit.DV_MODES if m not in dv] + ["P25", "NXDN", "M17"]
+    words = "FM USB LSB AM CW DIG" + "".join(" " + m for m in dv) + \
+        (" (C4FM = Yaesu System Fusion)" if "C4FM" in dv else "") + \
+        f" (skip {', '.join(other)} and other digital voice nets: no radio here decodes them)"
+    return _FIELDS % (n, words)
+
+
+def _dv_ask(modes: list[str]) -> str:
+    dv = [fit.DV_NAME[m] for m in fit.DV_MODES if m in modes]
+    if not dv:
+        return ""
+    return ("A radio here decodes " + " and ".join(dv) + ": also find the digital voice nets in " +
+            ("that mode" if len(dv) == 1 else "those modes") + " that a local digital repeater or hotspot carries "
+            "(local digital repeater groups, and the state, regional or national reflector, room or talkgroup nets "
+            "the area's repeaters link to). Give the local repeater's frequency when the page names one, and in "
+            "\"access\" the reflector, room or talkgroup.\n")
 
 
 def _prompt(loc: dict, want: dict, km: int, hf_km: int, modes: list[str], hf: dict | None = None,
@@ -234,7 +260,8 @@ def _prompt(loc: dict, want: dict, km: int, hf_km: int, modes: list[str], hf: di
             "clubs, county ARES groups, RACES / county emergency management radio groups, Skywarn spotter groups, "
             "repeater associations, CERT and hospital radio groups), then look up each one's net schedule on its own "
             "site, newsletter, calendar or social page. Also check repeater directories (RepeaterBook, state repeater "
-            "councils) for repeaters noting a net, and linked-repeater systems that reach the area.\n") + _FIELDS % 30
+            "councils) for repeaters noting a net, and linked-repeater systems that reach the area.\n"
+            + _dv_ask(modes)) + _fields(30, modes)
     ints = [i for i in (interests or DEFAULT_INTERESTS) if i in INTERESTS] or DEFAULT_INTERESTS
     ant = hfprop.ANTENNAS.get((hf or {}).get("antenna"), hfprop.ANTENNAS["efhw"])[0]
     return head + (
@@ -247,7 +274,7 @@ def _prompt(loc: dict, want: dict, km: int, hf_km: int, modes: list[str], hf: di
         "special-interest group pages, and recent net lists on ham forums. Give the net's own frequency (the "
         "published one, in MHz) and its start time as published.\n"
         f"The station's HF setup: {ant}, {(hf or {}).get('height_m', 10):g} m up, {(hf or {}).get('power_w', 100):g} W: "
-        "include nets on 160, 80, 60 and 40 m for regional coverage and 20 m and up for long distances.\n") + _FIELDS % 40
+        "include nets on 160, 80, 60 and 40 m for regional coverage and 20 m and up for long distances.\n") + _fields(40, [m for m in modes if m not in fit.DV_MODES])
 
 
 def _utc_windows(table: list[dict], per_region: int = 4) -> str:
@@ -277,7 +304,8 @@ def _dx_prompt(loc: dict, modes: list[str], hf: dict, table: list[dict]) -> str:
             "published (UTC where the page gives UTC) and its home or net control's location as lat/lon; set "
             "\"region\" to the region's id in brackets above.\n") + _FIELDS.replace(
         "\"kind\": one of emergency traffic social technical special,",
-        "\"region\": the region id, \"kind\": one of emergency traffic social technical special,") % 40
+        "\"region\": the region id, \"kind\": one of emergency traffic social technical special,") % (
+        40, "FM USB LSB AM CW DIG (skip digital voice nets)")
 
 
 def _post(key: str, body: dict, timeout: float) -> dict:
@@ -382,8 +410,15 @@ def _clean(raw: dict, seen: set[str], want: dict, km: int, hf_km: int, modes: li
     if band == "HF" and not want.get("HF") or band in ("VHF", "UHF") and not want.get("VU"):
         return None, f"{name}: {band}, not a band your radios do"
     mode = str(raw.get("mode") or "").upper().strip() or ("FM" if band != "HF" else "")
-    if re.search(r"DMR|D-?STAR|FUSION|C4FM|YSF|P25|NXDN|M17|DIGITAL VOICE", mode + " " + name.upper()):
-        return None, f"{name}: digital voice, which the station can't record or transcribe"
+    # digital voice: the radio decodes it, so it is kept only in a mode a radio here decodes (fit.DV_MODES)
+    dv = fit.dv_mode(mode) or (fit.dv_mode(name) if mode in ("", "FM", "DIGITAL", "DIG", "DV") else None)
+    if dv:
+        if dv not in modes:
+            return None, (f"{name}: {fit.DV_NAME[dv]}, which no radio here decodes (if one does, set its type under "
+                          "Radios)")
+        mode = dv
+    elif re.search(r"P25|NXDN|M17|DIGITAL VOICE", mode + " " + name.upper()):
+        return None, f"{name}: digital voice of a kind the station has no radio type for"
     mode = {"SSB": "LSB" if f < 10 else "USB", "DIGITAL": "DIG", "PSK": "DIG", "FT8": "DIG"}.get(mode, mode)
     if mode not in MODES:
         mode = "FM" if band != "HF" else ("LSB" if f < 10 else "USB")
@@ -434,6 +469,7 @@ def _clean(raw: dict, seen: set[str], want: dict, km: int, hf_km: int, modes: li
            "offset_mhz": _num(raw.get("offset_mhz")) if band != "HF" else None,
            "tone_hz": _num(raw.get("tone_hz")) if band != "HF" else None,
            "ncs": (str(raw.get("ncs") or "").strip()[:40] or None), "emergency": bool(raw.get("emergency")),
+           "access": (" ".join(str(raw.get("access") or "").split())[:80] or None) if dv else None,
            "band": band, "area": str(raw.get("area") or "").strip()[:80], "distance_km": round(dist) if dist else None,
            "dist_src": dist_src if dist else None,
            "lat": nlat if dist_src in ("computed", "region") else None,
@@ -818,7 +854,7 @@ class Finder:
                 continue
             rid = (radios or {}).get(i, n.get("radio")) or None
             body = {k: n[k] for k in ("name", "freq_mhz", "mode", "start", "duration_min", "repeat", "offset_mhz",
-                                      "tone_hz", "ncs", "emergency") if n.get(k) is not None}
+                                      "tone_hz", "ncs", "emergency", "access") if n.get(k) is not None}
             body["radio"] = rid
             body["source"] = n["source_url"]
             try:

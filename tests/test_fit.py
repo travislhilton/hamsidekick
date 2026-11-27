@@ -281,3 +281,30 @@ def test_a_net_is_never_called_silent_while_the_radio_is_on_another_frequency(tm
     st.set_radio("ic", other, "LSB")                 # the radio is somewhere else (a lost race, or the operator)
     edge(st, clock, wed.replace(hour=20, minute=5))
     assert st.radios["ic"]["listen"]["now"] == first and "switched" not in st.radios["ic"]["listen"]
+
+
+def test_a_digital_voice_net_needs_a_radio_that_decodes_it_and_decoded_audio():
+    """Owner 2026-11-27: D-STAR, Fusion and DMR. The radio decodes; the station records the speech it plays."""
+    dstar = HT | {"model": "dstar", "gate": "voice"}
+    n = net("a", 442.1, "D-STAR", "ht", access="REF030 C")
+    assert fit.fit(n, dstar | {"mode": "D-STAR"})["kind"] == "ready"
+    assert fit.fit(n, dstar)["kind"] == "tune"                                    # on the frequency, still in FM
+    f = fit.fit(net("a", 145.67, "D-STAR", "ht", access="REF030 C"), dstar)
+    assert f["kind"] == "tune" and "145.670 D-STAR (REF030 C)" in f["why"]      # the alert names what to set
+    f = fit.fit(n, HT)                                                            # an FM-only radio hears hiss
+    assert f["kind"] == "cant" and "can't decode D-STAR" in f["why"]
+    f = fit.fit(n, dstar | {"gate": "carrier"})                                   # a data jack: undecoded signal
+    assert f["kind"] == "cant" and "data jack" in f["why"]
+    assert fit.fit(net("a", 442.1, "DMR", "ht"), dstar)["kind"] == "cant"         # each kind decodes only its own
+    assert fit.fit(net("a", 442.1, "DMR", "ht"), HT | {"model": "dmr", "gate": "voice"})["kind"] == "tune"
+    assert fit.fit(net("a", 442.1, "C4FM", "ht"), HT | {"model": "fusion", "gate": "voice"})["kind"] == "tune"
+    f = fit.fit(net("a", 145.67, "D-STAR", "ic", access="REF030 C"), IC | {"antenna": "vu"}, has_cat=True)
+    assert f["kind"] == "ready" and "REF030 C" in f["why"]                        # CAT tunes; the link is yours
+    assert fit.fit(net("a", 3.915, "LSB", "ic"), IC | {"model": "hf"})["kind"] == "ready"
+    assert fit.fit(net("a", 3.915, "D-STAR", "ic"), IC | {"model": "hf"})["kind"] == "cant"
+
+
+def test_the_words_for_a_digital_voice_mode():
+    assert [fit.dv_mode(w) for w in ("DV", "d-star", "DSTAR", "Fusion", "YSF", "C4FM", "DMR", "BrandMeister TG 3100")] \
+        == ["D-STAR", "D-STAR", "D-STAR", "C4FM", "C4FM", "C4FM", "DMR", "DMR"]
+    assert fit.dv_mode("FM") is None and fit.dv_mode("Advanced Net") is None and fit.dv_mode("") is None

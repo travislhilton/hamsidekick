@@ -16,9 +16,9 @@ import json
 import re
 from pathlib import Path
 
-EDITABLE = ("id", "name", "device", "gate", "mode", "freq_mhz", "cat", "tx")   # cat: CI-V (station/cat.py); tx: PTT (station/ptt.py)
+EDITABLE = ("id", "name", "device", "gate", "mode", "freq_mhz", "cat", "tx", "model")   # cat: CI-V (station/cat.py); tx: PTT (station/ptt.py)
 GATES = ("carrier", "voice")
-MODES = ("FM", "USB", "LSB", "AM", "CW", "DIG")
+from .fit import ALL_MODES as MODES, MODELS
 SKIP = ("stereo mix", "primary sound capture", "microsoft sound mapper")
 
 
@@ -110,6 +110,8 @@ def load(path: Path, base: list[dict]) -> list[dict]:
     out = []
     for r in saved.get("radios", []):
         keep = {k: v for k, v in (by_id.get(r.get("id")) or {}).items() if k not in EDITABLE}
+        if (by_id.get(r.get("id")) or {}).get("model"):            # station.yaml's radio type stays until the
+            keep["model"] = by_id[r["id"]]["model"]                # dashboard chooses one
         out.append(keep | {k: r[k] for k in EDITABLE if r.get(k) not in (None, "")})
     return out
 
@@ -157,11 +159,15 @@ def clean(radios: list[dict]) -> list[dict]:
                 raise ValueError(f"{name}: CI-V address must be 01-DF (hex)")
             cat = {"port": port.upper() if port.upper().startswith("COM") else port, "civ": f"{civ:02X}",
                    "baud": int(cat.get("baud") or 19200), "model": str(cat.get("model") or "IC-705")}
+        model = str(r.get("model") or "").strip()      # what it can hear (station/fit.py); empty = worked out
+        if model and model not in MODELS:
+            raise ValueError(f"{name}: unknown radio type")
         from .ptt import clean_tx
         tx = clean_tx(r.get("tx"), name, cat and cat["port"])
         ids.add(rid); devs.add(dev.lower())
         out.append({"id": rid, "name": name, "device": dev, "gate": gate, "mode": mode,
-                    "freq_mhz": None if f in (None, "") else f} | ({"cat": cat} if cat else {}) | ({"tx": tx} if tx else {}))
+                    "freq_mhz": None if f in (None, "") else f} | ({"cat": cat} if cat else {}) | ({"tx": tx} if tx else {})
+                   | ({"model": model} if model else {}))
     return out
 
 

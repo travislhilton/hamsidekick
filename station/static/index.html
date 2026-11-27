@@ -522,7 +522,7 @@ a.btn,label.btn{display:inline-block;padding:4px 10px;border:1px solid var(--lin
 .vxfer{margin:4px 0}.vxbar{height:10px;border-radius:5px;background:var(--line);overflow:hidden}.vxbar i{display:block;height:100%;background:var(--accent,#2a6);transition:width .4s}.vrecv{border:1px solid var(--accent);border-radius:8px;padding:6px 10px;margin:6px 0;background:var(--panel)}
 .vest{border-collapse:collapse;margin:3px 0;font-size:12.5px}.vest th,.vest td{border:1px solid var(--line);padding:1px 7px;text-align:center}.vest th{font-weight:600}.vspeed{line-height:1.7}
 .vpre{display:flex;flex-wrap:wrap;gap:4px}.vpre button{font-size:12.5px;padding:2px 9px;min-height:0;border-radius:12px}
-.vcomp{display:flex;gap:6px;align-items:flex-end}.vcomp textarea{flex:1;min-height:2.6em;max-height:9em;resize:vertical;font:inherit;padding:5px 8px}
+.vcomp{display:flex;flex-wrap:wrap;gap:5px 6px;align-items:center}.vcomp textarea{flex:1 0 100%;width:100%;box-sizing:border-box;min-height:calc(2.8em + 14px);max-height:11em;line-height:1.4;resize:vertical;font:inherit;padding:6px 8px}.vcomp>button.primary{order:3;margin-left:auto;min-width:6em}.vcomp>.vhint{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
 #varaDlg{width:min(720px,calc(100vw - 32px))}
 #askDlg{width:min(640px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}.aqlist{display:flex;flex-direction:column;gap:6px;margin:6px 0}.aqrow{display:flex;gap:6px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:6px}.aqord{display:flex;flex-direction:column;gap:2px}.aqord button{min-height:0;padding:0 7px}.aqf{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}.aqf input:not([type=checkbox]){width:100%;min-height:0}.aqsub{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}.aqsub input:not([type=checkbox]){flex:1 1 12em;width:auto;font-size:13px}.aqsub .chk{display:flex;gap:5px;align-items:center;white-space:nowrap}.aqsub .chk input{width:auto;min-height:0}.aqadd{display:flex;gap:6px;margin-top:6px}.aqadd input{flex:1;min-height:0}
 #bpDlg{width:min(1100px,calc(100vw - 32px))}
@@ -614,7 +614,7 @@ header button.hq{background:transparent;border-color:rgba(255,255,255,.18);font-
 .vql{display:block;font-weight:600}.vqh{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
 @container (max-width:520px){.vpanel .vchan{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:4px}
   .vpanel .vros{display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-height:68px;overflow:auto;padding:3px;border:0}.vpanel .vros h5,.vpanel .vros [data-vall]{display:none}.vpanel .vros .vst{width:auto;padding:1px 8px 1px 4px;border-color:var(--line);border-radius:999px}.vpanel .vros .vst .sub,.vpanel .vros .vai.sm{display:none}.vpanel .vros .vst.aikid{margin-left:0}.vpanel .vros form{margin:0}.vpanel .vros input:not([type=checkbox]){width:7em}
-  .vaddbtn{display:inline-block}.vaddcall:not(.show){display:none}.vfl{display:none}.vb{max-width:94%}.vphead h3{font-size:14px}
+  .vaddbtn{display:inline-block}.vaddcall:not(.show){display:none}.vb{max-width:94%}.vphead h3{font-size:14px}
   .vpanel:not(.vfocus) [data-vfocus]{background:var(--accent,#1f4fbf);color:#fff;border-color:transparent}}
 /* Focus: the chat takes the whole window */
 body.vfocusing{overflow:hidden}.vpanel.vfocus{position:fixed;inset:0;z-index:70;background:var(--bg,var(--panel));padding:10px 16px;overflow:auto;margin:0;border-radius:0}
@@ -1154,11 +1154,11 @@ async function runAcc(radio,start,end){
   const i=S.accurate.findIndex(j=>j.key===d.key);if(i>=0)S.accurate[i]=d;else S.accurate.push(d);renderFeed(radio);wlAccNote();
 }
 // ---------- Radios…: add / replace / remove a radio (station/radios.py); saving restarts the station ----------
-let RD=null;
+let RD=null,RDM={};
 // Radios… (header) lists every radio folded to one line; ⚙ Settings… on a radio's card opens that radio's settings
 async function openRadios(rid){
   try{RD=await api("/api/radio-list")}catch(e){alert(e.message);return}
-  RD.list=RD.radios.map(r=>({...r}));RD.msg="";
+  RD.list=RD.radios.map(r=>({...r}));RD.msg="";RDM=Object.fromEntries((RD.models||[]).map(m=>[m.id,m]));
   const fi=typeof rid==="string"?RD.list.findIndex(r=>r.id===rid):-1;
   RD.open=new Set(fi>=0?[fi]:RD.list.length===1?[0]:[]);renderRadiosDlg();
   if(fi>=0)setTimeout(()=>{const el=$("radiosBody").querySelector(`.rad[data-i="${fi}"]`);if(el)el.scrollIntoView({block:"start"})},0);if(!$("radiosDlg").open)$("radiosDlg").showModal();
@@ -1202,7 +1202,9 @@ function renderRadiosDlg(){
      <label>Audio from <select data-k="gate"><option value="voice"${r.gate==="voice"?" selected":""}>Speaker / earphone jack, or SSB (squelch closed)</option><option value="carrier"${r.gate==="carrier"?" selected":""}>FM data jack (hiss always on)</option></select></label>
      <p class="small muted" style="grid-column:1/-1;margin:0">${r.gate==="carrier"?"A data jack (e.g. FTM-150R DATA) leaves the radio's own speaker on: you hear the radio as usual."
        :"A cable in a handheld's speaker / earphone jack turns the radio's speaker off. To hear it on this PC: Windows Sound settings → Recording → this sound input → Properties → Listen → <b>Listen to this device</b>. (A USB radio such as the IC-705 keeps its speaker on.)"}</p>
-     <label>Mode <select data-k="mode">${["FM","USB","LSB","AM","CW","DIG"].map(m=>`<option${m===(r.mode||"FM")?" selected":""}>${m}</option>`).join("")}</select></label>
+     <label title="What this radio can hear: nets are only offered on a radio that covers their band and mode. Digital voice (D-STAR, Fusion, DMR) is decoded by the radio; the station records the speech it plays.">Radio type <select data-k="model"><option value="">${r.model?"Work it out":"Worked out"+(r.model_now&&RDM[r.model_now]?": "+esc(RDM[r.model_now].label):"")}</option>${(RD.models||[]).map(m=>`<option value="${esc(m.id)}"${m.id===r.model?" selected":""}>${esc(m.label)}</option>`).join("")}</select></label>
+     ${(()=>{const m=RDM[r.model||r.model_now]||{},dv=(m.dv||[]);return dv.length&&(r.model||r.model_now)!=="any"?`<p class="small ${r.gate==="carrier"?"bad":"muted"}" style="grid-column:1/-1;margin:0">${r.gate==="carrier"?`⚠ ${esc(dv.join(", "))} nets can't be recorded from a data jack: it carries the digital signal undecoded. Take this radio's audio from its speaker / earphone jack or USB audio and set “Audio from” to match.`:`${esc(dv.join(", "))}: the radio decodes it and the station records the speech it plays, so nets in that mode can go on this radio. You set the reflector, room or talkgroup on the radio.`}</p>`:""})()}
+     <label>Mode <select data-k="mode">${modeOpts(r.mode||"FM")}</select></label>
      <label>Frequency, MHz <input data-k="freq_mhz" value="${r.freq_mhz??""}" inputmode="decimal" placeholder="146.940" style="width:8em"></label>
      <label title="Icom CI-V (CAT): the station reads the radio's frequency and tunes it for this radio's nets, any band. On Wi-Fi: Icom Remote Utility's virtual COM port; on USB: the radio's first COM port. It never transmits.">CAT port (Icom CI-V) <select data-cat="port">${catOpt(r.cat&&r.cat.port)}</select></label>
      ${r.cat&&r.cat.port?`<label title="The radio's CI-V address (MENU → SET → Connectors → CI-V → CI-V Address). IC-705: A4.">CI-V address <input data-cat="civ" value="${esc((r.cat&&r.cat.civ)||"A4")}" maxlength="2" style="width:4em"></label>`:""}</div>
@@ -1216,7 +1218,7 @@ function renderRadiosDlg(){
    <div class="row"><button class="primary" id="rdSave">Save and restart the station</button> <button onclick="$('radiosDlg').close()">Cancel</button> <span class="bad small">${esc(RD.msg)}</span></div>
    <p class="small muted">Saving restarts the station (about 15 s; the page reconnects by itself). The list is then kept in data\\radios.json (station.yaml's radios are no longer read).${RD.from==="station.yaml"?"":" Delete that file to go back to station.yaml's list."}</p>`;
   for(const el of $("radiosBody").querySelectorAll("details.rad"))el.ontoggle=()=>{RD.open=RD.open||new Set();RD.open[el.open?"add":"delete"](+el.dataset.i)};
-  for(const el of $("radiosBody").querySelectorAll("[data-k]"))el.onchange=el.oninput=()=>{RD.list[+el.closest(".rad").dataset.i][el.dataset.k]=el.value};
+  for(const el of $("radiosBody").querySelectorAll("[data-k]"))el.onchange=el.oninput=e=>{RD.list[+el.closest(".rad").dataset.i][el.dataset.k]=el.value;if(e.type==="change"&&(el.dataset.k==="model"||el.dataset.k==="gate"))renderRadiosDlg()};
   for(const el of $("radiosBody").querySelectorAll("[data-cat]"))el.onchange=()=>{const r=RD.list[+el.closest(".rad").dataset.i];
     if(el.dataset.cat==="port"){r.cat=el.value?{...(r.cat||{civ:"A4"}),port:el.value}:null;renderRadiosDlg()}else if(r.cat)r.cat.civ=el.value.trim().toUpperCase()};
   for(const el of $("radiosBody").querySelectorAll("[data-tx]"))el.onchange=()=>{const r=RD.list[+el.closest(".rad").dataset.i],k=el.dataset.tx;
@@ -1562,7 +1564,7 @@ function renderRadios(){
       const dl=`fq-${esc(r.id)}`;
       el.querySelector(".tunebox").innerHTML=editing===r.id?`<form class="tuneform" data-rid="${esc(r.id)}"><input name="f" inputmode="decimal" list="${dl}" autocomplete="off" value="${r.freq_mhz??""}" aria-label="Frequency in MHz"> MHz
         <datalist id="${dl}">${(r.recent_freqs||[]).map(x=>`<option value="${Number(x.f).toFixed(3)}">${esc(x.m)}</option>`).join("")}</datalist>
-        <select name="m">${["FM","USB","LSB","AM","CW","DIG"].map(m=>`<option${m===r.mode?" selected":""}>${m}</option>`).join("")}</select>
+        <select name="m">${modeOpts(r.mode)}</select>
         <button type="submit">Save</button> <button type="button" data-cancel>Cancel</button> <span class="err tuneerr"></span>
         ${rec.length?`<div class="fqpicks" role="group" aria-label="Frequencies used before">${rec.map(x=>`<button type="button" class="np" data-fqpick="${Number(x.f).toFixed(4)}" data-m="${esc(x.m)}" title="Fill in ${Number(x.f).toFixed(3)} MHz ${esc(x.m)}, then Save">${Number(x.f).toFixed(3)} <span class="muted">${esc(x.m)}</span></button>`).join("")}</div>`:""}
         <div class="muted small">Set this to what you tuned the radio to. Every transmission is logged with it.${rec.length?" Tap a frequency used before to fill it in.":""}</div></form>`:"";
@@ -2387,7 +2389,7 @@ function vChannel(m,ok){const ch=m.channel;if(!ch)return"";const st=m.state||{};
       ${VA.msg&&VA.rid===rid&&!$("varaDlg").open?`<p class="vtoast ${VA.msg.bad?"bad":"ok"}" role="status">${esc(VA.msg.text)}<button class="linkish small" data-vmsgx aria-label="Dismiss" title="Dismiss">✕</button></p>`:""}
       <div class="vpre" aria-label="${isAI?"Quick requests":"Quick messages"}"><button type="button" class="small vqbtn" data-vqtoggle="${esc(rid)}" aria-haspopup="menu" aria-expanded="${VA.qopen===rid}">⚡ ${isAI?"Quick requests":"Quick messages"} <span class="muted">(${isAI?ASKS.length:(ch.presets||[]).length})</span><span class="vqcar">${VA.qopen===rid?"▴":"▾"}</span></button><span class="vqchips">${presets}${isAI?"":' <button class="small linkish" data-vpedit>Edit</button>'}</span></div>
       ${VA.pedit?`<div><textarea id="vPresets-${esc(rid)}" rows="6" style="width:100%" aria-label="Quick messages, one per line">${esc((ch.presets||[]).join("\n"))}</textarea><div class="small muted">One per line, up to 12. Fill-ins: {me} {them} {sn} {name} {grid}.</div><button class="small primary" data-vpsave>Save quick messages</button> <button class="small quiet" data-vpedit>Cancel</button><div class="small muted">A quick message is sent as soon as you tap it.</div></div>`:""}
-      <form class="vcomp" id="vCompose-${esc(rid)}"><textarea id="vMsg-${esc(rid)}" maxlength="4000" placeholder="Message to ${esc(who)} · Enter sends, Shift+Enter new line" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer;white-space:nowrap" title="Choose a file to send (up to 5 MB). It goes out by itself over a link, checked at the other end; the other station needs this program. You are told how long it should take before it goes.">📎<span class="vfl"> Send a file…</span><input type="file" id="vCFile-${esc(rid)}" style="display:none"></label></form>
+      <form class="vcomp" id="vCompose-${esc(rid)}"><textarea id="vMsg-${esc(rid)}" maxlength="4000" rows="2" placeholder="Message to ${esc(who)}" aria-label="Message">${esc(VA.draft[rid]||"")}</textarea><button class="primary">Send</button><label class="btn small" style="cursor:pointer;white-space:nowrap" title="Choose a file to send (up to 5 MB). It goes out by itself over a link, checked at the other end; the other station needs this program. You are told how long it should take before it goes.">📎<span class="vfl"> Send a file…</span><input type="file" id="vCFile-${esc(rid)}" style="display:none"></label><span class="vhint">Enter sends · Shift+Enter new line</span></form>
       ${one?`<details class="vtools small" data-vkeep="tools-${esc(rid)}"${vKeep("tools-"+rid)||(VA.share&&VA.share.to===one?" open":"")}><summary>Link tools <span class="muted">· ${r&&(r.via||[]).length?"via "+r.via.map(esc).join(" › "):"direct"} · ${r&&r.speed?vBps(r.speed.bps):"speed not tested"} · share your band plan and nets · forget</span></summary>`:""}
       ${one&&m.cfg.kind!=="hf"?`<form class="small vpath" data-vviaform="${esc(one)}"><span title="A VARA FM digipeater relays the link when the two stations cannot hear each other directly. The digipeater is another station's VARA FM with its Digipeater call set (VARA FM → Settings → VARA Setup; it needs a licensed VARA FM).">🛰 <b>Path to ${esc(one)}:</b></span> ${(r&&(r.via||[]).length)?`via <b class="mono">${r.via.map(esc).join(" › ")}</b>${r.via_by==="heard"?' <span class="muted">(the way its announcement came)</span>':""}`:"direct"}
         <input data-vvia value="${esc(((r&&r.via)||[]).join(" "))}" placeholder="direct, or digipeater call(s)" aria-label="Digipeaters on the way to ${esc(one)}, at most two" style="width:15em;text-transform:uppercase;min-height:0" autocomplete="off"><button class="small">Save path</button>
@@ -3088,7 +3090,12 @@ function netHay(n){const f=n.freq_mhz?Number(n.freq_mhz):null;
   return [n.name,n.mode,n.ncs,n.when,n.summary,n.radio?rName(n.radio):"no radio",f?f.toFixed(3):"",f?String(f):"",netBand(n),n.emergency?"emergency":""].join(" ").toLowerCase()}
 function netBand(n){const f=Number(n.freq_mhz);return !n.freq_mhz||!isFinite(f)?"":f<30?"HF":f<300?"VHF":"UHF"}
 function netMatch(n,q){const w=String(q||"").toLowerCase().split(/\s+/).filter(Boolean);if(!w.length)return true;const h=netHay(n);return w.every(x=>h.includes(x))}
-function netFreq(n){return n.freq_mhz?`${Number(n.freq_mhz).toFixed(3)} MHz${n.mode?" "+esc(n.mode):""}`:n.mode?esc(n.mode):'<span class="muted">—</span>'}
+/* Digital voice (D-STAR, Fusion, DMR): the radio decodes it and the station records the decoded speech. */
+const DV={"D-STAR":["D-STAR","Reflector and module, like REF030 C"],"C4FM":["C4FM (Fusion)","Room or reflector and DG-ID, like DG-ID 00"],"DMR":["DMR","Talkgroup, time slot and color code, like TG 3100 TS2 CC1"]};
+function modeOpts(cur){return ["FM","USB","LSB","AM","CW","DIG"].map(m=>`<option${m===cur?" selected":""}>${m}</option>`).join("")+`<optgroup label="Digital voice (the radio decodes it)">${Object.keys(DV).map(m=>`<option value="${m}"${m===cur?" selected":""}>${DV[m][0]}</option>`).join("")}</optgroup>`}
+const dvAcc=n=>DV[n.mode]&&n.access?`<div class="small muted" title="Set this on the radio yourself: the station can tune a frequency, not link a reflector or pick a talkgroup">📡 ${esc(n.access)}</div>`:"";
+document.addEventListener("change",e=>{const t=e.target;if(!t.matches||!t.matches('#netForm [name="mode"]'))return;const l=t.form.querySelector("[data-dvacc]");if(!l)return;l.hidden=!DV[t.value];if(DV[t.value])l.querySelector("input").placeholder=DV[t.value][1]});
+function netFreq(n){return n.freq_mhz?`${Number(n.freq_mhz).toFixed(3)} MHz${n.mode?" "+esc(n.mode):""}${dvAcc(n)}`:n.mode?esc(n.mode):'<span class="muted">—</span>'}
 function netTable(list){
   const here=id=>id&&S.radios.some(r=>r.id===id);
   const by={name:(a,b)=>a.name.localeCompare(b.name),time:(a,b)=>String(a.start||"").localeCompare(String(b.start||""))||a.name.localeCompare(b.name),
@@ -3240,7 +3247,7 @@ async function renderFind(){
     <td><b>${esc(n.name)}</b>${n.region_label?` <span class="np k-ready" style="padding:0 6px" title="Found by the worldwide search">${esc(n.region_label)}</span>`:""}${n.kind&&n.band==="HF"?` <span class="np" style="padding:0 6px">${esc((d.interests.find(i=>i.id===n.kind)||{}).label||n.kind)}</span>`:""}${n.wide?' <span class="small muted">covers your area</span>':""}${n.emergency?' <span class="badge emergency">Emergency</span>':""}
       <div class="small muted">${esc([n.org,n.area,n.distance_km!=null?`${n.dist_src==="computed"?"":"~"}${dText(n.distance_km)}${n.dist_src==="computed"?"":" (search's estimate)"}`:""].filter(Boolean).join(" · "))}${n.note?` · ${esc(n.note)}`:""}</div></td>
     <td>${nfRule(n)}</td>
-    <td class="f">${Number(n.freq_mhz).toFixed(3)} MHz ${esc(n.mode)}${n.offset_mhz!=null?`<div class="small muted">${n.offset_mhz>0?"+":""}${n.offset_mhz} MHz${n.tone_hz?` · tone ${n.tone_hz}`:""}</div>`:n.tone_hz?`<div class="small muted">tone ${n.tone_hz}</div>`:""}</td>
+    <td class="f">${Number(n.freq_mhz).toFixed(3)} MHz ${esc(n.mode)}${n.offset_mhz!=null?`<div class="small muted">${n.offset_mhz>0?"+":""}${n.offset_mhz} MHz${n.tone_hz?` · tone ${n.tone_hz}`:""}</div>`:n.tone_hz?`<div class="small muted">tone ${n.tone_hz}</div>`:""}${dvAcc(n)}</td>
     <td>${n.prop?`<div title="${esc(kmText(n.prop.why))}">Hear ${chip(n.prop.chance,n.prop.pct_hear)}</div><div title="${esc(kmText(n.prop.why))}" class="small">Check in ${chip(n.prop.checkin,n.prop.pct_send)}</div><div class="small muted" title="${esc(kmText(n.prop.why))}">${dText(n.prop.km)}${n.prop.long_path?" the long way round":""}${n.prop.gray?` · <span title="Sunrise or sunset at ${esc(n.prop.gray)} when this net meets: the daytime absorption is gone there while the upper layer still returns the signal, so the low bands carry farthest">🌅 gray line at ${esc(n.prop.gray)}</span>`:""}${n.prop.sea?` · <span title="Ground bounces between hops that land on sea water, which reflects HF almost without loss">🌊 ${n.prop.sea} bounce${n.prop.sea>1?"s":""} on sea</span>`:""} · ${n.prop.snr_hear!=null?`${n.prop.hops} hop${n.prop.hops>1?"s":""} at ${n.prop.takeoff}°`:`skips (MUF ${n.prop.muf} MHz)`}${n.prop.dark!=null?(n.prop.dark?" · dark":" · daylight"):""}</div><details class="small"><summary>why</summary>${esc(kmText(n.prop.why))}</details>`:'<span class="small muted">—</span>'}</td>
     <td><select data-nfradio="${n.id}" aria-label="Radio for ${esc(n.name)}"><option value="">no radio</option>${tgt.map(r=>`<option value="${esc(r.id)}"${rid===r.id?" selected":""}>${esc(r.name)}</option>`).join("")}</select>${n.radio_why&&rid===n.radio?`<div class="small muted">${esc(n.radio_why)}</div>`:""}</td>
     <td class="small"><a href="${esc(n.source_url)}" target="_blank" rel="noopener noreferrer">source</a><div class="${n.source_opened?"muted":"warnc"}">${n.source_opened?"opened by the search":"not opened: check it"}</div></td></tr>`}).join("");
@@ -3324,7 +3331,8 @@ function netForm(n){
    <label>Starts at (this PC's time) <input name="start" type="time" required value="${esc(n.start||"19:00")}"></label>
    <label>Lasts (minutes) <input name="duration_min" type="number" min="1" max="1440" required value="${esc(n.duration_min||60)}"></label>
    <label>Frequency (MHz) <input name="freq_mhz" inputmode="decimal" placeholder="146.940" value="${esc(n.freq_mhz??"")}"></label>
-   <label>Mode <select name="mode"><option value="">the radio's</option>${["FM","USB","LSB","AM","CW","DIG"].map(m=>`<option${m===n.mode?" selected":""}>${m}</option>`).join("")}</select></label>
+   <label>Mode <select name="mode"><option value="">the radio's</option>${modeOpts(n.mode)}</select></label>
+   <label data-dvacc${DV[n.mode]?"":" hidden"}>On the radio <input name="access" maxlength="80" value="${esc(n.access||"")}" placeholder="${esc((DV[n.mode]||DV.DMR)[1])}"><span class="hint">digital voice: what you set besides the frequency. The station can't set it for you.</span></label>
    <label>Net control (callsign) <input name="ncs" maxlength="11" value="${esc(n.ncs||"")}" class="up" placeholder="optional"></label>
    <label>Reach (${UNIT.d()}) <input name="reach_km" type="number" min="30" max="5000" step="10" value="${esc(dNum(n.reach_km??""))}" placeholder="the station's"><span class="hint">a linked system or intertie: how far its stations can be (a call licensed farther is set aside as probably misheard)</span></label>
    <label>Alert, minutes before <input name="alert_min" type="number" min="0" max="120" value="${esc(n.alert_min??5)}"><span class="hint">0 = no alert</span></label>
@@ -3358,7 +3366,7 @@ function collectNet(f,saved){
   if(freq!=="once"){if(f.ends.value==="on")rule.until=f.until.value;if(f.ends.value==="after")rule.count=f.count.value}
   const b={name:f.name.value,radio:f.radio.value,start:f.start.value,duration_min:f.duration_min.value,freq_mhz:f.freq_mhz.value,
     mode:f.mode.value,ncs:f.ncs.value,alert_min:f.alert_min.value,emergency:f.emergency.checked,checkins:f.checkins.value,repeat:rule,
-    reach_km:dIn(f.reach_km.value)};
+    reach_km:dIn(f.reach_km.value),access:DV[f.mode.value]?f.access.value:""};
   if(saved&&saved.exceptions)b.exceptions=saved.exceptions;
   return b}
 function showFor(f){

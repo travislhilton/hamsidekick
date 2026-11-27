@@ -17,6 +17,7 @@ import yaml
 from hamkit import glossary
 from hamkit.bands import band
 from hamkit.callsigns import load_roster, normalize, _ANY as CALL_SHAPE
+from . import fit as fit_mod
 from .fit import infer_model as fit_infer
 from hamkit.hints import Hinter, phonetic
 from . import callfix
@@ -468,7 +469,7 @@ class Station:
     # ---------- operator settings (set on the dashboard; the operator tunes the radio) ----------
     KEEP_TX = 6000      # in memory (the day's log keeps all): a busy day on two radios is ~1000; the Winlink span,
                         # the accurate pass and the dashboard all need a net's FIRST transmission
-    MODES = ("FM", "USB", "LSB", "AM", "CW", "DIG")
+    from .fit import ALL_MODES as MODES      # analog modes and the digital voice a radio decodes itself
 
     def _operator_path(self) -> Path:
         return self.data / "operator.json"
@@ -701,7 +702,8 @@ class Station:
         from . import radios as rmod
         with self.lock:
             cur = [{k: self.radio_cfg.get(r, {}).get(k) for k in rmod.EDITABLE}
-                   | {"state": self.radios[r].get("state"), "error": self.radios[r].get("error")} for r in self.radios]
+                   | {"state": self.radios[r].get("state"), "error": self.radios[r].get("error"),
+                      "model_now": self.radios[r].get("model")} for r in self.radios]
         nets = {}
         for n in self.cfg.get("schedule", []):
             if n.get("radio"):
@@ -710,6 +712,8 @@ class Station:
         return {"radios": cur, "inputs": rmod.fresh_inputs() or rmod.inputs(), "nets": nets, "ports": rmod.serial_ports(),
                 "outputs": ptt.fresh_outputs() or ptt.outputs(), "hids": ptt.hid_devices(),
                 "from": "dashboard" if (self.data / "radios.json").exists() else "station.yaml",
+                "models": [{"id": k, "label": v["label"], "dv": [m for m in v["modes"] if m in fit_mod.DV_MODES]}
+                           for k, v in fit_mod.MODELS.items()],
                 "restart": os.name == "nt"}
 
     def save_radios(self, body: dict) -> dict:

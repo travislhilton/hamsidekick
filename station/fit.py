@@ -25,15 +25,43 @@ from datetime import datetime, timedelta
 
 from . import recur
 
-ALL_MODES = ("FM", "USB", "LSB", "AM", "CW", "DIG")
+ANALOG_MODES = ("FM", "USB", "LSB", "AM", "CW", "DIG")
+# Digital voice (owner 2026-11-27). The RADIO decodes it: the station records the decoded speech from the radio's
+# speaker jack or USB audio, exactly as it records FM. So a net in one of these modes needs a radio of that kind,
+# and its audio must not come from a data jack (that carries the undecoded signal).
+DV_MODES = ("D-STAR", "C4FM", "DMR")
+DV_NAME = {"D-STAR": "D-STAR", "C4FM": "Fusion (C4FM)", "DMR": "DMR"}
+DV_ACCESS = {"D-STAR": "reflector and module, like REF030 C", "C4FM": "room or reflector and DG-ID, like DG-ID 00",
+             "DMR": "talkgroup, time slot and color code, like TG 3100 TS2 CC1"}
+ALL_MODES = ANALOG_MODES + DV_MODES
 VU = ((144.0, 148.0), (420.0, 450.0))
+VU3 = ((144.0, 148.0), (219.0, 225.0), (420.0, 450.0))
 MODELS = {
     "vu_fm": {"label": "2 m / 70 cm FM (handheld or mobile)", "bands": VU, "modes": ("FM",)},
-    "ic705": {"label": "Icom IC-705 (HF to 70 cm, all modes)", "bands": ((0.03, 199.999999), (400.0, 470.0)),
-              "modes": ALL_MODES, "antennas": {"hf": ((0.03, 54.0),), "vu": VU}},
-    "hf": {"label": "HF transceiver (160-6 m)", "bands": ((1.8, 54.0),), "modes": ALL_MODES},
+    "dstar": {"label": "D-STAR handheld or mobile: FM and D-STAR (TH-D74/D75, ID-52, ID-5100)", "bands": VU3,
+              "modes": ("FM", "D-STAR")},
+    "fusion": {"label": "Yaesu Fusion handheld or mobile: FM and C4FM (FT5D, FT-70D, FTM-500D)", "bands": VU,
+               "modes": ("FM", "C4FM")},
+    "dmr": {"label": "DMR handheld or mobile: FM and DMR", "bands": VU3, "modes": ("FM", "DMR")},
+    "ic705": {"label": "Icom IC-705 (HF to 70 cm, all modes and D-STAR)", "bands": ((0.03, 199.999999), (400.0, 470.0)),
+              "modes": ANALOG_MODES + ("D-STAR",), "antennas": {"hf": ((0.03, 54.0),), "vu": VU}},
+    "hf": {"label": "HF transceiver (160-6 m)", "bands": ((1.8, 54.0),), "modes": ANALOG_MODES},
     "any": {"label": "Other (any band, any mode: not checked)", "bands": ((0.0, 100000.0),), "modes": ALL_MODES},
 }
+
+
+def dv_mode(text) -> str | None:
+    """The digital voice mode a word or a net's name means: 'DV', 'D Star' -> D-STAR; 'YSF', 'Fusion', 'WIRES-X' ->
+    C4FM; 'DMR', 'BrandMeister' -> DMR. None for anything else."""
+    import re
+    t = str(text or "").upper()
+    if re.search(r"\bD[- ]?STAR\b|\bDV\b|\bDPLUS\b", t):
+        return "D-STAR"
+    if re.search(r"\bC4FM\b|\bFUSION\b|\bYSF\b|\bWIRES[- ]?X\b", t):
+        return "C4FM"
+    if re.search(r"\bDMR\b|\bBRANDMEISTER\b|\bTGIF\b", t):
+        return "DMR"
+    return None
 ANTENNA_LABEL = {"hf": "HF", "vu": "VHF/UHF"}
 CLASH_DAYS = 56
 
@@ -82,17 +110,28 @@ def fit(net: dict, radio: dict | None, has_cat: bool = False) -> dict:
                         "why": f"{name} has its {ANTENNA_LABEL.get(radio.get('antenna'), '?')} antenna on; "
                                f"{fmt(f)} MHz ({band_name(f)}) needs the {ANTENNA_LABEL[other]} one"}
             return {"kind": "cant", "why": f"{name} can't receive {fmt(f)} MHz ({band_name(f)})"}
-    if mode and mode not in m["modes"]:
+    acc = str(net.get("access") or "").strip()
+    if mode in DV_MODES:
+        if mode not in m["modes"]:
+            return {"kind": "cant", "why": f"{name} can't decode {DV_NAME[mode]}: this net needs a "
+                                           f"{DV_NAME[mode].split(' ')[0]} radio (Radios → Radio type)"}
+        if radio.get("gate") == "carrier":
+            return {"kind": "cant", "why": f"{name}'s audio comes from a data jack, which carries {DV_NAME[mode]} "
+                                           "undecoded: take its audio from the speaker jack or USB (Radios → Audio from)"}
+    elif mode and mode not in m["modes"]:
         return {"kind": "cant", "why": f"{name} has no {mode}"}
     if not f:
         return {"kind": "ready", "why": f"No frequency given: recorded on whatever {name} is tuned to"}
     if has_cat:
-        return {"kind": "ready", "why": f"Tunes itself to {fmt(f)} {mode or ''} (CAT), and back after".replace("  ", " ")}
+        why = f"Tunes itself to {fmt(f)} {mode or ''} (CAT), and back after".replace("  ", " ")
+        if mode in DV_MODES and acc:
+            why += f". You set the rest on the radio: {acc}"
+        return {"kind": "ready", "why": why}
     on = radio.get("freq_mhz")
     if on and abs(float(on) - float(f)) < 0.0005 and (not mode or mode == radio.get("mode")):
         return {"kind": "ready", "why": f"Already on {fmt(f)}"}
-    return {"kind": "tune", "why": f"You tune it to {fmt(f)} {mode or ''}: the alert asks before the net"
-                                    .replace("  ", " ")}
+    what = f"{fmt(f)} {mode or ''}".strip() + (f" ({acc})" if mode in DV_MODES and acc else "")
+    return {"kind": "tune", "why": f"You tune it to {what}: the alert asks before the net"}
 
 
 def windows(nets: list[dict], at: datetime, days: int = CLASH_DAYS) -> dict:

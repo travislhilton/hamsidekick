@@ -251,3 +251,13 @@ def test_radios_dialog_keeps_a_valid_cat_port_and_refuses_a_bad_one():
     assert "cat" not in radios.clean([{"name": "x", "device": "y", "gate": "voice", "cat": None}])[0]
     with pytest.raises(ValueError, match="CAT port"):
         radios.clean([{"name": "x", "device": "y", "gate": "voice", "cat": {"port": "rm -rf"}}])
+
+
+def test_d_star_voice_is_a_mode_the_radio_is_set_to_and_read_as():
+    """Owner 2026-11-27: the IC-705 decodes D-STAR itself, so a D-STAR net tunes it to DV like any other mode."""
+    radio = FakeIC705(freq=146_520_000, mode=0x05)
+    rig = Icom(radio)
+    rig.tune(145.67, "D-STAR", offset_mhz=-0.6, tone_hz=100.0)
+    assert radio.mode == 0x17 and radio.freq == 145_670_000
+    assert rig.mode() == "D-STAR"
+    assert radio.tone_on == 0 and radio.tsql == 1              # the FM-only tone settings are left alone

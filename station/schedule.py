@@ -30,7 +30,7 @@ from datetime import datetime, timedelta
 from . import fit, recur
 
 DAYS = recur.DAYS
-MODES = ("FM", "USB", "LSB", "AM", "CW", "DIG")
+MODES = fit.ALL_MODES
 LEAD_MIN = 1          # resume this many minutes before a net starts (owner 11-02: one minute)
 GRACE_MIN = 5         # pause this many minutes after it ends (nets run over)
 OVERRUN_QUIET_MIN = 5   # a net past its scheduled end keeps running while it was heard less than this long ago
@@ -107,6 +107,8 @@ def validate(body: dict, radios: dict) -> dict:
     # how far this net reaches (VHF/UHF): a linked system or an intertie carries stations far past one repeater's
     # range (the 2026-11-10 intertie net: check-ins from 440-590 km away), so its far calls are judged against this
     reach = num("reach_km", 50, 5000, "the net's reach (km, like 600 for a linked system)")
+    # a digital voice net: what the operator sets on the radio besides the frequency (reflector, room, talkgroup)
+    access = re.sub(r"[\x00-\x1f<>]", " ", str(body.get("access") or "")).strip()[:80] or None
     src = str(body.get("source") or "").strip() or None            # where Find nets found it (station/netfind.py)
     if src and (not re.match(r"https?://", src, re.I) or len(src) > 400 or any(c in src for c in " <>\"'")):
         raise ValueError("the source must be a web address (http:// or https://)")
@@ -119,7 +121,7 @@ def validate(body: dict, radios: dict) -> dict:
            "offset_mhz": offset, "tone_hz": tone, "reach_km": int(reach) if reach else None,             # CAT: set on the radio with the frequency (station/cat.py)
            "beats": sorted(set(beats)) or None,              # clashes settled: these nets lose to this one
            "checkins": "none" if body.get("checkins") == "none" else None,
-           "source": src}   # Einstein: never check in (members/mobiles/traffic only)
+           "source": src, "access": access}   # Einstein: never check in (members/mobiles/traffic only)
     return {k: v for k, v in out.items() if v is not None}
 
 
@@ -136,7 +138,7 @@ def item(n: dict, o: dict) -> dict:
             "end": o["end"].isoformat(timespec="minutes"), "freq_mhz": o.get("freq_mhz"), "mode": o.get("mode"),
             "ncs": n.get("ncs"), "note": o.get("note"), "moved": o.get("moved", False),
             "emergency": bool(n.get("emergency")), "offset_mhz": n.get("offset_mhz"), "tone_hz": n.get("tone_hz"),
-            "checkins": n.get("checkins")}
+            "checkins": n.get("checkins"), "access": n.get("access")}
 
 
 def may_be_on(n: dict, rid: str) -> bool:

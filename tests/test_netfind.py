@@ -329,3 +329,33 @@ def test_hf_distance_is_no_longer_capped_at_5000_km(tmp_path, xai_key):
     assert f.settings({"hf_km": 15000})["hf_km"] == 15000
     with pytest.raises(ValueError, match="20000"):
         f.settings({"hf_km": 30000})
+
+
+def test_digital_voice_nets_are_found_only_for_a_radio_that_decodes_them(tmp_path, xai_key):
+    """Owner 2026-11-27: "I searched for nets and was expecting to see local D-STAR nets." A D-STAR net is kept when
+    a radio here decodes D-STAR (an IC-705 does); Fusion and DMR need a radio set up as that type."""
+    dstar = dict(VHF, name="Springfield D-STAR Net", mode="DV", freq_mhz=145.67, access="REF030  C", tone_hz=None)
+    ysf = dict(VHF, name="Fusion Friday", mode="FM", freq_mhz=442.1, access="DG-ID 00")
+    dmr = dict(VHF, name="State DMR Net", mode="DMR", freq_mhz=443.5, access="TG 3149 TS2 CC1")
+    p25 = dict(VHF, name="County P25 Net", mode="P25", freq_mhz=444.0)
+    sent = []
+    st, f = _finder(tmp_path, [VHF, dstar, ysf, dmr, p25], seen=sent)
+    st.radios["ic"]["gate"] = "voice"
+    assert "D-STAR" in NF.reach(st)["modes"] and "DMR" not in NF.reach(st)["modes"]
+    s = f.search()
+    got = {n["name"]: n for n in s["nets"]}
+    assert set(got) == {"Springfield ARES Net", "Springfield D-STAR Net"}
+    d = got["Springfield D-STAR Net"]
+    assert d["mode"] == "D-STAR" and d["access"] == "REF030 C" and got["Springfield ARES Net"]["access"] is None
+    why = " | ".join(str(x) for x in s["left_out"])
+    assert "Fusion (C4FM), which no radio here decodes" in why and "DMR, which no radio here decodes" in why
+    ask = sent[0]["input"][0]["content"]
+    assert "A radio here decodes D-STAR" in ask and "FM USB LSB AM CW DIG D-STAR (skip Fusion, DMR" in ask
+    f.add([d["id"]])                                               # the reflector goes with the net
+    assert [n.get("access") for n in st.cfg["schedule"] if n["mode"] == "D-STAR"] == ["REF030 C"]
+    st.radios["ic"]["model"] = "any"                               # "Other" is not checked: no digital voice asked
+    assert not set(NF.reach(st)["modes"]) & set(NF.fit.DV_MODES)
+    st.radios["ic"] |= {"model": "dmr", "gate": "carrier"}         # a data jack carries DMR undecoded
+    assert "DMR" not in NF.reach(st)["modes"]
+    st.radios["ic"]["gate"] = "voice"
+    assert "DMR" in NF.reach(st)["modes"]

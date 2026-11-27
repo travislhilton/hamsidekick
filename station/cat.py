@@ -42,9 +42,9 @@ ALLOWED = {(0x03,): "read frequency", (0x04,): "read mode", (0x05,): "set freque
            (0x16, 0x43): "tone squelch on/off", (0x1B, 0x00): "set repeater tone", (0x1A, 0x06): "data mode",
            (0x15, 0x02): "read S-meter"}         # the HF scan (station/scan.py): receive only
 
-MODE_CODE = {"LSB": 0x00, "USB": 0x01, "AM": 0x02, "CW": 0x03, "FM": 0x05}
+MODE_CODE = {"LSB": 0x00, "USB": 0x01, "AM": 0x02, "CW": 0x03, "FM": 0x05, "D-STAR": 0x17}
 CODE_MODE = {0x00: "LSB", 0x01: "USB", 0x02: "AM", 0x03: "CW", 0x04: "DIG", 0x05: "FM", 0x07: "CW", 0x08: "DIG",
-             0x17: "DIG"}      # 04 RTTY, 07 CW-R, 08 RTTY-R, 17 D-STAR DV
+             0x17: "D-STAR"}   # 04 RTTY, 07 CW-R, 08 RTTY-R, 17 DV (D-STAR voice: the radio decodes it)
 COVERAGE = {"IC-705": ((0.03, 199.999999), (400.0, 470.0))}
 
 

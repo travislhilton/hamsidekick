@@ -139,3 +139,17 @@ def test_a_virtual_com_port_only_in_the_registry_is_offered(monkeypatch):
 def test_fresh_outputs_reads_a_new_list_in_a_child_process():
     from station.ptt import fresh_outputs
     assert isinstance(fresh_outputs(), list)                # [] on a machine with no audio outputs, never None
+
+
+def test_the_radio_type_is_chosen_on_the_dashboard_and_station_yamls_stays_until_then(tmp_path):
+    out = radios.clean([{"name": "D74", "device": "USB Audio", "gate": "voice", "model": "dstar", "mode": "d-star"},
+                        {"name": "HT", "device": "Digirig", "gate": "voice"}])
+    assert out[0]["model"] == "dstar" and out[0]["mode"] == "D-STAR" and "model" not in out[1]
+    with pytest.raises(ValueError, match="radio type"):
+        radios.clean([{"name": "A", "device": "x", "model": "walkie"}])
+    base = [{"id": "ic", "name": "IC", "device": "IC-705", "gate": "voice", "model": "hf"}]
+    radios.save(tmp_path / "radios.json", [{"id": "ic", "name": "IC", "device": "IC-705", "gate": "voice", "mode": "FM"}])
+    assert radios.load(tmp_path / "radios.json", base)[0]["model"] == "hf"
+    radios.save(tmp_path / "radios.json", [{"id": "ic", "name": "IC", "device": "IC-705", "gate": "voice",
+                                            "mode": "FM", "model": "ic705"}])
+    assert radios.load(tmp_path / "radios.json", base)[0]["model"] == "ic705"

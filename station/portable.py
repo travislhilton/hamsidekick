@@ -29,7 +29,7 @@ from . import schedule as sched
 SCHEMA = "hamsidekick-settings/1"
 SIDEKICK_PLAIN = ("license_class", "model", "deep_model", "compare", "voice", "speed")
 SIDEKICK_IDENTITY = ("name", "checkin", "operator", "station", "region")
-NET_KEYS = ("name", "freq_mhz", "mode", "start", "duration_min", "ncs", "repeat", "exceptions", "alert_min",
+NET_KEYS = ("access", "name", "freq_mhz", "mode", "start", "duration_min", "ncs", "repeat", "exceptions", "alert_min",
             "emergency", "offset_mhz", "tone_hz", "reach_km", "checkins")
 
 

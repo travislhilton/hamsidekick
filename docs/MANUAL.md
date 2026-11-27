@@ -518,6 +518,11 @@ from radio** (keep a copy of that image), **File → Import** → the CSV → **
   Niner…"; a frequency's digits, "point niner four"; a clock time, "zero niner zero five"; a signal report, "five
   niner") the 9 is **Niner**; Einstein is told the same. Counts stay words ("nineteen", "ninety"). A call heard with
   "Nine" is still recognised, and still counts as an ID.
+- **Digital voice nets (D-STAR, Fusion, DMR)** (owner 2026-11-27): the radio decodes the voice; the station records
+  the speech it plays. Set each radio's **Radio type** in Radios… (IC-705 = D-STAR; D-STAR, Fusion or DMR handheld or
+  mobile). Take its audio from the speaker / earphone jack or USB audio, never a data jack. Find nets then also looks
+  for nets in those modes; a net's **On the radio** line (REF030 C, DG-ID 00, TG 3100 TS2 CC1) is what you set by hand:
+  the station tunes a frequency (IC-705 with CAT) but cannot link a reflector or pick a talkgroup.
 - **Find nets around the world** (owner 2026-11-14): in Nets → Find nets, **What you can hear around the world today**
   lists, for your antenna, height, power and today's solar flux, each part of the world (Japan, China, Russia,
   Europe, South America, Antarctica, the Pacific…) with the bands and the hours (your time) you hear it at least 60%

@@ -44,6 +44,8 @@ def test_validate_normalizes_and_refuses():
                  "start": "07:05", "duration_min": 90, "ncs": "K7ABC"}
     ok = {"name": "n", "radio": "ftm", "days": ["Tue"], "start": "20:00", "duration_min": 60}
     assert "freq_mhz" not in validate(ok, radios)                         # optional: the radio's own frequency
+    dv = validate(ok | {"mode": "dmr", "freq_mhz": 443.5, "access": " TG 3149 <b>TS2</b> CC1 "}, radios)   # digital voice
+    assert dv["mode"] == "DMR" and dv["access"] == "TG 3149  b TS2 /b  CC1" and "access" not in validate(ok, radios)
     for bad in ({"radio": "nope"}, {"start": "24:00"}, {"start": "8pm"}, {"start": "20:61"}, {"days": ["Tuz"]},
                 {"days": []}, {"duration_min": 0}, {"duration_min": 1441}, {"duration_min": "x"},
                 {"freq_mhz": 99999}, {"freq_mhz": "abc"}, {"mode": "SSB"}, {"ncs": "not a call"}, {"name": ""}):
