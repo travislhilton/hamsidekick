@@ -471,3 +471,27 @@ def test_the_asking_station_tells_an_ai_station_its_grid_square(tmp_path):
     d = m.chan.load()
     m.chan._learn_ai(d, "K7ABC-14", ["+AI", "+OF=K7ABC"])
     assert sent == ["LOC EN50WC"] and m.chan.view()["share_loc"] is False
+
+
+def test_a_link_found_up_after_a_restart_is_let_go_when_it_stays_quiet(tmp_path):
+    """2026-11-27: both stations were reinstalled while linked. VARA kept the link through the restart, neither
+    program remembered opening it, and it stayed up for good. A link nobody here saw start is let go after
+    ORPHAN_S with nothing moving; a link that started while we watched is still the caller's to close."""
+    st, m, v, clk = _chan(tmp_path)
+    v.st.update(session="connected", peer="K7ABC", peer_proto="HSK1")      # already up: no "connected" event
+    m.chan.tick()
+    clk.t += 60
+    m.chan.tick()
+    assert ("disconnect",) not in v.calls                                  # not yet
+    m._event("chat", {"seq": 1, "text": "still here", "peer": "K7ABC"})    # something moved: the quiet starts again
+    clk.t += 60
+    m.chan.tick()
+    assert ("disconnect",) not in v.calls
+    clk.t += 40
+    m.chan.tick()
+    assert v.calls[-1] == ("disconnect",)
+    _drop(m, v)
+    _link(m, v, "K7ABC")                                                   # they call us, and we see it start
+    clk.t += 600
+    m.chan.tick()
+    assert v.calls.count(("disconnect",)) == 1                             # their link: they close it

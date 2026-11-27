@@ -35,6 +35,8 @@ EVERY = {"fm": 10, "hf": 15}       # minutes between keep-alives
 MIN_EVERY, MAX_EVERY = 5, 60
 GRACE_S = 180                      # a keep-alive may be late by this much before the station greys out
 LINGER_S = {"fm": 20, "hf": 40}    # a link we opened closes after this long with nothing to send
+ORPHAN_S = 90                      # a link found already up when the station started (it restarted under the link, so
+                                   # neither end remembers opening it): let go after this long with nothing moving
 MIN_QUIET_S = 5                    # with others waiting, a link is let go after this long with nothing moving
 CONNECT_TIMEOUT_S = 150
 TRIES = 3
@@ -126,6 +128,7 @@ class Channel:
         self.opened = None             # the station we linked to (we close that link when it goes quiet)
         self.connect_at = None
         self.activity_at = 0.0
+        self.orphan_at = None          # when a link nobody here saw start was first noticed
         self.seq_map: dict[tuple, str] = {}      # (peer, "chat"|"file", seq) -> message id
         self.backoff: dict[str, float] = {}
         self.linked = False
@@ -562,6 +565,7 @@ class Channel:
                         if it.get("by") == "einstein" and it["status"] in ("queued", "sending"):
                             it["status"] = "held"
                 self.opened, self.connect_at, self.linked, self.local = None, None, False, None
+                self.orphan_at = None
                 if d.get("pinned") == gone:
                     d["pinned"] = None
             else:
@@ -630,8 +634,13 @@ class Channel:
                 idle = quiet >= LINGER_S.get(s.get("kind") or "fm", 20) or (others and quiet >= MIN_QUIET_S)
                 if self._ai_owes(d, peer, now):
                     idle = False                                 # an AI station is still working on our question
-                if (self.opened == peer and d.get("pinned") != peer and not waiting and not unconfirmed
-                        and not s.get("sending") and not s.get("buffer") and idle):
+                # A link that was already up when this program started: VARA kept it through the restart, and the
+                # opener forgot it was theirs, so it stayed up for good (2026-11-27, both ends reinstalled mid-link).
+                self.orphan_at = (self.orphan_at or now) if not self.linked else None
+                orphan = (self.orphan_at is not None and now - self.orphan_at >= ORPHAN_S and quiet >= ORPHAN_S
+                          and not s.get("receiving"))
+                if ((self.opened == peer and idle or orphan) and d.get("pinned") != peer and not waiting
+                        and not unconfirmed and not s.get("sending") and not s.get("buffer")):
                     try:
                         v.disconnect()                           # quiet: let the frequency go
                     except Exception:  # noqa: BLE001
